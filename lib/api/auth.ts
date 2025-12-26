@@ -1,6 +1,6 @@
-import type { AuthCredentials, AuthResponse, Company } from "@/lib/types"
+import type { AuthCredentials, AuthResponse, Company } from "../auth/types"
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || ""
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://internal.prosessed.com"
 
 export async function getCompaniesByEmail(email: string): Promise<Company[]> {
   try {

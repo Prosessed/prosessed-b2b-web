@@ -3,19 +3,6 @@ export interface Company {
   company_url: string
 }
 
-export interface AuthUser {
-  sid: string
-  apiKey: string
-  apiSecret: string
-  username: string
-  email: string
-  customerId: string
-  fullName: string
-  defaultWarehouse?: string
-  defaultPaymentTerm?: string
-  defaultCurrency?: string
-}
-
 export interface LoginResponse {
   message: {
     success_key: number
@@ -39,3 +26,27 @@ export interface LoginResponse {
   home_page: string
   full_name: string
 }
+
+export interface AuthUser {
+  email: string
+  fullName: string
+  username: string
+  apiKey: string
+  apiSecret: string
+  sid: string
+  customerId: string
+  isCustomer: boolean
+  defaultWarehouse: string
+  defaultPaymentTerm: string
+  defaultCurrency: string
+  companyUrl: string
+  disablePriceEdit: boolean
+  disableDiscountApply: boolean
+}
+
+export interface AuthCredentials {
+  usr: string
+  pwd: string
+}
+
+export type AuthResponse = LoginResponse
