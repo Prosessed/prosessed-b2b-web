@@ -1,6 +1,7 @@
 import type { Company, LoginResponse } from "../auth/types" // Assuming these types are declared in a separate file
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://internal.prosessed.com"
+const COMPANY_FETCH_BASE_URL = "https://internal.prosessed.com"
 
 export class ApiError extends Error {
   constructor(
@@ -19,7 +20,7 @@ export const apiClient = {
       filters: `[["email_id", "=", "${email}"]]`,
     })
 
-    const response = await fetch(`${BASE_URL}/api/resource/All User Master?${params}`, {
+    const response = await fetch(`${COMPANY_FETCH_BASE_URL}/api/resource/All User Master?${params}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
