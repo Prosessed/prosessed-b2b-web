@@ -60,7 +60,7 @@ export default function LoginPage() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[120px]" />
       </div>
 
-      <header className="relative z-10 container mx-auto px-4 h-20 flex items-center justify-between">
+      {/* <header className="relative z-10 container mx-auto px-4 h-20 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xl font-bold">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             P
@@ -81,7 +81,7 @@ export default function LoginPage() {
             Contact
           </Button>
         </div>
-      </header>
+      </header> */}
 
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-12 text-center">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8">
