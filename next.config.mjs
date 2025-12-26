@@ -9,7 +9,7 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // Apply CORS headers to all routes
+        // Applying CORS headers to all routes
         source: '/:path*',
         headers: [
           {
