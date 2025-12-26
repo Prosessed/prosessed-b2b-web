@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,23 +7,28 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import {
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  Building,
-  CreditCard,
-  Package,
-  Heart,
-  Bell,
-  Shield,
-  Edit,
-  Camera,
-} from "lucide-react"
+import { User, Mail, MapPin, Building, CreditCard, Package, Heart, Bell, Shield, Edit, Camera } from "lucide-react"
+import { useAuth } from "@/lib/auth/context"
+import { useRouter } from "next/navigation"
 
 export default function AccountPage() {
+  const { user, isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login")
+    }
+  }, [isLoading, isAuthenticated, router])
+
+  if (isLoading || !user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Building className="h-8 w-8 animate-pulse text-primary" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -35,7 +40,12 @@ export default function AccountPage() {
               <div className="relative">
                 <Avatar className="h-32 w-32 border-4 border-primary/20">
                   <AvatarImage src="/placeholder.svg?height=128&width=128" alt="Profile" />
-                  <AvatarFallback className="text-3xl bg-primary/10 text-primary">JD</AvatarFallback>
+                  <AvatarFallback className="text-3xl bg-primary/10 text-primary">
+                    {user.fullName
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
+                  </AvatarFallback>
                 </Avatar>
                 <Button
                   size="icon"
@@ -46,22 +56,22 @@ export default function AccountPage() {
               </div>
               <div className="flex-1 text-center md:text-left">
                 <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
-                  <h1 className="text-3xl font-bold">John Doe</h1>
-                  <Badge className="bg-primary/10 text-primary border-primary/20">Premium Member</Badge>
+                  <h1 className="text-3xl font-bold">{user.fullName}</h1>
+                  {user.isCustomer && <Badge className="bg-primary/10 text-primary border-primary/20">Customer</Badge>}
                 </div>
-                <p className="text-muted-foreground mb-4">Member since January 2024</p>
+                <p className="text-muted-foreground mb-4">Member ID: {user.customerId}</p>
                 <div className="flex flex-wrap gap-4 justify-center md:justify-start text-sm">
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>john.doe@example.com</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>+1 (555) 123-4567</span>
+                    <span>{user.email}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Building className="h-4 w-4 text-muted-foreground" />
-                    <span>ABC Restaurant Supply</span>
+                    <span>{user.username}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-primary font-medium">
+                    <Building className="h-4 w-4" />
+                    <span>{user.defaultWarehouse}</span>
                   </div>
                 </div>
               </div>
@@ -131,28 +141,24 @@ export default function AccountPage() {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" defaultValue="John" disabled={!isEditing} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" defaultValue="Doe" disabled={!isEditing} />
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <Input id="fullName" defaultValue={user.fullName} disabled={!isEditing} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" defaultValue="john.doe@example.com" disabled={!isEditing} />
+                    <Input id="email" type="email" defaultValue={user.email} disabled />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input id="phone" type="tel" defaultValue="+1 (555) 123-4567" disabled={!isEditing} />
+                    <Label htmlFor="warehouse">Default Warehouse</Label>
+                    <Input id="warehouse" defaultValue={user.defaultWarehouse} disabled />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="company">Company Name</Label>
-                    <Input id="company" defaultValue="ABC Restaurant Supply" disabled={!isEditing} />
+                    <Label htmlFor="currency">Currency</Label>
+                    <Input id="currency" defaultValue={user.defaultCurrency} disabled />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="taxId">Tax ID / GST Number</Label>
-                    <Input id="taxId" defaultValue="12-3456789" disabled={!isEditing} />
+                    <Label htmlFor="paymentTerm">Default Payment Term</Label>
+                    <Input id="paymentTerm" defaultValue={user.defaultPaymentTerm} disabled />
                   </div>
                 </div>
                 {isEditing && (

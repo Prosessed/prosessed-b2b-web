@@ -13,8 +13,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect } from "react"
+import { useAuth } from "@/lib/auth/context"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 export function Navigation() {
+  const { user, logout, isAuthenticated } = useAuth()
   const [isDark, setIsDark] = useState(false)
   const [cartCount, setCartCount] = useState(3)
 
@@ -106,24 +109,49 @@ export function Navigation() {
               size="icon"
               className="text-foreground hover:bg-accent hover:text-accent-foreground border border-border hover:border-primary/50"
             >
-              <User className="h-5 w-5" />
+              {isAuthenticated && user ? (
+                <Avatar className="h-7 w-7">
+                  <AvatarFallback className="bg-primary/10 text-primary text-[10px]">
+                    {user.fullName
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <User className="h-5 w-5" />
+              )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem asChild>
-              <Link href="/login">Login</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/account">My Account</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/orders">My Orders</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/quotes">My Quotes</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>Logout</DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-56">
+            {isAuthenticated && user ? (
+              <>
+                <div className="flex items-center justify-start gap-2 p-2">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user.fullName}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                  </div>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/account">My Account</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/orders">My Orders</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/quotes">My Quotes</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                  Logout
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <DropdownMenuItem asChild>
+                <Link href="/login">Login</Link>
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
