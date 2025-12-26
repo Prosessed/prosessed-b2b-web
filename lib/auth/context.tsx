@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { authStorage } from "./storage"
 import type { AuthUser } from "./types"
+import { setApiBaseUrl } from "../api/client"
 
 interface AuthContextType {
   user: AuthUser | null
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = authStorage.getUser()
     if (storedUser) {
       if (authStorage.isSessionValid(storedUser.apiSecret)) {
+        setApiBaseUrl(storedUser.companyUrl)
         setUser(storedUser)
       } else {
         authStorage.removeUser()
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = (userData: AuthUser) => {
+    setApiBaseUrl(userData.companyUrl)
     setUser(userData)
     authStorage.setUser(userData)
     authStorage.setSession(userData.apiSecret)

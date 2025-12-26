@@ -4,10 +4,8 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, ArrowRight, Mail } from "lucide-react"
 import { apiClient, ApiError } from "@/lib/api/client"
@@ -56,16 +54,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-background via-background to-primary/5">
-      <Card className="w-full max-w-md border-border/50 shadow-xl">
-        <CardHeader className="space-y-2 text-center pb-8">
-          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xl font-bold">
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-[#000000]">
+      <Card className="w-full max-w-md border-none bg-transparent shadow-none">
+        <CardHeader className="space-y-4 text-center pb-12">
+          <div className="mx-auto w-16 h-16 bg-[#000000] border border-[#1a1a1a] rounded-full flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 bg-[#008000] rounded-full flex items-center justify-center text-white text-xl font-bold">
               P
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
-          <CardDescription className="text-base">
+          <CardTitle className="text-4xl font-bold text-white tracking-tight">Welcome Back</CardTitle>
+          <CardDescription className="text-[#808080] text-lg font-medium">
             {step === "email" ? "Enter your email to get started" : "Select your company"}
           </CardDescription>
         </CardHeader>
@@ -74,18 +72,15 @@ export default function LoginPage() {
           <form onSubmit={handleEmailSubmit}>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-base">
-                  Email Address
-                </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#808080]" />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="you@company.com"
+                    placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-12 text-base"
+                    className="pl-10 h-14 bg-[#111111] border-[#222222] text-white text-lg placeholder:text-[#444444] focus:ring-0 focus:border-[#008000] transition-colors"
                     required
                     disabled={isLoading}
                   />
@@ -93,16 +88,20 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg">
+                <div className="p-4 text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl">
                   {error}
                 </div>
               )}
 
-              <Button type="submit" className="w-full h-12 text-base" size="lg" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full h-14 bg-[#008000] hover:bg-[#006400] text-white text-lg font-semibold rounded-xl transition-all"
+                disabled={isLoading}
+              >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Loading...
+                    Checking...
                   </>
                 ) : (
                   <>
@@ -111,13 +110,6 @@ export default function LoginPage() {
                   </>
                 )}
               </Button>
-
-              <p className="text-sm text-center text-muted-foreground pt-4">
-                New to prosessed.ai?{" "}
-                <Link href="/contact" className="text-primary hover:underline font-medium">
-                  Contact Sales
-                </Link>
-              </p>
             </CardContent>
           </form>
         ) : (
@@ -127,17 +119,19 @@ export default function LoginPage() {
                 <button
                   key={idx}
                   onClick={() => handleCompanySelect(company)}
-                  className="w-full p-4 text-left border border-border/50 rounded-lg hover:border-primary hover:bg-primary/5 transition-all group"
+                  className="w-full p-6 text-left bg-[#111111] border border-[#222222] rounded-2xl hover:border-[#008000]/50 hover:bg-[#1a1a1a] transition-all group"
                   disabled={isLoading}
                 >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-base group-hover:text-primary transition-colors">
+                    <div className="space-y-1">
+                      <div className="font-semibold text-lg text-white group-hover:text-[#008000] transition-colors">
                         {company.company_name}
                       </div>
-                      <div className="text-sm text-muted-foreground mt-1">{company.company_url}</div>
+                      <div className="text-sm text-[#808080] font-mono opacity-80">
+                        {company.company_url.replace(/\/$/, "")}
+                      </div>
                     </div>
-                    <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="h-6 w-6 text-[#444444] group-hover:text-[#008000] group-hover:translate-x-1 transition-all" />
                   </div>
                 </button>
               ))}
@@ -145,7 +139,7 @@ export default function LoginPage() {
 
             <Button
               variant="ghost"
-              className="w-full mt-6"
+              className="w-full mt-8 text-[#808080] hover:text-white hover:bg-transparent text-base font-medium"
               onClick={() => {
                 setStep("email")
                 setCompanies([])

@@ -4,6 +4,20 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://internal.prose
 const COMPANY_FETCH_BASE_URL = "https://internal.prosessed.com"
 const FRAPPE_API_TOKEN = "f53b798f9a6d54f:f863ed6ae78da94"
 
+let currentBaseUrl = ""
+
+export const setApiBaseUrl = (url: string) => {
+  // Clean URL to match requirements: up to .com (no trailing slashes or paths)
+  try {
+    const parsed = new URL(url)
+    currentBaseUrl = `${parsed.protocol}//${parsed.host}`
+  } catch (e) {
+    currentBaseUrl = url.replace(/\/$/, "")
+  }
+}
+
+export const getApiBaseUrl = () => currentBaseUrl || process.env.NEXT_PUBLIC_API_BASE_URL || ""
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -43,7 +57,10 @@ export const apiClient = {
   },
 
   async login(email: string, password: string, companyUrl: string): Promise<LoginResponse> {
-    const response = await fetch(`${companyUrl}/api/method/prosessed_orderit.api.login`, {
+    setApiBaseUrl(companyUrl)
+    const baseUrl = getApiBaseUrl()
+
+    const response = await fetch(`${baseUrl}/api/method/prosessed_orderit.api.login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -65,5 +82,22 @@ export const apiClient = {
     }
 
     return data
+  },
+
+  async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const baseUrl = getApiBaseUrl()
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+
+    if (!response.ok) {
+      throw new ApiError(response.status, `API request failed: ${response.statusText}`)
+    }
+
+    return response.json()
   },
 }
