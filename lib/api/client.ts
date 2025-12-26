@@ -2,6 +2,7 @@ import type { Company, LoginResponse } from "../auth/types" // Assuming these ty
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://internal.prosessed.com"
 const COMPANY_FETCH_BASE_URL = "https://internal.prosessed.com"
+const FRAPPE_API_TOKEN = "f53b798f9a6d54f:f863ed6ae78da94"
 
 export class ApiError extends Error {
   constructor(
@@ -24,6 +25,7 @@ export const apiClient = {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `token ${FRAPPE_API_TOKEN}`,
       },
     })
 
