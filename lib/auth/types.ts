@@ -31,6 +31,7 @@ export interface AuthUser {
   email: string
   fullName: string
   username: string
+  companyName: string
   apiKey: string
   apiSecret: string
   sid: string

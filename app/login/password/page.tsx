@@ -49,6 +49,7 @@ export default function PasswordPage() {
         email: response.message.email,
         fullName: response.full_name,
         username: response.message.username,
+        companyName: company.company_name,
         apiKey: response.message.api_key,
         apiSecret: response.message.api_secret,
         sid: response.message.sid,

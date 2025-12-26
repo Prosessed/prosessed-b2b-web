@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Search, ShoppingCart, MapPin, User, Moon, Sun } from "lucide-react"
+import { Search, ShoppingCart, User, Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -40,14 +40,15 @@ export function Navigation() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             P
           </div>
-          <span className="hidden sm:inline">prosessed.ai</span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-sm font-bold">prosessed.ai</span>
+            {isAuthenticated && user && (
+              <span className="text-[10px] text-primary font-medium tracking-tight uppercase truncate max-w-[120px]">
+                {user.companyName || user.companyUrl.replace(/https?:\/\//, "").split(".")[0]}
+              </span>
+            )}
+          </div>
         </Link>
-
-        {/* Location indicator */}
-        <div className="hidden items-center gap-1 text-sm text-muted-foreground lg:flex">
-          <MapPin className="h-4 w-4" />
-          <span>San Francisco, CA</span>
-        </div>
 
         {/* Search bar */}
         <div className="relative flex-1 max-w-2xl mx-auto">
