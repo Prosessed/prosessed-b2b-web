@@ -1,5 +1,4 @@
 import { Apple, Coffee, Milk, Wheat, Package, Fish } from "lucide-react"
-import { ProductModel } from "@/lib/models/product"
 import { AnimatedBanner } from "@/components/animated-banner"
 import { StickyDealCards } from "@/components/sticky-deal-cards"
 import { CategoryGrid } from "@/components/category-grid"
@@ -58,48 +57,27 @@ const heroBanners = [
   },
 ]
 
-export default async function HomePage() {
-  const allProducts = await ProductModel.getAll()
-
-  const dairyProducts = allProducts.slice(0, 6).map((p, i) => ({
-    ...p,
-    deliveryTime: "8 MINS",
-    originalPrice: i % 2 === 0 ? p.price + 5 : undefined,
-  }))
-
-  const snacksProducts = allProducts.slice(6, 12).map((p, i) => ({
-    ...p,
-    deliveryTime: "8 MINS",
-    originalPrice: i % 3 === 0 ? p.price + 3 : undefined,
-  }))
-
-  const beveragesProducts = allProducts.slice(12, 18).map((p, i) => ({
-    ...p,
-    deliveryTime: "8 MINS",
-    originalPrice: i % 2 === 1 ? p.price + 4 : undefined,
-  }))
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background/50">
       <AnimatedBanner items={bannerItems} />
 
       <div className="container mx-auto px-4 py-6">
         <HeroCarousel banners={heroBanners} />
       </div>
 
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 pb-12">
         <StickyDealCards />
-
         <CategoryGrid />
 
-        <ProductRow title="Dairy, Bread & Eggs" products={dairyProducts} categoryHref="/products?category=dairy" />
+        <ProductRow title="Dairy, Bread & Eggs" itemGroup="Dairy & Bakery" categoryHref="/products?category=dairy" />
 
-        <ProductRow title="Snacks & Munchies" products={snacksProducts} categoryHref="/products?category=snacks" />
+        <ProductRow title="Snacks & Munchies" itemGroup="Snacks & Munchies" categoryHref="/products?category=snacks" />
 
         <ProductRow
-          title="Cold Drinks & Juices"
-          products={beveragesProducts}
-          categoryHref="/products?category=beverages"
+          title="Fresh Fruits & Vegetables"
+          itemGroup="Fruits & Vegetables"
+          categoryHref="/products?category=fruits"
         />
       </div>
 

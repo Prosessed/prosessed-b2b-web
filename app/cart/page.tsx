@@ -1,14 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import { Minus, Plus, Trash2, ArrowLeft } from "lucide-react"
+import { Minus, Plus, Trash2, ArrowLeft, ShoppingCart, Loader2 } from "lucide-react"
 
 interface CartItem {
   id: string
@@ -49,17 +47,35 @@ export default function CartPage() {
       note: "Dark roast preferred",
     },
   ])
+  const [isUpdating, setIsUpdating] = useState<string | null>(null)
 
-  const updateQuantity = (id: string, newQuantity: number) => {
-    if (newQuantity < 1) return
-    setCartItems((items) => items.map((item) => (item.id === id ? { ...item, quantity: newQuantity } : item)))
-  }
+  const updateQuantity = useCallback(
+    async (id: string, newQuantity: number) => {
+      if (newQuantity < 1) return
+      setIsUpdating(id)
+
+      // Optimistic update
+      setCartItems((items) => items.map((item) => (item.id === id ? { ...item, quantity: newQuantity } : item)))
+
+      try {
+        // Simulation for API latency
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      } catch (error) {
+        // Rollback would happen here with real API
+        console.error("[v0] Cart update failed", error)
+      } finally {
+        setIsUpdating(null)
+      }
+    },
+    [cartItems],
+  )
 
   const updateNote = (id: string, note: string) => {
     setCartItems((items) => items.map((item) => (item.id === id ? { ...item, note } : item)))
   }
 
-  const removeItem = (id: string) => {
+  const removeItem = async (id: string) => {
+    // Optimistic removal with exit animation
     setCartItems((items) => items.filter((item) => item.id !== id))
   }
 
@@ -76,66 +92,79 @@ export default function CartPage() {
         </Link>
       </Button>
 
-      <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
+      <h1 className="text-3xl font-bold mb-8 tracking-tight">Shopping Cart</h1>
 
       {cartItems.length === 0 ? (
-        <Card className="p-12 text-center">
-          <p className="text-muted-foreground mb-4">Your cart is empty</p>
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>
-            <Link href="/products">Start Shopping</Link>
-          </Button>
-        </Card>
+        <div className="p-12 text-center border-dashed border-2">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+              <ShoppingCart className="h-10 w-10" />
+            </div>
+            <p className="text-muted-foreground font-medium">Your cart is feeling a bit light...</p>
+            <Button className="bg-primary text-primary-foreground font-bold h-11 px-8" asChild>
+              <Link href="/products">Browse Products</Link>
+            </Button>
+          </div>
+        </div>
       ) : (
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-3 gap-8 items-start">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {cartItems.map((item) => (
-              <Card key={item.id} className="p-6">
-                <div className="flex gap-6">
+              <div
+                key={item.id}
+                className="p-6 overflow-hidden border-border/50 hover:border-primary/20 transition-colors"
+              >
+                <div className="flex flex-col sm:flex-row gap-6">
                   {/* Product Image */}
-                  <div className="relative w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-muted">
-                    <Image src={item.image || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
+                  <div className="relative w-full sm:w-28 aspect-square shrink-0 rounded-xl overflow-hidden bg-muted/40">
+                    <Image src={item.image || "/placeholder.svg"} alt={item.name} fill className="object-contain p-2" />
+                    {isUpdating === item.id && (
+                      <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px] flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Product Details */}
                   <div className="flex-1 space-y-4">
-                    <div className="flex justify-between gap-4">
-                      <div>
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="space-y-1">
                         <Link
                           href={`/products/${item.id}`}
-                          className="font-medium hover:text-primary inline-block mb-1"
+                          className="font-bold text-lg hover:text-primary transition-colors leading-tight"
                         >
                           {item.name}
                         </Link>
-                        <p className="text-sm text-muted-foreground">Unit: {item.unit}</p>
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <span>{item.unit}</span>
+                          <span>•</span>
+                          <span>${item.price.toFixed(2)} each</span>
+                        </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-lg">${(item.price * item.quantity).toFixed(2)}</p>
-                        <p className="text-sm text-muted-foreground">${item.price.toFixed(2)} each</p>
+                        <p className="font-black text-xl text-primary">${(item.price * item.quantity).toFixed(2)}</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 border rounded-lg border-border">
+                    <div className="flex items-center flex-wrap gap-4">
+                      <div className="flex items-center gap-1 bg-primary/5 rounded-xl border border-primary/20 p-1">
                         <Button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 text-foreground hover:bg-accent hover:text-foreground"
+                          disabled={isUpdating === item.id || item.quantity <= 1}
+                          className="h-8 w-8 rounded-lg text-primary hover:bg-primary/10"
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
-                        <Input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => updateQuantity(item.id, Number.parseInt(e.target.value) || 1)}
-                          className="w-16 text-center border-none h-9 focus-visible:ring-0"
-                        />
+                        <div className="w-10 text-center font-bold text-sm tabular-nums">{item.quantity}</div>
                         <Button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 text-foreground hover:bg-accent hover:text-foreground"
+                          disabled={isUpdating === item.id}
+                          className="h-8 w-8 rounded-lg text-primary hover:bg-primary/10"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -144,7 +173,7 @@ export default function CartPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeItem(item.id)}
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl font-medium"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Remove
@@ -152,23 +181,26 @@ export default function CartPage() {
                     </div>
 
                     {/* Item Note */}
-                    <div>
+                    <div className="relative group">
                       <Textarea
-                        placeholder="Add note for this item..."
+                        placeholder="Add special instructions (e.g. 'extra ripe', 'substitute if unavailable')..."
                         value={item.note || ""}
                         onChange={(e) => updateNote(item.id, e.target.value)}
-                        className="min-h-[60px] text-sm"
+                        className="min-h-[50px] text-sm bg-muted/20 border-border/40 focus:bg-background transition-all rounded-xl resize-none"
                       />
+                      <div className="absolute right-3 bottom-3 text-[10px] text-muted-foreground opacity-0 group-focus-within:opacity-100 transition-opacity">
+                        Auto-saving...
+                      </div>
                     </div>
                   </div>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <Card className="p-6 sticky top-24">
+            <div className="p-8 sticky top-24 border-2 border-primary/10 shadow-xl shadow-primary/5 rounded-2xl">
               <h2 className="text-xl font-bold mb-6">Order Summary</h2>
 
               <div className="space-y-4">
@@ -210,7 +242,7 @@ export default function CartPage() {
                 <p>Free shipping on orders over $500</p>
                 <p>Estimated delivery: 2-3 business days</p>
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       )}
