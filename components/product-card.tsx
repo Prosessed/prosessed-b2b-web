@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, Minus, Loader2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useCartContext } from "@/lib/cart/context"
+import { useAuth } from "@/lib/auth/context"
 
 interface ProductCardProps {
   id: string
@@ -14,34 +16,64 @@ interface ProductCardProps {
   image: string
   unit?: string
   stock?: number
+  rate?: number
 }
 
-export function ProductCard({ id, name, price, image, unit = "kg", stock }: ProductCardProps) {
-  const [quantity, setQuantity] = useState(0)
+export function ProductCard({ id, name, price, image, unit = "kg", stock, rate }: ProductCardProps) {
+  const { cart, addItem, updateItem, removeItem, isLoading: cartLoading } = useCartContext()
+  const { user } = useAuth()
   const [isMutating, setIsMutating] = useState(false)
 
-  const handleUpdateQuantity = useCallback(
-    async (newQty: number) => {
-      const prevQty = quantity
-      setQuantity(newQty) // Optimistic update
-      setIsMutating(true)
+  const cartItem = cart?.items?.find((item) => item.item_code === id)
+  const quantity = cartItem?.qty || 0
 
-      try {
-        // API call would go here
-        await new Promise((resolve) => setTimeout(resolve, 600)) // Simulation
-        setIsMutating(false)
-      } catch (error) {
-        setQuantity(prevQty) // Rollback on failure
-        setIsMutating(false)
-        // Toast error here
+  const handleAdd = useCallback(async () => {
+    if (!user) return
+    setIsMutating(true)
+    try {
+      await addItem({
+        item_code: id,
+        qty: 1,
+        rate: rate ?? (price || 0),
+        warehouse: user.defaultWarehouse,
+        uom: unit,
+      })
+      // Small delay to ensure UI updates smoothly
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    } catch (error) {
+      console.error("Failed to add item:", error)
+    } finally {
+      setIsMutating(false)
+    }
+  }, [id, price, rate, unit, user, addItem])
+
+  const increment = useCallback(async () => {
+    if (!user || !cartItem) return
+    setIsMutating(true)
+    try {
+      await updateItem(cartItem.name, { qty: quantity + 1 })
+    } catch (error) {
+      console.error("Failed to update item:", error)
+    } finally {
+      setIsMutating(false)
+    }
+  }, [cartItem, quantity, updateItem, user])
+
+  const decrement = useCallback(async () => {
+    if (!cartItem) return
+    setIsMutating(true)
+    try {
+      if (quantity <= 1) {
+        await removeItem(cartItem.name)
+      } else {
+        await updateItem(cartItem.name, { qty: quantity - 1 })
       }
-    },
-    [quantity],
-  )
-
-  const handleAdd = () => handleUpdateQuantity(1)
-  const increment = () => handleUpdateQuantity(quantity + 1)
-  const decrement = () => handleUpdateQuantity(Math.max(0, quantity - 1))
+    } catch (error) {
+      console.error("Failed to update item:", error)
+    } finally {
+      setIsMutating(false)
+    }
+  }, [cartItem, quantity, updateItem, removeItem])
 
   return (
     <motion.div
@@ -67,7 +99,7 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock }: Prod
           </Link>
           <div className="flex items-center justify-between mt-2">
             <div>
-              <p className="text-lg font-bold text-foreground">${price.toFixed(2)}</p>
+              <p className="text-lg font-bold text-foreground">${(price || 0).toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">per {unit}</p>
             </div>
 

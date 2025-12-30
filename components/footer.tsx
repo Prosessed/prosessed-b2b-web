@@ -12,21 +12,6 @@ export function Footer() {
             <h3 className="font-bold mb-4">Useful Links</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
-                  About
-                </Link>
-              </li>
-              <li>
-                <Link href="/careers" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Careers
-                </Link>
-              </li>
-              <li>
-                <Link href="/blog" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Blog
-                </Link>
-              </li>
-              <li>
                 <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
                   Privacy
                 </Link>
@@ -34,16 +19,6 @@ export function Footer() {
               <li>
                 <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
                   Terms
-                </Link>
-              </li>
-              <li>
-                <Link href="/faq" className="text-muted-foreground hover:text-foreground transition-colors">
-                  FAQs
-                </Link>
-              </li>
-              <li>
-                <Link href="/security" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Security
                 </Link>
               </li>
               <li>

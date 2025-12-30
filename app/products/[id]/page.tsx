@@ -1,5 +1,6 @@
 "use client"
-import { useState } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -7,125 +8,268 @@ import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Minus, Plus, ArrowLeft } from "lucide-react"
-
-// Mock product data
-const productData = {
-  id: "1",
-  name: "Organic Tomatoes",
-  price: 12.99,
-  image: "/ripe-tomatoes.png",
-  description:
-    "Premium quality organic tomatoes, vine-ripened for exceptional flavor. Perfect for restaurants, catering, and food service businesses. Grown without pesticides or synthetic fertilizers.",
-  category: "Fruits & Vegetables",
-  brand: "FreshCo",
-  units: [
-    { id: "kg", label: "Kilogram (kg)", price: 12.99 },
-    { id: "box", label: "Box (10kg)", price: 120.0 },
-    { id: "case", label: "Case (25kg)", price: 280.0 },
-  ],
-}
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Minus, Plus, ArrowLeft, Loader2, AlertCircle } from "lucide-react"
+import { useItemDetails } from "@/lib/api/hooks"
+import { useCartContext } from "@/lib/cart/context"
+import { useAuth } from "@/lib/auth/context"
+import { motion } from "framer-motion"
 
 export default function ProductDetailPage() {
-  const [selectedUnit, setSelectedUnit] = useState(productData.units[0].id)
+  const params = useParams()
+  const router = useRouter()
+  const itemCode = params.id as string
+  const [selectedUom, setSelectedUom] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [note, setNote] = useState("")
+  const [isAdding, setIsAdding] = useState(false)
 
-  const currentUnit = productData.units.find((u) => u.id === selectedUnit) || productData.units[0]
-  const totalPrice = currentUnit.price * quantity
+  const { user } = useAuth()
+  const { addItem } = useCartContext()
+  const { data, isLoading, error } = useItemDetails(itemCode, quantity)
+
+  const product = data
+
+  // Debug logging
+  useEffect(() => {
+    if (product && process.env.NODE_ENV === "development") {
+      console.log("[Product Detail] Product data:", {
+        item_code: product.item_code,
+        item_name: product.item_name,
+        rate: product.rate,
+        price_list_rate: product.price_list_rate,
+        uoms: product.uoms?.length || 0,
+      })
+    }
+  }, [product])
+
+  // Reset state when itemCode changes
+  useEffect(() => {
+    setSelectedUom(null)
+    setQuantity(1)
+    setNote("")
+    // SWR will automatically refetch when itemCode changes due to key change
+  }, [itemCode])
+
+  // Set default UOM when data loads
+  useEffect(() => {
+    if (product?.uom && !selectedUom) {
+      setSelectedUom(product.uom)
+    }
+  }, [product?.uom, selectedUom])
+
+  const currentUom = useMemo(() => {
+    if (!product?.uoms || !Array.isArray(product.uoms) || product.uoms.length === 0) return null
+    if (selectedUom) {
+      return product.uoms.find((u: any) => u.uom === selectedUom) || product.uoms[0]
+    }
+    return product.uoms[0]
+  }, [product?.uoms, selectedUom])
+
+  const currentRate = useMemo(() => {
+    if (currentUom?.price_list_rate) return currentUom.price_list_rate
+    if (product?.price_list_rate) return product.price_list_rate
+    if (product?.rate) return product.rate
+    return 0
+  }, [currentUom, product])
+
+  const totalPrice = currentRate * quantity
 
   const increment = () => setQuantity((prev) => prev + 1)
   const decrement = () => setQuantity((prev) => (prev > 1 ? prev - 1 : 1))
 
-  const handleAddToCart = () => {
-    console.log("Add to cart:", { productData, selectedUnit, quantity, note })
-    // Cart logic will be implemented later
+  const handleAddToCart = async () => {
+    if (!user || !product) return
+    setIsAdding(true)
+    try {
+      await addItem({
+        item_code: product.item_code,
+        qty: quantity,
+        rate: currentRate,
+        warehouse: user.defaultWarehouse,
+        uom: selectedUom || product.uom || product.stock_uom,
+        custom_quotation_item_details: note || undefined,
+      })
+      // Small delay for smooth UI update
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      router.push("/cart")
+    } catch (error) {
+      console.error("Failed to add to cart:", error)
+    } finally {
+      setIsAdding(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !product) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <AlertCircle className="h-12 w-12 text-destructive" />
+          <h2 className="text-2xl font-bold">Product not found</h2>
+          <Button onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Back button */}
-      <Button variant="ghost" asChild className="mb-4 -ml-4">
-        <Link href="/products">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Products
-        </Link>
+      <Button variant="ghost" onClick={() => router.back()} className="mb-6 -ml-4">
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back
       </Button>
 
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
         {/* Product Image */}
-        <div className="space-y-4">
-          <Card className="overflow-hidden">
-            <div className="relative aspect-square bg-muted">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="space-y-4"
+        >
+          <Card className="overflow-hidden rounded-2xl border-2 border-primary/10">
+            <div className="relative aspect-square bg-muted/30">
               <Image
-                src={productData.image || "/placeholder.svg"}
-                alt={productData.name}
+                src={product.image || "/placeholder.svg"}
+                alt={product.item_name || "Product image"}
                 fill
-                className="object-cover"
+                className="object-contain p-8"
+                priority
               />
             </div>
           </Card>
-        </div>
+          {product.tags && (
+            <div className="flex flex-wrap gap-2">
+              {product.tags.split(",").map((tag: string) => (
+                <Badge key={tag.trim()} variant="secondary" className="rounded-full">
+                  {tag.trim()}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </motion.div>
 
         {/* Product Details */}
-        <div className="space-y-6">
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="space-y-6"
+        >
           <div>
-            <p className="text-sm text-muted-foreground mb-2">{productData.category}</p>
-            <h1 className="text-3xl font-bold mb-2">{productData.name}</h1>
-            <p className="text-muted-foreground">{productData.description}</p>
+            <div className="flex items-center gap-2 mb-2">
+              {product.item_group && (
+                <Badge variant="outline" className="text-xs">
+                  {product.item_group}
+                </Badge>
+              )}
+              {product.brand && (
+                <Badge variant="outline" className="text-xs">
+                  {product.brand}
+                </Badge>
+              )}
+            </div>
+            <h1 className="text-4xl font-black mb-3 tracking-tight">{product.item_name}</h1>
+            {product.description && (
+              <p className="text-muted-foreground leading-relaxed">{product.description}</p>
+            )}
           </div>
 
+
           {/* Price */}
-          <Card className="p-6 bg-muted/50">
+          <Card className="p-6 bg-primary/5 border-primary/20 rounded-xl">
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold">${currentUnit.price.toFixed(2)}</span>
-              <span className="text-muted-foreground">per {currentUnit.label.split("(")[0].trim()}</span>
+              <span className="text-4xl font-black text-primary">${currentRate.toFixed(2)}</span>
+              <span className="text-muted-foreground">per {selectedUom || product.uom || product.stock_uom}</span>
             </div>
           </Card>
 
-          {/* Unit Selector */}
-          <div className="space-y-3">
-            <Label className="text-base font-medium">Select Unit of Measurement</Label>
-            <RadioGroup value={selectedUnit} onValueChange={setSelectedUnit} className="space-y-2">
-              {productData.units.map((unit) => (
-                <div key={unit.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-accent">
-                  <RadioGroupItem value={unit.id} id={unit.id} />
-                  <Label htmlFor={unit.id} className="flex-1 cursor-pointer flex justify-between">
-                    <span>{unit.label}</span>
-                    <span className="font-medium">${unit.price.toFixed(2)}</span>
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
+          {/* UOM Selector */}
+          {product.uoms && product.uoms.length > 1 && (
+            <div className="space-y-3">
+              <Label className="text-base font-bold">Select Unit of Measurement</Label>
+              <RadioGroup
+                value={selectedUom || product.uom}
+                onValueChange={setSelectedUom}
+                className="space-y-2"
+              >
+                {product.uoms.map((uom: any) => (
+                  <motion.div
+                    key={uom.uom}
+                    whileHover={{ scale: 1.02 }}
+                    className="flex items-center space-x-3 p-4 border-2 rounded-xl hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer"
+                  >
+                    <RadioGroupItem value={uom.uom} id={uom.uom} />
+                    <Label htmlFor={uom.uom} className="flex-1 cursor-pointer flex justify-between items-center">
+                      <div>
+                        <span className="font-bold">{uom.uom}</span>
+                        {uom.conversion_factor !== 1 && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            (Conversion: {uom.conversion_factor}x)
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-lg">${uom.price_list_rate.toFixed(2)}</div>
+                      </div>
+                    </Label>
+                  </motion.div>
+                ))}
+              </RadioGroup>
+            </div>
+          )}
 
           {/* Quantity Selector */}
           <div className="space-y-3">
-            <Label className="text-base font-medium">Quantity</Label>
+            <Label className="text-base font-bold">Quantity</Label>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 border rounded-lg">
-                <Button onClick={decrement} variant="ghost" size="icon" className="h-12 w-12">
+              <div className="flex items-center gap-2 border-2 rounded-xl overflow-hidden">
+                <Button
+                  onClick={decrement}
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-none"
+                  disabled={quantity <= 1}
+                >
                   <Minus className="h-5 w-5" />
                 </Button>
                 <input
                   type="number"
                   value={quantity}
                   onChange={(e) => setQuantity(Math.max(1, Number.parseInt(e.target.value) || 1))}
-                  className="w-16 text-center text-lg font-medium bg-transparent border-none focus:outline-none"
+                  className="w-20 text-center text-lg font-bold bg-transparent border-none focus:outline-none"
+                  min="1"
                 />
-                <Button onClick={increment} variant="ghost" size="icon" className="h-12 w-12">
+                <Button
+                  onClick={increment}
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-none"
+                >
                   <Plus className="h-5 w-5" />
                 </Button>
               </div>
               <div className="text-lg">
-                Total: <span className="font-bold">${totalPrice.toFixed(2)}</span>
+                Total: <span className="font-black text-primary text-xl">${totalPrice.toFixed(2)}</span>
               </div>
             </div>
           </div>
 
           {/* Add Note */}
           <div className="space-y-3">
-            <Label htmlFor="note" className="text-base font-medium">
+            <Label htmlFor="note" className="text-base font-bold">
               Add Note (Optional)
             </Label>
             <Textarea
@@ -133,29 +277,67 @@ export default function ProductDetailPage() {
               placeholder="Special instructions, delivery preferences, etc."
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="min-h-[100px]"
+              className="min-h-[100px] rounded-xl"
             />
           </div>
 
           {/* Add to Cart Button */}
-          <Button size="lg" className="w-full text-lg h-14" onClick={handleAddToCart}>
-            Add to Cart - ${totalPrice.toFixed(2)}
+          <Button
+            size="lg"
+            className="w-full text-lg h-14 rounded-xl font-bold"
+            onClick={handleAddToCart}
+            disabled={isAdding}
+          >
+            {isAdding ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Adding...
+              </span>
+            ) : (
+              `Add to Cart - $${totalPrice.toFixed(2)}`
+            )}
           </Button>
 
           {/* Product Info */}
-          <Card className="p-4 bg-muted/30">
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Brand:</span>
-                <span className="font-medium">{productData.brand}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Category:</span>
-                <span className="font-medium">{productData.category}</span>
-              </div>
+          <Card className="p-6 bg-muted/30 rounded-xl">
+            <div className="space-y-3 text-sm">
+              {product.item_group && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Category:</span>
+                  <span className="font-bold">{product.item_group}</span>
+                </div>
+              )}
+              {product.brand && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Brand:</span>
+                  <span className="font-bold">{product.brand}</span>
+                </div>
+              )}
             </div>
           </Card>
-        </div>
+
+          {/* Pricing Rules */}
+          {product.pricing_rule_details && product.pricing_rule_details.length > 0 && (
+            <Card className="p-6 bg-primary/5 border-primary/20 rounded-xl">
+              <h3 className="font-bold mb-3">Special Offers</h3>
+              <div className="space-y-2">
+                {product.pricing_rule_details.map((rule: any, idx: number) => (
+                  <div key={idx} className="p-3 bg-background rounded-lg">
+                    {rule.custom_offer_text && (
+                      <p className="font-semibold text-primary">{rule.custom_offer_text}</p>
+                    )}
+                    {rule.custom_pricing_rule_description && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {rule.custom_pricing_rule_description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+        </motion.div>
       </div>
     </div>
   )

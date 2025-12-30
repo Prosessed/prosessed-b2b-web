@@ -1,34 +1,62 @@
 "use client"
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Plus, Minus, ChevronRight } from "lucide-react"
-import { useItems } from "@/lib/api/hooks"
+import { useItems, useMostBoughtItems } from "@/lib/api/hooks"
+import { useCartContext } from "@/lib/cart/context"
+import { useAuth } from "@/lib/auth/context"
 import { SkeletonProductRow } from "./skeleton-card"
 import { motion } from "framer-motion"
 
 interface ProductRowProps {
   title: string
-  itemGroup: string // added itemGroup for API fetching
+  itemGroup: string
   categoryHref?: string
+  pageSize?: number
 }
 
-export function ProductRow({ title, itemGroup, categoryHref = "/products" }: ProductRowProps) {
-  const { data, isLoading } = useItems({ item_group: itemGroup, page_size: 6 })
+export function ProductRow({ title, itemGroup, categoryHref = "/products", pageSize = 6 }: ProductRowProps) {
+  const isPreviouslyBought = title === "Previously Bought Items" || categoryHref.includes("previously_bought")
+  
+  const { data: itemsData, isLoading: itemsLoading } = useItems({ 
+    item_group: !isPreviouslyBought && itemGroup ? itemGroup : undefined, 
+    page_size: !isPreviouslyBought ? pageSize : undefined
+  })
+  
+  const { data: mostBoughtData, isLoading: mostBoughtLoading } = useMostBoughtItems(
+    isPreviouslyBought ? {
+      page_size: pageSize,
+      time_frame: "6 months",
+    } : undefined
+  )
+
+  const isLoading = isPreviouslyBought ? mostBoughtLoading : itemsLoading
+  const products = isPreviouslyBought 
+    ? (mostBoughtData?.message?.items || mostBoughtData?.items || []) 
+    : (itemsData?.message?.items || [])
+
+  if (isPreviouslyBought && process.env.NODE_ENV === "development") {
+    console.log(`[ProductRow] Previously Bought - Loading: ${mostBoughtLoading}, Items: ${products.length}`, {
+      hasMessage: !!mostBoughtData?.message,
+      messageItems: mostBoughtData?.message?.items?.length || 0,
+      directItems: mostBoughtData?.items?.length || 0,
+      data: mostBoughtData
+    })
+  }
 
   if (isLoading) return <SkeletonProductRow />
-
-  const products = data?.message?.items || []
+  
+  if (isPreviouslyBought && products.length === 0 && !isLoading) return null
 
   return (
-    <section className="py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-        <Button variant="ghost" asChild className="text-primary hover:text-primary/90 font-semibold">
-          <Link href={categoryHref} className="flex items-center gap-1">
+    <section className="py-10">
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-3xl font-black tracking-tight">{title}</h2>
+        <Button variant="ghost" asChild className="text-primary hover:text-primary/90 font-bold text-sm">
+          <Link href={categoryHref} className="flex items-center gap-1.5 hover:gap-2 transition-all">
             see all
             <ChevronRight className="h-4 w-4" />
           </Link>
@@ -37,18 +65,20 @@ export function ProductRow({ title, itemGroup, categoryHref = "/products" }: Pro
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4"
+        className={pageSize >= 10 
+          ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+          : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+        }
       >
         {products.map((product: any) => (
           <ProductRowCard
             key={product.item_code}
             id={product.item_code}
             name={product.item_name}
-            price={product.rate}
-            originalPrice={product.price_list_rate > product.rate ? product.price_list_rate : undefined}
+            price={product.price_list_rate ?? product.rate ?? 0}
+            rate={product.rate}
             image={product.image}
-            unit={product.stock_uom}
-            deliveryTime="8 MINS"
+            unit={product.stock_uom || product.uom}
           />
         ))}
       </motion.div>
@@ -56,92 +86,118 @@ export function ProductRow({ title, itemGroup, categoryHref = "/products" }: Pro
   )
 }
 
-function ProductRowCard({ id, name, price, originalPrice, image, unit = "kg", deliveryTime }: any) {
-  const [quantity, setQuantity] = useState(0)
+function ProductRowCard({ id, name, price, rate, image, unit = "kg" }: any) {
+  const { cart, addItem, updateItem, removeItem } = useCartContext()
+  const { user } = useAuth()
   const [isAdding, setIsAdding] = useState(false)
 
-  const handleAdd = async () => {
+  const cartItem = cart?.items?.find((item) => item.item_code === id)
+  const quantity = cartItem?.qty || 0
+
+  const handleAdd = useCallback(async () => {
+    if (!user) return
     setIsAdding(true)
-    await new Promise((r) => setTimeout(r, 400)) // simulation for smooth UX
-    setQuantity(1)
-    setIsAdding(false)
-  }
+    try {
+      await addItem({
+        item_code: id,
+        qty: 1,
+        rate: rate ?? (price || 0),
+        warehouse: user.defaultWarehouse,
+        uom: unit,
+      })
+      // Small delay to ensure UI updates smoothly
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    } catch (error) {
+      console.error("Failed to add item:", error)
+    } finally {
+      setIsAdding(false)
+    }
+  }, [id, price, rate, unit, user, addItem])
 
-  const increment = () => setQuantity((prev) => prev + 1)
-  const decrement = () => setQuantity((prev) => Math.max(0, prev - 1))
+  const increment = useCallback(async () => {
+    if (!user || !cartItem) return
+    try {
+      await updateItem(cartItem.name, { qty: quantity + 1 })
+    } catch (error) {
+      console.error("Failed to update item:", error)
+    }
+  }, [cartItem, quantity, updateItem, user])
 
-  const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0
+  const decrement = useCallback(async () => {
+    if (!cartItem) return
+    try {
+      if (quantity <= 1) {
+        await removeItem(cartItem.name)
+      } else {
+        await updateItem(cartItem.name, { qty: quantity - 1 })
+      }
+    } catch (error) {
+      console.error("Failed to update item:", error)
+    }
+  }, [cartItem, quantity, updateItem, removeItem])
 
   return (
-    <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-border/50 group flex flex-col">
-      <Link href={`/products/${id}`} className="block relative aspect-square bg-muted/30 overflow-hidden">
-        <Image
-          src={image || "/placeholder.svg"}
-          alt={name}
-          fill
-          className="object-contain p-4 group-hover:scale-110 transition-transform duration-500"
-        />
-        {deliveryTime && (
-          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-background/90 backdrop-blur shadow-sm flex items-center gap-1">
-            <span className="text-[10px] font-bold text-primary">⚡</span>
-            <span className="text-[10px] font-bold uppercase">{deliveryTime}</span>
-          </div>
-        )}
-        {discount > 0 && (
-          <Badge className="absolute top-2 right-2 text-[10px] bg-primary text-primary-foreground font-bold border-0">
-            {discount}% OFF
-          </Badge>
-        )}
-      </Link>
-      <CardContent className="p-3 flex-1 flex flex-col">
-        <Link href={`/products/${id}`} className="hover:text-primary transition-colors flex-1">
-          <h3 className="font-medium text-sm mb-1 line-clamp-2 leading-snug">{name}</h3>
+    <motion.div
+      whileHover={{ y: -4 }}
+      transition={{ duration: 0.2 }}
+      className="h-full"
+    >
+      <Card className="overflow-hidden hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300 border-2 border-border/30 hover:border-primary/30 group flex flex-col rounded-2xl h-full bg-gradient-to-b from-card to-card/95">
+        <Link href={`/products/${id}`} className="block relative aspect-square bg-gradient-to-br from-muted/40 via-muted/20 to-muted/40 overflow-hidden rounded-t-2xl">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent z-10" />
+          <Image
+            src={image || "/placeholder.svg"}
+            alt={name || "Product image"}
+            fill
+            className="object-contain p-3 group-hover:scale-110 transition-transform duration-500 rounded-t-2xl"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+          />
         </Link>
-        <p className="text-[11px] text-muted-foreground mb-3 font-medium uppercase tracking-wider">{unit}</p>
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            <span className="text-base font-bold text-foreground">${price.toFixed(2)}</span>
-            {originalPrice && (
-              <span className="text-[10px] text-muted-foreground line-through decoration-destructive/50">
-                ${originalPrice.toFixed(2)}
-              </span>
-            )}
-          </div>
+        <CardContent className="p-4 flex-1 flex flex-col rounded-b-2xl bg-card">
+          <Link href={`/products/${id}`} className="hover:text-primary transition-colors flex-1 mb-2 group/link">
+            <h3 className="font-black text-sm mb-1.5 line-clamp-2 leading-tight group-hover/link:text-primary transition-colors">{name}</h3>
+          </Link>
+          <p className="text-[9px] text-muted-foreground mb-3 font-bold uppercase tracking-widest opacity-70">{unit}</p>
+          <div className="flex items-end justify-between mt-auto gap-3">
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-xl font-black text-foreground leading-none">${(price || 0).toFixed(2)}</span>
+            </div>
 
-          <div className="relative h-9 w-20 flex items-center justify-center">
-            {quantity === 0 ? (
-              <Button
-                onClick={handleAdd}
-                disabled={isAdding}
-                size="sm"
-                className="w-full h-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold border-0 shadow-sm active:scale-95 transition-all"
-              >
-                {isAdding ? (
-                  <span className="h-4 w-4 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
-                ) : (
-                  "ADD"
-                )}
-              </Button>
-            ) : (
-              <div className="flex items-center w-full h-8 bg-primary/10 rounded-md border border-primary/20 overflow-hidden">
-                <button
-                  onClick={decrement}
-                  className="flex-1 h-full flex items-center justify-center hover:bg-primary/20 transition-colors text-primary"
+            <div className="relative h-10 w-24 flex items-center justify-center shrink-0">
+              {quantity === 0 ? (
+                <Button
+                  onClick={handleAdd}
+                  disabled={isAdding}
+                  size="sm"
+                  className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90 font-black text-sm border-0 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 active:scale-95 transition-all rounded-xl px-4"
                 >
-                  <Minus className="h-3 w-3" />
-                </button>
-                <span className="w-6 text-center text-xs font-bold text-primary">{quantity}</span>
-                <button
-                  onClick={increment}
-                  className="flex-1 h-full flex items-center justify-center hover:bg-primary/20 transition-colors text-primary"
-                >
-                  <Plus className="h-3 w-3" />
-                </button>
-              </div>
-            )}
+                  {isAdding ? (
+                    <span className="h-4 w-4 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
+                  ) : (
+                    "ADD"
+                  )}
+                </Button>
+              ) : (
+                <div className="flex items-center w-full h-10 bg-primary/10 rounded-xl border-2 border-primary/30 overflow-hidden shadow-sm">
+                  <button
+                    onClick={decrement}
+                    className="flex-1 h-full flex items-center justify-center hover:bg-primary/20 active:bg-primary/30 transition-colors text-primary"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="w-8 text-center text-base font-black text-primary tabular-nums">{quantity}</span>
+                  <button
+                    onClick={increment}
+                    className="flex-1 h-full flex items-center justify-center hover:bg-primary/20 active:bg-primary/30 transition-colors text-primary"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </motion.div>
   )
 }

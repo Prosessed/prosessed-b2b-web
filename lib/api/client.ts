@@ -157,13 +157,19 @@ export const apiClient = {
     // Use include credentials for cross-origin requests with authentication
     const credentials: RequestCredentials = auth.apiKey ? "include" : "same-origin"
     
-    const response = await fetch(`${baseUrl}${endpoint}`, {
+    const fullUrl = `${baseUrl}${endpoint}`
+    const response = await fetch(fullUrl, {
       method: options.method || "GET",
       headers,
       credentials,
       body: options.body,
       signal: options.signal,
     })
+
+    // Log cart API calls
+    if (endpoint.includes("cart") || endpoint.includes("quotation")) {
+      console.log(`[Cart API] ${options.method || "GET"} ${fullUrl} - Status: ${response.status}`)
+    }
 
     if (!response.ok) {
       if (response.status === 403) {

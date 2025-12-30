@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Navigation } from "@/components/navigation"
 import { AuthProvider } from "@/lib/auth/context"
+import { CartProvider } from "@/lib/cart/context"
 import { AuthGuard } from "@/components/auth-guard"
 import "./globals.css"
 
@@ -42,11 +43,13 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`font-sans antialiased`}>
         <AuthProvider>
-          <AuthGuard>
-            <Navigation />
-            {children}
-            <Analytics />
-          </AuthGuard>
+          <CartProvider>
+            <AuthGuard>
+              <Navigation />
+              {children}
+              <Analytics />
+            </AuthGuard>
+          </CartProvider>
         </AuthProvider>
       </body>
     </html>

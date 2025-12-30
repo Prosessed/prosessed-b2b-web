@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Search, ShoppingCart, User, Moon, Sun } from "lucide-react"
+import { Search, ShoppingCart, User, Moon, Sun, X, Package, Tag, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -13,7 +13,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth/context"
+import { useCartContext } from "@/lib/cart/context"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useSearch } from "@/lib/api/hooks"
 import { useDebounce } from "@/hooks/use-debounce"
@@ -23,11 +25,31 @@ import Image from "next/image"
 
 export function Navigation() {
   const { user, logout, isAuthenticated } = useAuth()
+  const { cart } = useCartContext()
+  const router = useRouter()
   const [isDark, setIsDark] = useState(false)
-  const [cartCount, setCartCount] = useState(3)
+  const cartCount = cart?.items?.length || 0
   const [searchTerm, setSearchTerm] = useState("")
   const debouncedSearch = useDebounce(searchTerm, 400)
   const { data: searchResults, isValidating: isSearching } = useSearch(debouncedSearch)
+
+  // Debug logging
+  useEffect(() => {
+    console.log("[Search Navigation] Term:", searchTerm, "Debounced:", debouncedSearch, "Results:", searchResults?.items?.length || 0, "IsSearching:", isSearching)
+    console.log("[Search Navigation] Full Results:", searchResults)
+    if (searchResults) {
+      console.log("[Search Navigation] Items:", searchResults.items)
+      console.log("[Search Navigation] Categories:", searchResults.categories)
+      console.log("[Search Navigation] Brands:", searchResults.brands)
+    }
+  }, [searchTerm, debouncedSearch, searchResults, isSearching])
+
+  const handleSearchSubmit = () => {
+    if (searchTerm.trim().length >= 2) {
+      router.push(`/products?search=${encodeURIComponent(searchTerm.trim())}`)
+      setSearchTerm("")
+    }
+  }
 
   useEffect(() => {
     const isDarkMode = document.documentElement.classList.contains("dark")
@@ -66,56 +88,177 @@ export function Navigation() {
             placeholder="Search for organic tomatoes, milk, eggs..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 bg-muted/50 focus:bg-background transition-all border-transparent focus:border-primary/50 h-10 rounded-xl"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setSearchTerm("")
+              } else if (e.key === "Enter" && searchTerm.trim().length >= 2) {
+                handleSearchSubmit()
+              }
+            }}
+            className="w-full pl-10 pr-24 bg-muted/50 focus:bg-background transition-all border-transparent focus:border-primary/50 h-10 rounded-xl"
           />
+          {searchTerm && (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <button
+                onClick={() => setSearchTerm("")}
+                className="h-7 w-7 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors"
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              {searchTerm.trim().length >= 2 && (
+                <button
+                  onClick={handleSearchSubmit}
+                  className="h-7 w-7 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center transition-colors shadow-lg shadow-primary/20"
+                >
+                  <ArrowRight className="h-4 w-4 text-primary-foreground" />
+                </button>
+              )}
+            </div>
+          )}
 
           <AnimatePresence>
             {searchTerm.length >= 2 && (
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-xl shadow-2xl overflow-hidden z-[100]"
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className="absolute top-full left-0 right-0 mt-2 bg-background border-2 border-primary/20 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden z-[100]"
+                onClick={(e) => e.stopPropagation()}
               >
-                <div className="p-4 max-h-[400px] overflow-y-auto">
+                <div className="max-h-[500px] overflow-y-auto">
                   {isSearching ? (
-                    <div className="space-y-4">
-                      {[1, 2, 3].map((i) => (
+                    <div className="p-4 space-y-3">
+                      {[1, 2, 3, 4].map((i) => (
                         <div key={i} className="flex items-center gap-3">
-                          <Skeleton className="h-12 w-12 rounded-lg" />
+                          <Skeleton className="h-14 w-14 rounded-xl shrink-0" />
                           <div className="space-y-2 flex-1">
-                            <Skeleton className="h-4 w-1/2" />
-                            <Skeleton className="h-3 w-1/4" />
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-3 w-1/3" />
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : searchResults?.items?.length > 0 ? (
-                    <div className="space-y-1">
-                      {searchResults.items.map((item: any) => (
-                        <Link
-                          key={item.item_code}
-                          href={`/products/${item.item_code}`}
-                          onClick={() => setSearchTerm("")}
-                          className="flex items-center gap-3 p-2 hover:bg-muted rounded-lg transition-colors group"
-                        >
-                          <div className="h-12 w-12 rounded-lg bg-muted relative overflow-hidden">
-                            <Image src={item.image || "/placeholder.svg"} alt="" fill className="object-contain p-1" />
+                    <>
+                      {/* Items */}
+                      <div className="p-2">
+                        <div className="px-2 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                          Products ({searchResults.items.length})
+                        </div>
+                        <div className="space-y-1">
+                          {searchResults.items.slice(0, 8).map((item: any) => (
+                            <Link
+                              key={item.item_code}
+                              href={`/products/${item.item_code}`}
+                              onClick={() => setSearchTerm("")}
+                              className="flex items-center gap-3 p-3 hover:bg-primary/5 rounded-xl transition-all group border border-transparent hover:border-primary/20"
+                            >
+                              <div className="h-14 w-14 rounded-xl bg-muted/50 relative overflow-hidden shrink-0 border border-border/50">
+                                <Image
+                                  src={item.image || "/placeholder.svg"}
+                                  alt={item.item_name || "Product"}
+                                  fill
+                                  className="object-contain p-2 group-hover:scale-110 transition-transform"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold group-hover:text-primary transition-colors line-clamp-1">
+                                  {item.item_name}
+                                </p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <p className="text-xs font-black text-primary">
+                                    ${(item.price_list_rate || item.rate || 0).toFixed(2)}
+                                  </p>
+                                  {item.item_group && (
+                                    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">
+                                      {item.item_group}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <Package className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0 opacity-0 group-hover:opacity-100" />
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Categories */}
+                      {searchResults?.categories && searchResults.categories.length > 0 && (
+                        <>
+                          <div className="border-t border-border/50 mx-2" />
+                          <div className="p-2">
+                            <div className="px-2 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                              Categories
+                            </div>
+                            <div className="space-y-1">
+                              {searchResults.categories.slice(0, 3).map((cat: any, idx: number) => (
+                                <Link
+                                  key={idx}
+                                  href={`/products?category=${encodeURIComponent(cat.label)}`}
+                                  onClick={() => setSearchTerm("")}
+                                  className="flex items-center gap-2 p-2.5 hover:bg-primary/5 rounded-lg transition-colors group"
+                                >
+                                  <Tag className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                                  <span className="text-sm font-medium group-hover:text-primary">
+                                    {cat.label}
+                                  </span>
+                                </Link>
+                              ))}
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium group-hover:text-primary transition-colors">
-                              {item.item_name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">${item.rate?.toFixed(2)}</p>
+                        </>
+                      )}
+
+                      {/* Brands */}
+                      {searchResults?.brands && searchResults.brands.length > 0 && (
+                        <>
+                          <div className="border-t border-border/50 mx-2" />
+                          <div className="p-2">
+                            <div className="px-2 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                              Brands
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {searchResults.brands.slice(0, 5).map((brand: any, idx: number) => (
+                                <Link
+                                  key={idx}
+                                  href={`/products?brand=${encodeURIComponent(brand.label)}`}
+                                  onClick={() => setSearchTerm("")}
+                                  className="px-3 py-1.5 text-xs font-semibold bg-muted hover:bg-primary hover:text-primary-foreground rounded-lg transition-colors"
+                                >
+                                  {brand.label}
+                                </Link>
+                              ))}
+                            </div>
                           </div>
-                        </Link>
-                      ))}
+                        </>
+                      )}
+
+                      {/* View All Results */}
+                      {searchResults?.pagination && searchResults.pagination.total_records > 8 && (
+                        <>
+                          <div className="border-t border-border/50 mx-2" />
+                          <Link
+                            href={`/products?search=${encodeURIComponent(searchTerm)}`}
+                            onClick={() => setSearchTerm("")}
+                            className="block p-3 text-center text-sm font-bold text-primary hover:bg-primary/5 transition-colors"
+                          >
+                            View all {searchResults.pagination.total_records} results →
+                          </Link>
+                        </>
+                      )}
+                    </>
+                  ) : searchTerm.length >= 2 && !isSearching ? (
+                    <div className="p-8 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Search className="h-8 w-8 text-muted-foreground opacity-50" />
+                        <p className="text-sm font-medium text-muted-foreground">
+                          No results found for "{searchTerm}"
+                        </p>
+                        <p className="text-xs text-muted-foreground/70">Try different keywords</p>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="py-8 text-center">
-                      <p className="text-sm text-muted-foreground">No results found for "{searchTerm}"</p>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               </motion.div>
             )}
@@ -130,8 +273,8 @@ export function Navigation() {
           <Link href="/products" className="text-sm font-medium hover:text-primary transition-colors">
             Products
           </Link>
-          <Link href="/deals" className="text-sm font-medium hover:text-primary transition-colors">
-            Deals
+          <Link href="/cart" className="text-sm font-medium hover:text-primary transition-colors">
+            Cart
           </Link>
           <Link href="/orders" className="text-sm font-medium hover:text-primary transition-colors">
             My Orders

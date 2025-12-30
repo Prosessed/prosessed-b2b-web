@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card } from "@/components/ui/card"
-import { useItems } from "@/lib/api/hooks"
+import { useItems, useMostBoughtItems, useSearch } from "@/lib/api/hooks"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
 import { motion, AnimatePresence } from "framer-motion"
 import { Filter, X, Loader2 } from "lucide-react"
@@ -39,6 +39,9 @@ export default function ProductsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const categoryFromUrl = searchParams.get("category") || undefined
+  const searchQuery = searchParams.get("search") || undefined
+  const previouslyBoughtParam = searchParams.get("previously_bought")
+  const isPreviouslyBought = previouslyBoughtParam === "true"
   const observerTarget = useRef<HTMLDivElement>(null)
 
   const [sortBy, setSortBy] = useState<"relevance" | "price-low" | "price-high" | "qty-desc">("relevance")
@@ -64,32 +67,71 @@ export default function ProductsPage() {
     return "asc"
   }, [sortBy])
 
+  // Search results
+  const { data: searchData, isLoading: searchLoading, isValidating: searchValidating } = useSearch(
+    searchQuery || "",
+    currentPage,
+    pageSize
+  )
+
   // Fetch products with all filters
-  const { data, isLoading, isValidating } = useItems({
-    item_group: categoryFromUrl,
-    page: currentPage,
-    page_size: pageSize,
-    sortByQty: sortByQty,
-    filterByBrand: selectedBrands.length > 0 ? selectedBrands : undefined,
-    inStockOnly: inStockOnly,
+  const { data: itemsData, isLoading: itemsLoading, isValidating: itemsValidating } = useItems({
+    item_group: !isPreviouslyBought && !searchQuery ? categoryFromUrl : undefined,
+    page: !isPreviouslyBought && !searchQuery ? currentPage : undefined,
+    page_size: !isPreviouslyBought && !searchQuery ? pageSize : undefined,
+    sortByQty: !isPreviouslyBought && !searchQuery ? sortByQty : undefined,
+    filterByBrand: !isPreviouslyBought && !searchQuery && selectedBrands.length > 0 ? selectedBrands : undefined,
+    inStockOnly: !isPreviouslyBought && !searchQuery ? inStockOnly : undefined,
   })
 
-  const products = data?.message?.items || []
-  const pagination = data?.message?.pagination
+  const { data: mostBoughtData, isLoading: mostBoughtLoading, isValidating: mostBoughtValidating } = useMostBoughtItems({
+    page: isPreviouslyBought ? currentPage : undefined,
+    page_size: isPreviouslyBought ? pageSize : undefined,
+    sortByQty: isPreviouslyBought ? sortByQty : undefined,
+    filterByBrand: isPreviouslyBought && selectedBrands.length > 0 ? selectedBrands : undefined,
+    inStockOnly: isPreviouslyBought ? inStockOnly : undefined,
+    time_frame: isPreviouslyBought ? "6 months" : undefined,
+  })
+
+  const isLoading = searchQuery 
+    ? searchLoading 
+    : (isPreviouslyBought ? mostBoughtLoading : itemsLoading)
+  const isValidating = searchQuery
+    ? searchValidating
+    : (isPreviouslyBought ? mostBoughtValidating : itemsValidating)
+  const products = searchQuery
+    ? (searchData?.items || [])
+    : (isPreviouslyBought 
+      ? (mostBoughtData?.message?.items || mostBoughtData?.items || []) 
+      : (itemsData?.message?.items || []))
+  const pagination = searchQuery
+    ? searchData?.pagination
+    : (isPreviouslyBought 
+      ? (mostBoughtData?.message?.pagination || mostBoughtData?.pagination) 
+      : itemsData?.message?.pagination)
   const hasNextPage = pagination?.has_next_page || false
+  
+  // Debug: Log first product to check rate field
+  if (products.length > 0 && process.env.NODE_ENV === "development") {
+    console.log("[Products] Sample product:", { item_code: products[0].item_code, rate: products[0].rate, price_list_rate: products[0].price_list_rate })
+  }
+  
+  const brandsData = isPreviouslyBought 
+    ? (mostBoughtData?.message?.brands || mostBoughtData?.brands) 
+    : itemsData?.message?.brands
   const brands: Array<{ name: string; count: number }> = useMemo(() => {
-    const brandData = data?.message?.brands || []
-    return brandData
+    if (!brandsData || brandsData.length === 0) return []
+    return brandsData
       .map((b: any) => {
         const key = Object.keys(b)[0]
         return { name: key, count: b[key] }
       })
       .filter((b: { name: string; count: number }) => b.name && b.name !== "None")
       .sort((a: { name: string; count: number }, b: { name: string; count: number }) => a.name.localeCompare(b.name))
-  }, [data])
+  }, [brandsData])
 
-  // Create stable string for selectedBrands dependency
-  const selectedBrandsKey = useMemo(() => selectedBrands.sort().join(","), [selectedBrands])
+  // Create stable string for selectedBrands dependency (don't mutate original array)
+  const selectedBrandsKey = useMemo(() => [...selectedBrands].sort().join(","), [selectedBrands])
 
   // Reset when category or filters change
   useEffect(() => {
@@ -105,27 +147,35 @@ export default function ProductsPage() {
   }, [categoryFromUrl, selectedBrandsKey, inStockOnly, sortBy])
 
   // Reset products when filters/category change
+  const prevProductsLengthRef = useRef(0)
+  const prevPageRef = useRef(1)
+  
   useEffect(() => {
     if (isResettingRef.current && currentPage === 1) {
-      // Skip update during reset
       return
     }
+    
+    const productsChanged = products.length !== prevProductsLengthRef.current
+    const pageChanged = currentPage !== prevPageRef.current
+    
+    if (!productsChanged && !pageChanged) return
+    
+    prevProductsLengthRef.current = products.length
+    prevPageRef.current = currentPage
     
     if (currentPage === 1) {
       setAllProducts(products)
       setIsCategoryChanging(false)
-    } else {
-      // Append new products for infinite scroll
+    } else if (products.length > 0) {
       setAllProducts((prev) => {
-        // Prevent duplicates
         const existingIds = new Set(prev.map((p: any) => p.item_code))
         const newProducts = products.filter((p: any) => !existingIds.has(p.item_code))
+        if (newProducts.length === 0) return prev
         return [...prev, ...newProducts]
       })
       setIsLoadingMore(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, currentPage])
+  }, [products.length, currentPage])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -188,9 +238,9 @@ export default function ProductsPage() {
     })
   }, [])
 
-  const handleSortChange = (value: string) => {
+  const handleSortChange = useCallback((value: string) => {
     setSortBy(value as typeof sortBy)
-  }
+  }, [])
 
   const handleClearFilters = () => {
     setSelectedBrands([])
@@ -387,7 +437,7 @@ export default function ProductsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div className="space-y-1">
               <h1 className="text-3xl font-black tracking-tighter">
-                {categoryFromUrl || "All Products"}
+                {isPreviouslyBought ? "Previously Bought Items" : (categoryFromUrl || "All Products")}
               </h1>
               <p className="text-sm font-medium text-muted-foreground">
                 {isLoading && currentPage === 1
@@ -434,7 +484,8 @@ export default function ProductsPage() {
                       key={`${product.item_code}-${currentPage}`}
                       id={product.item_code}
                       name={product.item_name}
-                      price={product.rate || 0}
+                      price={product.price_list_rate ?? product.rate ?? 0}
+                      rate={product.rate}
                       image={product.image}
                       unit={product.stock_uom || product.uom}
                       stock={product.actual_qty}

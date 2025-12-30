@@ -1,6 +1,5 @@
 import { Apple, Coffee, Milk, Wheat, Package, Fish } from "lucide-react"
 import { AnimatedBanner } from "@/components/animated-banner"
-import { StickyDealCards } from "@/components/sticky-deal-cards"
 import { CategoryGrid } from "@/components/category-grid"
 import { ProductRow } from "@/components/product-row"
 import { Footer } from "@/components/footer"
@@ -36,8 +35,8 @@ const heroBanners = [
     image: "/hero-banner-2.jpg",
     title: "Bulk Orders Made Easy",
     subtitle: "Special prices for businesses & restaurants",
-    ctaText: "View Deals",
-    ctaLink: "/deals",
+    ctaText: "View Products",
+    ctaLink: "/products",
   },
   {
     id: "3",
@@ -53,7 +52,7 @@ const heroBanners = [
     title: "Save Big on Daily Essentials",
     subtitle: "Up to 40% off on selected items",
     ctaText: "View Offers",
-    ctaLink: "/deals",
+    ctaLink: "/products",
   },
 ]
 
@@ -67,7 +66,12 @@ export default function HomePage() {
       </div>
 
       <div className="container mx-auto px-4 pb-12">
-        <StickyDealCards />
+        <ProductRow 
+          title="Previously Bought Items" 
+          itemGroup="" 
+          categoryHref="/products?previously_bought=true"
+          pageSize={10}
+        />
         <CategoryGrid />
 
         {/* <ProductRow title="Dairy, Bread & Eggs" itemGroup="Dairy & Bakery" categoryHref="/products?category=dairy" />
