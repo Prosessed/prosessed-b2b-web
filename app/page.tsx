@@ -4,6 +4,7 @@ import { CategoryGrid } from "@/components/category-grid"
 import { ProductRow } from "@/components/product-row"
 import { Footer } from "@/components/footer"
 import { HeroCarousel } from "@/components/hero-carousel"
+import { StickyDealCards } from "@/components/sticky-deal-cards"
 
 const categories = [
   { name: "Fruits & Vegetables", icon: Apple, href: "/products?category=fruits" },
@@ -66,6 +67,7 @@ export default function HomePage() {
       </div>
 
       <div className="container mx-auto px-4 pb-12">
+        <StickyDealCards />
         <ProductRow 
           title="Previously Bought Items" 
           itemGroup="" 
