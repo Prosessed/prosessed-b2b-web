@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useRef, useCallback } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { ProductCard } from "@/components/product-card"
 import { SkeletonCard } from "@/components/skeleton-card"
 import { Button } from "@/components/ui/button"
@@ -8,48 +9,234 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card } from "@/components/ui/card"
 import { useItems } from "@/lib/api/hooks"
+import { useItemGroupTree } from "@/hooks/useItemGroupTree"
 import { motion, AnimatePresence } from "framer-motion"
-import { Filter, X } from "lucide-react"
+import { Filter, X, Loader2 } from "lucide-react"
+
+// Helper to flatten all categories from tree
+const getAllCategories = (tree: any[]): string[] => {
+  const categories: string[] = []
+  
+  const traverse = (nodes: any[]) => {
+    for (const node of nodes) {
+      if (node.value && node.value !== "All Item Groups") {
+        categories.push(node.value)
+      }
+      if (node.children && Array.isArray(node.children)) {
+        traverse(node.children)
+      }
+    }
+  }
+  
+  if (tree.length > 0 && tree[0].children) {
+    traverse(tree[0].children)
+  }
+  
+  return categories
+}
 
 export default function ProductsPage() {
-  const [sortBy, setSortBy] = useState("relevance")
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([])
-  const [showDealsOnly, setShowDealsOnly] = useState(false)
-  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const categoryFromUrl = searchParams.get("category") || undefined
+  const observerTarget = useRef<HTMLDivElement>(null)
 
-  // Fetching real data using our custom hook
-  // We use the first selected category if any, otherwise broad search
+  const [sortBy, setSortBy] = useState<"relevance" | "price-low" | "price-high" | "qty-desc">("relevance")
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([])
+  const [inStockOnly, setInStockOnly] = useState(false)
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
+  const [allProducts, setAllProducts] = useState<any[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [isCategoryChanging, setIsCategoryChanging] = useState(false)
+  const isResettingRef = useRef(false)
+
+  const pageSize = 20
+
+  // Get categories from API
+  const { data: categoryTree } = useItemGroupTree(false)
+  const allCategories = useMemo(() => getAllCategories(categoryTree || []), [categoryTree])
+
+  // Map sortBy to API sortByQty
+  const sortByQty = useMemo(() => {
+    if (sortBy === "qty-desc") return "desc"
+    if (sortBy === "price-low" || sortBy === "price-high") return "asc"
+    return "asc"
+  }, [sortBy])
+
+  // Fetch products with all filters
   const { data, isLoading, isValidating } = useItems({
-    item_group: selectedCategories.length > 0 ? selectedCategories[0] : undefined,
-    page_size: 40,
+    item_group: categoryFromUrl,
+    page: currentPage,
+    page_size: pageSize,
+    sortByQty: sortByQty,
+    filterByBrand: selectedBrands.length > 0 ? selectedBrands : undefined,
+    inStockOnly: inStockOnly,
   })
 
   const products = data?.message?.items || []
-  const brands = data?.message?.brands?.map((b: any) => Object.keys(b)[0]).filter((b: string) => b !== "None") || []
-  const categories = ["Dairy & Bakery", "Fruits & Vegetables", "Snacks & Munchies", "Beverages", "Grains", "Seafood"]
+  const pagination = data?.message?.pagination
+  const hasNextPage = pagination?.has_next_page || false
+  const brands: Array<{ name: string; count: number }> = useMemo(() => {
+    const brandData = data?.message?.brands || []
+    return brandData
+      .map((b: any) => {
+        const key = Object.keys(b)[0]
+        return { name: key, count: b[key] }
+      })
+      .filter((b: { name: string; count: number }) => b.name && b.name !== "None")
+      .sort((a: { name: string; count: number }, b: { name: string; count: number }) => a.name.localeCompare(b.name))
+  }, [data])
 
-  const handleCategoryToggle = (category: string) => {
-    setSelectedCategories((prev) => (prev.includes(category) ? prev.filter((c) => c !== category) : [category]))
-  }
+  // Create stable string for selectedBrands dependency
+  const selectedBrandsKey = useMemo(() => selectedBrands.sort().join(","), [selectedBrands])
 
-  const handleBrandToggle = (brand: string) => {
-    setSelectedBrands((prev) => (prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand]))
-  }
+  // Reset when category or filters change
+  useEffect(() => {
+    isResettingRef.current = true
+    setCurrentPage(1)
+    setAllProducts([])
+    setIsCategoryChanging(true)
+    // Reset the flag after a brief moment
+    const timer = setTimeout(() => {
+      isResettingRef.current = false
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [categoryFromUrl, selectedBrandsKey, inStockOnly, sortBy])
 
-  const filteredProducts = useMemo(() => {
-    let result = [...products]
-    if (selectedBrands.length > 0) {
-      result = result.filter((p) => selectedBrands.includes(p.brand))
+  // Reset products when filters/category change
+  useEffect(() => {
+    if (isResettingRef.current && currentPage === 1) {
+      // Skip update during reset
+      return
     }
-    // Note: sorting usually happens server-side, but we implement client-side for immediate feedback
-    if (sortBy === "price-low") result.sort((a, b) => a.rate - b.rate)
-    if (sortBy === "price-high") result.sort((a, b) => b.rate - a.rate)
-    return result
-  }, [products, selectedBrands, sortBy])
+    
+    if (currentPage === 1) {
+      setAllProducts(products)
+      setIsCategoryChanging(false)
+    } else {
+      // Append new products for infinite scroll
+      setAllProducts((prev) => {
+        // Prevent duplicates
+        const existingIds = new Set(prev.map((p: any) => p.item_code))
+        const newProducts = products.filter((p: any) => !existingIds.has(p.item_code))
+        return [...prev, ...newProducts]
+      })
+      setIsLoadingMore(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, currentPage])
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!hasNextPage || isLoading || isLoadingMore || isCategoryChanging) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsLoadingMore(true)
+          setCurrentPage((prev) => prev + 1)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    const currentTarget = observerTarget.current
+    if (currentTarget) {
+      observer.observe(currentTarget)
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget)
+      }
+    }
+  }, [hasNextPage, isLoading, isLoadingMore, isCategoryChanging])
+
+  const handleCategoryChange = useCallback((category: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (category) {
+      params.set("category", category)
+    } else {
+      params.delete("category")
+    }
+    router.push(`/products?${params.toString()}`)
+  }, [searchParams, router])
+
+  const handleBrandToggle = useCallback((brand: string) => {
+    setSelectedBrands((prev) => {
+      const isSelected = prev.includes(brand)
+      if (isSelected) {
+        const filtered = prev.filter((b) => b !== brand)
+        // Only update if array actually changed
+        if (filtered.length === prev.length) return prev
+        return filtered
+      } else {
+        // Only update if brand not already in array
+        if (prev.includes(brand)) return prev
+        return [...prev, brand]
+      }
+    })
+  }, [])
+
+  const handleInStockToggle = useCallback((checked: boolean | "indeterminate") => {
+    const newValue = checked === true
+    setInStockOnly((prev) => {
+      // Only update if value actually changed
+      if (prev === newValue) return prev
+      return newValue
+    })
+  }, [])
+
+  const handleSortChange = (value: string) => {
+    setSortBy(value as typeof sortBy)
+  }
+
+  const handleClearFilters = () => {
+    setSelectedBrands([])
+    setInStockOnly(false)
+    setSortBy("relevance")
+    router.push("/products")
+  }
+
+  const hasActiveFilters = selectedBrands.length > 0 || inStockOnly || categoryFromUrl
+
+  // Client-side price sorting (since API doesn't support it directly)
+  const sortedProducts = useMemo(() => {
+    if (sortBy === "price-low") {
+      return [...allProducts].sort((a: any, b: any) => (a.rate || 0) - (b.rate || 0))
+    }
+    if (sortBy === "price-high") {
+      return [...allProducts].sort((a: any, b: any) => (b.rate || 0) - (a.rate || 0))
+    }
+    return allProducts
+  }, [allProducts, sortBy])
+
+  // Handle direct navigation - show all products if no category
+  const shouldShowProducts = !categoryFromUrl || sortedProducts.length > 0 || !isLoading
 
   return (
-    <div className="container mx-auto px-4 py-8 bg-background/50 min-h-screen">
+    <div className="container mx-auto px-4 py-8 bg-background/50 min-h-screen relative">
+      {/* Full Screen Loading Overlay for Category Changes */}
+      <AnimatePresence>
+        {isCategoryChanging && isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-background/80 backdrop-blur-sm flex items-center justify-center"
+          >
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <Loader2 className="h-12 w-12 text-primary animate-spin" />
+                <div className="absolute inset-0 border-4 border-primary/20 rounded-full" />
+              </div>
+              <p className="text-lg font-semibold text-foreground">Loading products...</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Mobile Filter Toggle */}
         <div className="lg:hidden flex items-center justify-between mb-4">
@@ -60,8 +247,15 @@ export default function ProductsPage() {
           >
             <Filter className="h-4 w-4 mr-2" />
             Filters
+            {hasActiveFilters && (
+              <span className="ml-2 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
+                {selectedBrands.length + (inStockOnly ? 1 : 0) + (categoryFromUrl ? 1 : 0)}
+              </span>
+            )}
           </Button>
-          <div className="text-sm font-medium text-muted-foreground">{filteredProducts.length} items</div>
+          <div className="text-sm font-medium text-muted-foreground">
+            {pagination ? `${pagination.total_records || 0} items` : isLoading ? "Loading..." : "0 items"}
+          </div>
         </div>
 
         {/* Filters Sidebar */}
@@ -72,7 +266,7 @@ export default function ProductsPage() {
           ${isMobileFiltersOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
         `}
         >
-          <Card className="h-full lg:h-auto p-6 lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border shadow-none lg:shadow-xl shadow-primary/5">
+          <Card className="h-full lg:h-auto p-6 lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border shadow-none lg:shadow-xl shadow-primary/5 overflow-y-auto">
             <div className="flex items-center justify-between mb-6 lg:hidden">
               <h2 className="text-xl font-bold">Filters</h2>
               <Button variant="ghost" size="icon" onClick={() => setIsMobileFiltersOpen(false)}>
@@ -83,46 +277,41 @@ export default function ProductsPage() {
             <h2 className="hidden lg:block text-xl font-black mb-6 tracking-tight">Refine Results</h2>
 
             {/* Category Filter */}
-            <div className="mb-8">
-              <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Categories</h3>
-              <div className="space-y-3">
-                {categories.map((category) => (
-                  <label key={category} className="flex items-center gap-3 group cursor-pointer">
-                    <div className="relative flex items-center justify-center">
-                      <Checkbox
-                        id={`category-${category}`}
-                        checked={selectedCategories.includes(category)}
-                        onCheckedChange={() => handleCategoryToggle(category)}
-                        className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
-                      />
-                    </div>
+            {allCategories.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Categories</h3>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
+                  <label className="flex items-center gap-3 group cursor-pointer">
+                    <Checkbox
+                      id="category-all"
+                      checked={!categoryFromUrl}
+                      onCheckedChange={() => handleCategoryChange("")}
+                      className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
+                    />
                     <span
-                      className={`text-sm font-bold transition-colors ${selectedCategories.includes(category) ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}
+                      className={`text-sm font-bold transition-colors ${
+                        !categoryFromUrl ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                      }`}
                     >
-                      {category}
+                      All Categories
                     </span>
                   </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Brand Filter */}
-            {brands.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Brands</h3>
-                <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
-                  {brands.map((brand) => (
-                    <label key={brand} className="flex items-center gap-3 group cursor-pointer">
+                  {allCategories.map((category) => (
+                    <label key={category} className="flex items-center gap-3 group cursor-pointer">
                       <Checkbox
-                        id={`brand-${brand}`}
-                        checked={selectedBrands.includes(brand)}
-                        onCheckedChange={() => handleBrandToggle(brand)}
+                        id={`category-${category}`}
+                        checked={categoryFromUrl === category}
+                        onCheckedChange={() => handleCategoryChange(category)}
                         className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
                       />
                       <span
-                        className={`text-sm font-bold transition-colors ${selectedBrands.includes(brand) ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}
+                        className={`text-sm font-bold transition-colors ${
+                          categoryFromUrl === category
+                            ? "text-primary"
+                            : "text-muted-foreground group-hover:text-foreground"
+                        }`}
                       >
-                        {brand}
+                        {category}
                       </span>
                     </label>
                   ))}
@@ -130,18 +319,66 @@ export default function ProductsPage() {
               </div>
             )}
 
-            <Button
-              variant="outline"
-              className="w-full rounded-xl border-primary/20 text-primary font-bold hover:bg-primary/5 h-11 transition-all bg-transparent"
-              onClick={() => {
-                setSelectedCategories([])
-                setSelectedBrands([])
-                setShowDealsOnly(false)
-                setIsMobileFiltersOpen(false)
-              }}
-            >
-              Reset All
-            </Button>
+            {/* Brand Filter */}
+            {brands.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Brands</h3>
+                <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
+                  {brands.map((brand) => (
+                    <label key={brand.name} className="flex items-center justify-between group cursor-pointer">
+                      <div className="flex items-center gap-3 flex-1">
+                        <Checkbox
+                          id={`brand-${brand.name}`}
+                          checked={selectedBrands.includes(brand.name)}
+                          onCheckedChange={() => handleBrandToggle(brand.name)}
+                          className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
+                        />
+                        <span
+                          className={`text-sm font-bold transition-colors ${
+                            selectedBrands.includes(brand.name)
+                              ? "text-primary"
+                              : "text-muted-foreground group-hover:text-foreground"
+                          }`}
+                        >
+                          {brand.name}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground font-medium">{brand.count}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* In Stock Only Filter */}
+            <div className="mb-8">
+              <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Availability</h3>
+              <label className="flex items-center gap-3 group cursor-pointer">
+                <Checkbox
+                  id="in-stock-only"
+                  checked={inStockOnly}
+                  onCheckedChange={handleInStockToggle}
+                  className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
+                />
+                <span
+                  className={`text-sm font-bold transition-colors ${
+                    inStockOnly ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                  }`}
+                >
+                  In Stock Only
+                </span>
+              </label>
+            </div>
+
+            {hasActiveFilters && (
+              <Button
+                variant="outline"
+                className="w-full rounded-xl border-primary/20 text-primary font-bold hover:bg-primary/5 h-11 transition-all bg-transparent"
+                onClick={handleClearFilters}
+              >
+                Reset All Filters
+              </Button>
+            )}
           </Card>
         </aside>
 
@@ -150,15 +387,19 @@ export default function ProductsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div className="space-y-1">
               <h1 className="text-3xl font-black tracking-tighter">
-                {selectedCategories.length > 0 ? selectedCategories[0] : "All Products"}
+                {categoryFromUrl || "All Products"}
               </h1>
               <p className="text-sm font-medium text-muted-foreground">
-                {isLoading ? "Fetching latest inventory..." : `Found ${filteredProducts.length} premium quality items`}
+                {isLoading && currentPage === 1
+                  ? "Fetching latest inventory..."
+                  : pagination
+                    ? `Showing ${sortedProducts.length} of ${pagination.total_records || 0} items`
+                    : "Loading..."}
               </p>
             </div>
 
             <div className="flex items-center gap-3">
-              <Select value={sortBy} onValueChange={setSortBy}>
+              <Select value={sortBy} onValueChange={handleSortChange}>
                 <SelectTrigger className="w-48 h-11 rounded-xl border-primary/10 bg-background shadow-sm font-bold">
                   <SelectValue placeholder="Sort By" />
                 </SelectTrigger>
@@ -166,14 +407,14 @@ export default function ProductsPage() {
                   <SelectItem value="relevance">Recommended</SelectItem>
                   <SelectItem value="price-low">Price: Low to High</SelectItem>
                   <SelectItem value="price-high">Price: High to Low</SelectItem>
-                  <SelectItem value="popularity">Fastest Delivery</SelectItem>
+                  <SelectItem value="qty-desc">Stock: High to Low</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <AnimatePresence mode="popLayout">
-            {isLoading && !products.length ? (
+            {isLoading && currentPage === 1 && sortedProducts.length === 0 ? (
               <motion.div
                 key="loading-grid"
                 initial={{ opacity: 0 }}
@@ -185,20 +426,42 @@ export default function ProductsPage() {
                   <SkeletonCard key={i} />
                 ))}
               </motion.div>
-            ) : filteredProducts.length > 0 ? (
-              <motion.div key="product-grid" layout className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredProducts.map((product) => (
-                  <ProductCard
-                    key={product.item_code}
-                    id={product.item_code}
-                    name={product.item_name}
-                    price={product.rate}
-                    image={product.image}
-                    unit={product.stock_uom}
-                  />
-                ))}
-              </motion.div>
-            ) : (
+            ) : sortedProducts.length > 0 ? (
+              <>
+                <motion.div key="product-grid" layout className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {sortedProducts.map((product: any) => (
+                    <ProductCard
+                      key={`${product.item_code}-${currentPage}`}
+                      id={product.item_code}
+                      name={product.item_name}
+                      price={product.rate || 0}
+                      image={product.image}
+                      unit={product.stock_uom || product.uom}
+                      stock={product.actual_qty}
+                    />
+                  ))}
+                </motion.div>
+
+                {/* Infinite Scroll Trigger */}
+                {hasNextPage && (
+                  <div ref={observerTarget} className="h-20 flex items-center justify-center mt-8">
+                    {isLoadingMore && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-sm font-medium">Loading more products...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* End of Results */}
+                {!hasNextPage && sortedProducts.length > 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm font-medium">
+                    You've reached the end
+                  </div>
+                )}
+              </>
+            ) : !isLoading ? (
               <motion.div
                 key="empty-state"
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -212,24 +475,12 @@ export default function ProductsPage() {
                 <p className="text-muted-foreground max-w-xs">
                   Try adjusting your filters or search terms to find what you're looking for.
                 </p>
-                <Button
-                  onClick={() => setSelectedCategories([])}
-                  className="mt-6 bg-primary font-bold h-11 px-8 rounded-xl"
-                >
+                <Button onClick={handleClearFilters} className="mt-6 bg-primary font-bold h-11 px-8 rounded-xl">
                   Clear all filters
                 </Button>
               </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
-
-          {isValidating && products.length > 0 && (
-            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100]">
-              <div className="bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-sm font-bold animate-in fade-in slide-in-from-bottom-4">
-                <div className="h-3 w-3 rounded-full bg-primary-foreground animate-ping" />
-                Syncing latest prices...
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

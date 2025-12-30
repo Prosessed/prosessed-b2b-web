@@ -70,7 +70,7 @@ export default function HomePage() {
         <StickyDealCards />
         <CategoryGrid />
 
-        <ProductRow title="Dairy, Bread & Eggs" itemGroup="Dairy & Bakery" categoryHref="/products?category=dairy" />
+        {/* <ProductRow title="Dairy, Bread & Eggs" itemGroup="Dairy & Bakery" categoryHref="/products?category=dairy" />
 
         <ProductRow title="Snacks & Munchies" itemGroup="Snacks & Munchies" categoryHref="/products?category=snacks" />
 
@@ -78,7 +78,7 @@ export default function HomePage() {
           title="Fresh Fruits & Vegetables"
           itemGroup="Fruits & Vegetables"
           categoryHref="/products?category=fruits"
-        />
+        /> */}
       </div>
 
       <Footer />

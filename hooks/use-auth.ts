@@ -1,8 +1,17 @@
 "use client"
 
+import { AuthResponse } from "@/lib/auth/types"
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
-import type { AuthResponse, UserProfile } from "@/lib/types"
+
+interface UserProfile {
+  username: string
+  email: string
+  full_name: string
+  customer_id: string
+  default_warehouse: string
+  default_currency: string
+}
 
 interface AuthState {
   user: UserProfile | null
