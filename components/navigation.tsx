@@ -16,6 +16,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth/context"
 import { useCartContext } from "@/lib/cart/context"
+import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useSearch } from "@/lib/api/hooks"
 import { useDebounce } from "@/hooks/use-debounce"
@@ -26,6 +27,7 @@ import Image from "next/image"
 export function Navigation() {
   const { user, logout, isAuthenticated } = useAuth()
   const { cart } = useCartContext()
+  const { openDrawer } = useCartDrawer()
   const router = useRouter()
   const [isDark, setIsDark] = useState(false)
   const cartCount = cart?.items?.length || 0
@@ -296,20 +298,18 @@ export function Navigation() {
         <Button
           variant="ghost"
           size="icon"
+          onClick={openDrawer}
           className="relative text-foreground hover:bg-accent hover:text-accent-foreground border border-border hover:border-primary/50"
-          asChild
         >
-          <Link href="/cart">
-            <ShoppingCart className="h-5 w-5" />
-            {cartCount > 0 && (
-              <Badge
-                variant="default"
-                className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-primary text-primary-foreground border-2 border-background"
-              >
-                {cartCount}
-              </Badge>
-            )}
-          </Link>
+          <ShoppingCart className="h-5 w-5" />
+          {cartCount > 0 && (
+            <Badge
+              variant="default"
+              className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-primary text-primary-foreground border-2 border-background"
+            >
+              {cartCount}
+            </Badge>
+          )}
         </Button>
 
         <DropdownMenu>

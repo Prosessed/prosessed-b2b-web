@@ -8,18 +8,19 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Card } from "@/components/ui/card"
-import { Minus, Plus, Trash2, ArrowLeft, ShoppingCart, Loader2, CheckCircle2 } from "lucide-react"
+import { Minus, Plus, Trash2, ArrowLeft, ShoppingCart, Loader2, CheckCircle2, X } from "lucide-react"
 import { useCartContext } from "@/lib/cart/context"
 import { motion, AnimatePresence } from "framer-motion"
 import { useAuth } from "@/lib/auth/context"
 
 export default function CartPage() {
-  const { cart, isLoading, updateItem, removeItem, submitQuotation } = useCartContext()
+  const { cart, isLoading, updateItem, removeItem, submitQuotation, clearCart } = useCartContext()
   const { user } = useAuth()
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [isClearing, setIsClearing] = useState(false)
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({})
 
   const updateQuantity = useCallback(
@@ -66,6 +67,35 @@ export default function CartPage() {
     }
   }, [cart, submitQuotation, router])
 
+  const handleClearCart = useCallback(async () => {
+    const items = cart?.items || []
+    if (!cart || items.length === 0) return
+    
+    // Confirm before clearing
+    if (!confirm("Are you sure you want to clear all items from your cart?")) {
+      return
+    }
+    
+    setIsClearing(true)
+    try {
+      // Remove all items one by one (in parallel for better performance)
+      const removePromises = items.map((item) => removeItem(item.name))
+      await Promise.all(removePromises)
+      
+      // Small delay to ensure backend updates are complete
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      
+      // Clear cart state
+      clearCart()
+    } catch (error) {
+      console.error("Failed to clear cart:", error)
+      // Even if some removals fail, try to refresh the cart
+      // The cart context will handle the refresh
+    } finally {
+      setIsClearing(false)
+    }
+  }, [cart, removeItem, clearCart])
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -88,7 +118,29 @@ export default function CartPage() {
         </Link>
       </Button>
 
-      <h1 className="text-3xl font-bold mb-8 tracking-tight">Shopping Cart</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Shopping Cart</h1>
+        {cartItems.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={handleClearCart}
+            disabled={isClearing}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+          >
+            {isClearing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Clearing...
+              </>
+            ) : (
+              <>
+                <X className="h-4 w-4 mr-2" />
+                Clear Cart
+              </>
+            )}
+          </Button>
+        )}
+      </div>
 
       {cartItems.length === 0 ? (
         <motion.div

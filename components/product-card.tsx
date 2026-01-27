@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Plus, Minus, Loader2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useCartContext } from "@/lib/cart/context"
+import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
 
 interface ProductCardProps {
@@ -21,6 +22,7 @@ interface ProductCardProps {
 
 export function ProductCard({ id, name, price, image, unit = "kg", stock, rate }: ProductCardProps) {
   const { cart, addItem, updateItem, removeItem, isLoading: cartLoading } = useCartContext()
+  const { openDrawer } = useCartDrawer()
   const { user } = useAuth()
   const [isMutating, setIsMutating] = useState(false)
 
@@ -29,23 +31,35 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate }
 
   const handleAdd = useCallback(async () => {
     if (!user) return
+    
+    // Use rate if available, otherwise fall back to price (which already has fallback logic)
+    // Prioritize rate as it's the actual API field, but use price as fallback
+    const itemRate = (rate && rate > 0) ? rate : (price && price > 0 ? price : 0)
+    
+    if (!itemRate || itemRate <= 0) {
+      console.error(`Cannot add item ${id}: Invalid rate. Rate: ${rate}, Price: ${price}`)
+      return
+    }
+    
     setIsMutating(true)
     try {
       await addItem({
         item_code: id,
         qty: 1,
-        rate: rate ?? (price || 0),
+        rate: itemRate,
         warehouse: user.defaultWarehouse,
         uom: unit,
       })
       // Small delay to ensure UI updates smoothly
       await new Promise((resolve) => setTimeout(resolve, 100))
+      // Open cart drawer after adding item
+      openDrawer()
     } catch (error) {
       console.error("Failed to add item:", error)
     } finally {
       setIsMutating(false)
     }
-  }, [id, price, rate, unit, user, addItem])
+  }, [id, price, rate, unit, user, addItem, openDrawer])
 
   const increment = useCallback(async () => {
     if (!user || !cartItem) return

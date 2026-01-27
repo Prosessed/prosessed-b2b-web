@@ -166,9 +166,21 @@ export const apiClient = {
       signal: options.signal,
     })
 
-    // Log cart API calls
+    // Log cart API calls with detailed request/response
     if (endpoint.includes("cart") || endpoint.includes("quotation")) {
-      console.log(`[Cart API] ${options.method || "GET"} ${fullUrl} - Status: ${response.status}`)
+      const requestBody = options.body ? (typeof options.body === "string" ? JSON.parse(options.body) : options.body) : null
+      console.log(`[Cart API] ${options.method || "GET"} ${fullUrl}`)
+      console.log(`[Cart API] Request Body:`, requestBody)
+      
+      // Clone response to read body without consuming it
+      const responseClone = response.clone()
+      responseClone.json().then((data) => {
+        console.log(`[Cart API] Response Status: ${response.status}`)
+        console.log(`[Cart API] Response Body:`, data)
+      }).catch(() => {
+        console.log(`[Cart API] Response Status: ${response.status}`)
+        console.log(`[Cart API] Response: [Unable to parse JSON]`)
+      })
     }
 
     if (!response.ok) {

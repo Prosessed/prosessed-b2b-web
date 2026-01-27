@@ -42,17 +42,40 @@ export default function ProductsPage() {
   const searchQuery = searchParams.get("search") || undefined
   const previouslyBoughtParam = searchParams.get("previously_bought")
   const isPreviouslyBought = previouslyBoughtParam === "true"
+  
+  // Read filter state from URL params
+  const brandsFromUrl = searchParams.get("brands")
+  const inStockFromUrl = searchParams.get("inStock")
+  const sortFromUrl = searchParams.get("sort")
+  
   const observerTarget = useRef<HTMLDivElement>(null)
 
-  const [sortBy, setSortBy] = useState<"relevance" | "price-low" | "price-high" | "qty-desc">("relevance")
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([])
-  const [inStockOnly, setInStockOnly] = useState(false)
+  // Initialize state from URL params
+  type SortByType = "relevance" | "price-low" | "price-high" | "qty-desc"
+  const [sortBy, setSortBy] = useState<SortByType>(() => {
+    if (sortFromUrl && ["relevance", "price-low", "price-high", "qty-desc"].includes(sortFromUrl)) {
+      return sortFromUrl as SortByType
+    }
+    return "relevance"
+  })
+  const [selectedBrands, setSelectedBrands] = useState<string[]>(() => {
+    if (brandsFromUrl) {
+      try {
+        return brandsFromUrl.split(",").filter(Boolean)
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
+  const [inStockOnly, setInStockOnly] = useState(() => inStockFromUrl === "true")
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
   const [allProducts, setAllProducts] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isCategoryChanging, setIsCategoryChanging] = useState(false)
   const isResettingRef = useRef(false)
+  const prevFiltersRef = useRef<string>("")
 
   const pageSize = 20
 
@@ -68,23 +91,25 @@ export default function ProductsPage() {
   }, [sortBy])
 
   // Search results
-  const { data: searchData, isLoading: searchLoading, isValidating: searchValidating } = useSearch(
+  const { data: searchData, isLoading: searchLoading, isValidating: searchValidating, error: searchError } = useSearch(
     searchQuery || "",
     currentPage,
     pageSize
   )
 
   // Fetch products with all filters
-  const { data: itemsData, isLoading: itemsLoading, isValidating: itemsValidating } = useItems({
-    item_group: !isPreviouslyBought && !searchQuery ? categoryFromUrl : undefined,
-    page: !isPreviouslyBought && !searchQuery ? currentPage : undefined,
-    page_size: !isPreviouslyBought && !searchQuery ? pageSize : undefined,
-    sortByQty: !isPreviouslyBought && !searchQuery ? sortByQty : undefined,
-    filterByBrand: !isPreviouslyBought && !searchQuery && selectedBrands.length > 0 ? selectedBrands : undefined,
-    inStockOnly: !isPreviouslyBought && !searchQuery ? inStockOnly : undefined,
+  // Always call API even when no category - pass undefined to fetch all products
+  const shouldFetchItems = !isPreviouslyBought && !searchQuery
+  const { data: itemsData, isLoading: itemsLoading, isValidating: itemsValidating, error: itemsError } = useItems({
+    item_group: shouldFetchItems ? categoryFromUrl : undefined,
+    page: shouldFetchItems ? currentPage : undefined,
+    page_size: shouldFetchItems ? pageSize : undefined,
+    sortByQty: shouldFetchItems ? sortByQty : undefined,
+    filterByBrand: shouldFetchItems && selectedBrands.length > 0 ? selectedBrands : undefined,
+    inStockOnly: shouldFetchItems ? inStockOnly : undefined,
   })
 
-  const { data: mostBoughtData, isLoading: mostBoughtLoading, isValidating: mostBoughtValidating } = useMostBoughtItems({
+  const { data: mostBoughtData, isLoading: mostBoughtLoading, isValidating: mostBoughtValidating, error: mostBoughtError } = useMostBoughtItems({
     page: isPreviouslyBought ? currentPage : undefined,
     page_size: isPreviouslyBought ? pageSize : undefined,
     sortByQty: isPreviouslyBought ? sortByQty : undefined,
@@ -99,6 +124,9 @@ export default function ProductsPage() {
   const isValidating = searchQuery
     ? searchValidating
     : (isPreviouslyBought ? mostBoughtValidating : itemsValidating)
+  const error = searchQuery
+    ? searchError
+    : (isPreviouslyBought ? mostBoughtError : itemsError)
   const products = searchQuery
     ? (searchData?.items || [])
     : (isPreviouslyBought 
@@ -132,41 +160,85 @@ export default function ProductsPage() {
 
   // Create stable string for selectedBrands dependency (don't mutate original array)
   const selectedBrandsKey = useMemo(() => [...selectedBrands].sort().join(","), [selectedBrands])
+  
+  // Create filter key for comparison
+  const currentFiltersKey = useMemo(() => {
+    return `${categoryFromUrl || ""}|${selectedBrandsKey}|${inStockOnly}|${sortBy}|${searchQuery || ""}`
+  }, [categoryFromUrl, selectedBrandsKey, inStockOnly, sortBy, searchQuery])
 
-  // Reset when category or filters change
+  // Sync state from URL params when they change (e.g., browser back/forward)
   useEffect(() => {
+    const newBrands = brandsFromUrl ? brandsFromUrl.split(",").filter(Boolean) : []
+    const newInStock = inStockFromUrl === "true"
+    const newSort = (sortFromUrl as typeof sortBy) || "relevance"
+    
+    // Only update if values actually changed to prevent unnecessary resets
+    if (JSON.stringify(newBrands.sort()) !== JSON.stringify(selectedBrands.sort())) {
+      setSelectedBrands(newBrands)
+    }
+    if (newInStock !== inStockOnly) {
+      setInStockOnly(newInStock)
+    }
+    if (newSort !== sortBy) {
+      setSortBy(newSort)
+    }
+  }, [brandsFromUrl, inStockFromUrl, sortFromUrl])
+
+  // Reset when category, search, or filters change
+  useEffect(() => {
+    // Skip if filters haven't actually changed (prevents reset on initial mount)
+    if (prevFiltersRef.current === currentFiltersKey && prevFiltersRef.current !== "") {
+      return
+    }
+    
+    prevFiltersRef.current = currentFiltersKey
     isResettingRef.current = true
     setCurrentPage(1)
-    setAllProducts([])
-    setIsCategoryChanging(true)
+    // Only clear products if we're actually changing filters (not on initial mount with same filters)
+    if (allProducts.length > 0) {
+      setAllProducts([])
+      setIsCategoryChanging(true)
+    }
     // Reset the flag after a brief moment
     const timer = setTimeout(() => {
       isResettingRef.current = false
     }, 100)
     return () => clearTimeout(timer)
-  }, [categoryFromUrl, selectedBrandsKey, inStockOnly, sortBy])
+  }, [currentFiltersKey])
 
-  // Reset products when filters/category change
+  // Update products list when data changes
   const prevProductsLengthRef = useRef(0)
   const prevPageRef = useRef(1)
+  const prevFiltersKeyRef = useRef("")
   
   useEffect(() => {
+    // If filters changed, wait for reset to complete
     if (isResettingRef.current && currentPage === 1) {
       return
     }
     
     const productsChanged = products.length !== prevProductsLengthRef.current
     const pageChanged = currentPage !== prevPageRef.current
+    const filtersChanged = prevFiltersKeyRef.current !== currentFiltersKey
     
-    if (!productsChanged && !pageChanged) return
+    // If filters changed, reset tracking refs
+    if (filtersChanged) {
+      prevFiltersKeyRef.current = currentFiltersKey
+      prevProductsLengthRef.current = 0
+      prevPageRef.current = 1
+    }
+    
+    if (!productsChanged && !pageChanged && !filtersChanged) return
     
     prevProductsLengthRef.current = products.length
     prevPageRef.current = currentPage
     
     if (currentPage === 1) {
+      // For page 1, replace all products
       setAllProducts(products)
       setIsCategoryChanging(false)
     } else if (products.length > 0) {
+      // For subsequent pages, append new products
       setAllProducts((prev) => {
         const existingIds = new Set(prev.map((p: any) => p.item_code))
         const newProducts = products.filter((p: any) => !existingIds.has(p.item_code))
@@ -175,7 +247,7 @@ export default function ProductsPage() {
       })
       setIsLoadingMore(false)
     }
-  }, [products.length, currentPage])
+  }, [products, currentPage, currentFiltersKey])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -203,67 +275,115 @@ export default function ProductsPage() {
     }
   }, [hasNextPage, isLoading, isLoadingMore, isCategoryChanging])
 
-  const handleCategoryChange = useCallback((category: string) => {
+  // Helper to update URL with current filter state
+  const updateUrlParams = useCallback((updates: {
+    category?: string | null
+    brands?: string[]
+    inStock?: boolean
+    sort?: string
+  }) => {
     const params = new URLSearchParams(searchParams.toString())
-    if (category) {
-      params.set("category", category)
-    } else {
-      params.delete("category")
+    
+    if (updates.category !== undefined) {
+      if (updates.category) {
+        params.set("category", updates.category)
+      } else {
+        params.delete("category")
+      }
     }
-    router.push(`/products?${params.toString()}`)
+    
+    if (updates.brands !== undefined) {
+      if (updates.brands.length > 0) {
+        params.set("brands", updates.brands.join(","))
+      } else {
+        params.delete("brands")
+      }
+    }
+    
+    if (updates.inStock !== undefined) {
+      if (updates.inStock) {
+        params.set("inStock", "true")
+      } else {
+        params.delete("inStock")
+      }
+    }
+    
+    if (updates.sort !== undefined) {
+      if (updates.sort && updates.sort !== "relevance") {
+        params.set("sort", updates.sort)
+      } else {
+        params.delete("sort")
+      }
+    }
+    
+    router.push(`/products?${params.toString()}`, { scroll: false })
   }, [searchParams, router])
+
+  const handleCategoryChange = useCallback((category: string) => {
+    updateUrlParams({ category: category || null })
+  }, [updateUrlParams])
 
   const handleBrandToggle = useCallback((brand: string) => {
     setSelectedBrands((prev) => {
       const isSelected = prev.includes(brand)
+      let newBrands: string[]
       if (isSelected) {
-        const filtered = prev.filter((b) => b !== brand)
-        // Only update if array actually changed
-        if (filtered.length === prev.length) return prev
-        return filtered
+        newBrands = prev.filter((b) => b !== brand)
       } else {
-        // Only update if brand not already in array
-        if (prev.includes(brand)) return prev
-        return [...prev, brand]
+        newBrands = [...prev, brand]
       }
+      // Update URL immediately
+      updateUrlParams({ brands: newBrands })
+      return newBrands
     })
-  }, [])
+  }, [updateUrlParams])
 
   const handleInStockToggle = useCallback((checked: boolean | "indeterminate") => {
     const newValue = checked === true
     setInStockOnly((prev) => {
-      // Only update if value actually changed
       if (prev === newValue) return prev
+      // Update URL immediately
+      updateUrlParams({ inStock: newValue })
       return newValue
     })
-  }, [])
+  }, [updateUrlParams])
 
   const handleSortChange = useCallback((value: string) => {
-    setSortBy(value as typeof sortBy)
-  }, [])
+    const newSort = value as typeof sortBy
+    setSortBy(newSort)
+    // Update URL immediately
+    updateUrlParams({ sort: newSort })
+  }, [updateUrlParams])
 
-  const handleClearFilters = () => {
-    setSelectedBrands([])
-    setInStockOnly(false)
-    setSortBy("relevance")
-    router.push("/products")
-  }
+  const handleClearFilters = useCallback(() => {
+    updateUrlParams({
+      category: null,
+      brands: [],
+      inStock: false,
+      sort: "relevance"
+    })
+  }, [updateUrlParams])
 
   const hasActiveFilters = selectedBrands.length > 0 || inStockOnly || categoryFromUrl
 
   // Client-side price sorting (since API doesn't support it directly)
   const sortedProducts = useMemo(() => {
     if (sortBy === "price-low") {
-      return [...allProducts].sort((a: any, b: any) => (a.rate || 0) - (b.rate || 0))
+      return [...allProducts].sort((a: any, b: any) => {
+        const priceA = a.price_list_rate ?? a.rate ?? 0
+        const priceB = b.price_list_rate ?? b.rate ?? 0
+        return priceA - priceB
+      })
     }
     if (sortBy === "price-high") {
-      return [...allProducts].sort((a: any, b: any) => (b.rate || 0) - (a.rate || 0))
+      return [...allProducts].sort((a: any, b: any) => {
+        const priceA = a.price_list_rate ?? a.rate ?? 0
+        const priceB = b.price_list_rate ?? b.rate ?? 0
+        return priceB - priceA
+      })
     }
     return allProducts
   }, [allProducts, sortBy])
-
-  // Handle direct navigation - show all products if no category
-  const shouldShowProducts = !categoryFromUrl || sortedProducts.length > 0 || !isLoading
 
   return (
     <div className="container mx-auto px-4 py-8 bg-background/50 min-h-screen relative">
@@ -464,7 +584,28 @@ export default function ProductsPage() {
           </div>
 
           <AnimatePresence mode="popLayout">
-            {isLoading && currentPage === 1 && sortedProducts.length === 0 ? (
+            {error ? (
+              <motion.div
+                key="error-state"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center justify-center py-20 text-center"
+              >
+                <div className="h-24 w-24 bg-destructive/5 rounded-full flex items-center justify-center mb-6">
+                  <X className="h-10 w-10 text-destructive/40" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Failed to load products</h3>
+                <p className="text-muted-foreground max-w-xs mb-6">
+                  {error instanceof Error ? error.message : "An error occurred while fetching products. Please try again."}
+                </p>
+                <Button 
+                  onClick={() => window.location.reload()} 
+                  className="bg-primary font-bold h-11 px-8 rounded-xl"
+                >
+                  Retry
+                </Button>
+              </motion.div>
+            ) : isLoading && currentPage === 1 && sortedProducts.length === 0 ? (
               <motion.div
                 key="loading-grid"
                 initial={{ opacity: 0 }}
@@ -479,18 +620,24 @@ export default function ProductsPage() {
             ) : sortedProducts.length > 0 ? (
               <>
                 <motion.div key="product-grid" layout className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {sortedProducts.map((product: any) => (
-                    <ProductCard
-                      key={`${product.item_code}-${currentPage}`}
-                      id={product.item_code}
-                      name={product.item_name}
-                      price={product.price_list_rate ?? product.rate ?? 0}
-                      rate={product.rate}
-                      image={product.image}
-                      unit={product.stock_uom || product.uom}
-                      stock={product.actual_qty}
-                    />
-                  ))}
+                  {sortedProducts.map((product: any) => {
+                    // Determine the display price and rate for cart
+                    const displayPrice = product.price_list_rate ?? product.rate ?? 0
+                    const cartRate = product.rate ?? product.price_list_rate ?? 0
+                    
+                    return (
+                      <ProductCard
+                        key={product.item_code}
+                        id={product.item_code}
+                        name={product.item_name}
+                        price={displayPrice}
+                        rate={cartRate}
+                        image={product.image}
+                        unit={product.stock_uom || product.uom}
+                        stock={product.actual_qty}
+                      />
+                    )
+                  })}
                 </motion.div>
 
                 {/* Infinite Scroll Trigger */}

@@ -70,17 +70,23 @@ export function ProductRow({ title, itemGroup, categoryHref = "/products", pageS
           : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
         }
       >
-        {products.map((product: any) => (
-          <ProductRowCard
-            key={product.item_code}
-            id={product.item_code}
-            name={product.item_name}
-            price={product.price_list_rate ?? product.rate ?? 0}
-            rate={product.rate}
-            image={product.image}
-            unit={product.stock_uom || product.uom}
-          />
-        ))}
+        {products.map((product: any) => {
+          // Determine the display price and rate for cart
+          const displayPrice = product.price_list_rate ?? product.rate ?? 0
+          const cartRate = product.rate ?? product.price_list_rate ?? 0
+          
+          return (
+            <ProductRowCard
+              key={product.item_code}
+              id={product.item_code}
+              name={product.item_name}
+              price={displayPrice}
+              rate={cartRate}
+              image={product.image}
+              unit={product.stock_uom || product.uom}
+            />
+          )
+        })}
       </motion.div>
     </section>
   )
@@ -96,12 +102,21 @@ function ProductRowCard({ id, name, price, rate, image, unit = "kg" }: any) {
 
   const handleAdd = useCallback(async () => {
     if (!user) return
+    
+    // Use rate if available, otherwise fall back to price (which already has fallback logic)
+    const itemRate = (rate && rate > 0) ? rate : (price && price > 0 ? price : 0)
+    
+    if (!itemRate || itemRate <= 0) {
+      console.error(`Cannot add item ${id}: Invalid rate. Rate: ${rate}, Price: ${price}`)
+      return
+    }
+    
     setIsAdding(true)
     try {
       await addItem({
         item_code: id,
         qty: 1,
-        rate: rate ?? (price || 0),
+        rate: itemRate,
         warehouse: user.defaultWarehouse,
         uom: unit,
       })

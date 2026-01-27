@@ -63,25 +63,39 @@ export function CartProvider({ children }: { children: ReactNode }) {
     async (item: CartItem) => {
       if (!user) throw new Error("User not authenticated")
 
+      // Validate rate - API requires a valid rate (must be > 0)
+      if (!item.rate || item.rate <= 0) {
+        throw new Error(`Invalid rate for item ${item.item_code}. Rate must be greater than 0.`)
+      }
+
       try {
         const currentQuotationId = quotationId || data?.cart?.name
+        
+        // Ensure item has required fields with valid values
+        const validatedItem: CartItem = {
+          ...item,
+          rate: item.rate, // Already validated above
+          qty: item.qty || 1,
+          uom: item.uom || "Unit",
+          warehouse: item.warehouse || user.defaultWarehouse,
+        }
         
         // Optimistic update: add item to local state immediately
         if (data?.cart) {
           const optimisticItem = {
             name: `temp-${Date.now()}`,
-            item_code: item.item_code,
-            item_name: item.item_code,
-            qty: item.qty || 1,
-            rate: item.rate || 0,
-            uom: item.uom || "Unit",
-            amount: (item.rate || 0) * (item.qty || 1),
-            warehouse: item.warehouse || "",
+            item_code: validatedItem.item_code,
+            item_name: validatedItem.item_code,
+            qty: validatedItem.qty,
+            rate: validatedItem.rate,
+            uom: validatedItem.uom,
+            amount: validatedItem.rate * validatedItem.qty,
+            warehouse: validatedItem.warehouse,
             image: "",
             item_group: "",
-            price_list_rate: item.rate || 0,
-            discount_percentage: item.discount_percentage || 0,
-            discount_amount: item.discount_amount || 0,
+            price_list_rate: validatedItem.rate,
+            discount_percentage: validatedItem.discount_percentage || 0,
+            discount_amount: validatedItem.discount_amount || 0,
           } as const
           const optimisticCart = {
             ...data.cart,
@@ -91,19 +105,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
 
         if (!currentQuotationId) {
-          const response = await createCart({ items: [item] }, user)
-          if (response.quotation_id) {
-            setQuotationId(response.quotation_id.name)
+          const response = await createCart({ items: [validatedItem] }, user)
+          console.log("[Cart Context] Create cart response:", response)
+          
+          // Handle different response structures
+          const quotationIdValue = response.quotation_id?.name || response.message?.quotation_id?.name
+          if (quotationIdValue) {
+            console.log("[Cart Context] Setting quotation ID:", quotationIdValue)
+            setQuotationId(quotationIdValue)
             // Wait a bit for state to update, then refetch
-            await new Promise((resolve) => setTimeout(resolve, 100))
+            await new Promise((resolve) => setTimeout(resolve, 200))
+          } else {
+            console.warn("[Cart Context] No quotation_id in response:", response)
           }
           await mutate()
         } else {
-          await modifyCart({ quotation_id: currentQuotationId, add_item: item }, user)
+          await modifyCart({ quotation_id: currentQuotationId, add_item: validatedItem }, user)
           await mutate()
         }
       } catch (err) {
-        console.error("Failed to add item:", err)
+        console.error("[Cart Context] Failed to add item:", err)
+        if (err instanceof Error) {
+          console.error("[Cart Context] Error details:", {
+            message: err.message,
+            stack: err.stack,
+          })
+        }
         // Revert optimistic update on error
         await mutate()
         throw err

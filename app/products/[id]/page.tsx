@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { Minus, Plus, ArrowLeft, Loader2, AlertCircle } from "lucide-react"
 import { useItemDetails } from "@/lib/api/hooks"
 import { useCartContext } from "@/lib/cart/context"
+import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
 import { motion } from "framer-motion"
 
@@ -27,6 +28,7 @@ export default function ProductDetailPage() {
 
   const { user } = useAuth()
   const { addItem } = useCartContext()
+  const { openDrawer } = useCartDrawer()
   const { data, isLoading, error } = useItemDetails(itemCode, quantity)
 
   const product = data
@@ -81,6 +83,13 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = async () => {
     if (!user || !product) return
+    
+    // Ensure we have a valid rate before adding to cart
+    if (!currentRate || currentRate <= 0) {
+      console.error(`Cannot add item ${product.item_code}: Invalid rate (${currentRate})`)
+      return
+    }
+    
     setIsAdding(true)
     try {
       await addItem({
@@ -93,7 +102,8 @@ export default function ProductDetailPage() {
       })
       // Small delay for smooth UI update
       await new Promise((resolve) => setTimeout(resolve, 200))
-      router.push("/cart")
+      // Open cart drawer instead of redirecting
+      openDrawer()
     } catch (error) {
       console.error("Failed to add to cart:", error)
     } finally {

@@ -5,6 +5,8 @@ import { Analytics } from "@vercel/analytics/next"
 import { Navigation } from "@/components/navigation"
 import { AuthProvider } from "@/lib/auth/context"
 import { CartProvider } from "@/lib/cart/context"
+import { CartDrawerProvider } from "@/lib/cart/drawer-context"
+import { CartDrawer } from "@/components/cart-drawer"
 import { AuthGuard } from "@/components/auth-guard"
 import "./globals.css"
 
@@ -44,11 +46,14 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <AuthProvider>
           <CartProvider>
-            <AuthGuard>
-              <Navigation />
-              {children}
-              <Analytics />
-            </AuthGuard>
+            <CartDrawerProvider>
+              <AuthGuard>
+                <Navigation />
+                {children}
+                <CartDrawer />
+                <Analytics />
+              </AuthGuard>
+            </CartDrawerProvider>
           </CartProvider>
         </AuthProvider>
       </body>
