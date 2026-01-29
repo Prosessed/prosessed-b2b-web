@@ -1,12 +1,12 @@
-import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import Image from "next/image"
+import { Card } from "@/components/ui/card"
+import { getAuthSession } from "@/lib/auth/storage.client"
 import { QuoteModel } from "@/lib/models/quote"
-import { ArrowLeft, FileText, Clock, CheckCircle, XCircle } from "lucide-react"
+import { ArrowLeft, CheckCircle, Clock, FileText, XCircle } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { getAuthSession } from "@/lib/auth/storage"
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getAuthSession()

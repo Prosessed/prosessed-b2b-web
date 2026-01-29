@@ -1,9 +1,9 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { authStorage } from "./storage"
-import type { AuthUser } from "./types"
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { setApiBaseUrl } from "../api/client"
+import { authStorage } from "./storage.client"
+import type { AuthUser } from "./types"
 
 interface AuthContextType {
   user: AuthUser | null

@@ -1,5 +1,5 @@
+import { getAuthSession } from "@/lib/auth/storage.client"
 import type { Quote } from "@/lib/types"
-import { getAuthSession } from "@/lib/auth/storage"
 
 interface QuotationResponse {
   name: string
