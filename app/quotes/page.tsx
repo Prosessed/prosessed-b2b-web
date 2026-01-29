@@ -4,9 +4,16 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
 import { QuoteModel } from "@/lib/models/quote"
-import { FileText, Clock, CheckCircle, XCircle } from "lucide-react"
+import { FileText, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react"
+import { getAuthSession } from "@/lib/auth/storage"
+import { redirect } from "next/navigation"
 
 export default async function QuotesPage() {
+  const session = await getAuthSession()
+  if (!session?.user) {
+    redirect("/login")
+  }
+
   const quotes = await QuoteModel.getAll()
 
   const getStatusIcon = (status: string) => {

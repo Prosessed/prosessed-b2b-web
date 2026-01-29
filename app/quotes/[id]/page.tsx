@@ -5,9 +5,15 @@ import Link from "next/link"
 import Image from "next/image"
 import { QuoteModel } from "@/lib/models/quote"
 import { ArrowLeft, FileText, Clock, CheckCircle, XCircle } from "lucide-react"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
+import { getAuthSession } from "@/lib/auth/storage"
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await getAuthSession()
+  if (!session?.user) {
+    redirect("/login")
+  }
+
   const { id } = await params
   const quote = await QuoteModel.getById(id)
 

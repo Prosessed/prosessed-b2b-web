@@ -54,12 +54,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
           user
         )
 
-        // 🔥 Normalize backend response here
+        // Normalize backend response - handle both direct and wrapped formats
+        const cartData = response?.message?.cart || response?.cart || null
         return {
-          cart: response?.message?.cart ?? null,
+          cart: cartData,
         }
       } catch (err) {
-        console.error("Failed to fetch cart:", err)
+        console.error("[Cart Context] Failed to fetch cart:", err)
         return { cart: null }
       }
     },
