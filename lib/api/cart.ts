@@ -1,8 +1,11 @@
 "use client"
 
-import { apiClient } from "./client"
 import type { AuthUser } from "@/lib/auth/types"
+import { apiClient } from "./client"
 
+/* =========================
+   CART ITEM (REQUEST)
+========================= */
 export interface CartItem {
   item_code: string
   qty: number
@@ -14,6 +17,9 @@ export interface CartItem {
   custom_quotation_item_details?: string
 }
 
+/* =========================
+   CREATE CART
+========================= */
 export interface CreateCartParams {
   items: CartItem[]
   customer_address?: string
@@ -41,6 +47,9 @@ export interface CartResponse {
   } | null
 }
 
+/* =========================
+   CART ITEM (RESPONSE)
+========================= */
 export interface CartItemResponse {
   name: string
   item_code: string
@@ -55,8 +64,12 @@ export interface CartItemResponse {
   item_group: string
   image?: string
   price_list_rate: number
+  custom_quotation_item_details?: string
 }
 
+/* =========================
+   GET CART RESPONSE
+========================= */
 export interface GetCartResponse {
   cart: {
     name: string
@@ -69,11 +82,15 @@ export interface GetCartResponse {
     discount_amount?: number
     grand_total: number
     workflow_state: string
-    items: CartItemResponse[]
     payment_terms_template?: string
+    pricing_rules?: any[]
+    items: CartItemResponse[]
   } | null
 }
 
+/* =========================
+   MODIFY CART
+========================= */
 export interface ModifyCartParams {
   quotation_id: string
   update_parent?: Record<string, any>
@@ -89,6 +106,9 @@ export interface ModifyCartResponse {
   message?: string
 }
 
+/* =========================
+   SUBMIT CART
+========================= */
 export interface SubmitCartParams {
   quotation_id: string
   signature_base64?: string
@@ -102,10 +122,14 @@ export interface SubmitCartResponse {
   signature_url?: string
 }
 
-export async function createCart(params: CreateCartParams, user: AuthUser): Promise<CartResponse> {
-  if (!user) {
-    throw new Error("User not authenticated")
-  }
+/* =========================
+   API FUNCTIONS
+========================= */
+export async function createCart(
+  params: CreateCartParams,
+  user: AuthUser
+): Promise<CartResponse> {
+  if (!user) throw new Error("User not authenticated")
 
   return apiClient.request<CartResponse>(
     "/api/method/prosessed_orderit.orderit.create_cart_quotation",
@@ -125,10 +149,12 @@ export async function createCart(params: CreateCartParams, user: AuthUser): Prom
   )
 }
 
-export async function getCart(quotationId: string | undefined, customerId: string | undefined, user: AuthUser): Promise<GetCartResponse> {
-  if (!user) {
-    throw new Error("User not authenticated")
-  }
+export async function getCart(
+  quotationId: string | undefined,
+  customerId: string | undefined,
+  user: AuthUser
+): Promise<GetCartResponse> {
+  if (!user) throw new Error("User not authenticated")
 
   return apiClient.request<GetCartResponse>(
     "/api/method/prosessed_orderit.orderit.get_cart",
@@ -147,30 +173,26 @@ export async function getCart(quotationId: string | undefined, customerId: strin
   )
 }
 
-export async function modifyCart(params: ModifyCartParams, user: AuthUser): Promise<ModifyCartResponse> {
-  if (!user) {
-    throw new Error("User not authenticated")
-  }
+export async function modifyCart(
+  params: ModifyCartParams,
+  user: AuthUser
+): Promise<ModifyCartResponse> {
+  if (!user) throw new Error("User not authenticated")
 
   const body: any = {
     quotation_id: params.quotation_id,
   }
 
-  if (params.update_parent) {
+  if (params.update_parent)
     body.update_parent = JSON.stringify(params.update_parent)
-  }
-  if (params.update_item) {
+  if (params.update_item)
     body.update_item = JSON.stringify(params.update_item)
-  }
-  if (params.delete_item) {
+  if (params.delete_item)
     body.delete_item = JSON.stringify(params.delete_item)
-  }
-  if (params.add_item) {
+  if (params.add_item)
     body.add_item = JSON.stringify(params.add_item)
-  }
-  if (params.add_items) {
+  if (params.add_items)
     body.add_items = JSON.stringify(params.add_items)
-  }
 
   return apiClient.request<ModifyCartResponse>(
     "/api/method/prosessed_orderit.orderit.modify_cart",
@@ -186,10 +208,11 @@ export async function modifyCart(params: ModifyCartParams, user: AuthUser): Prom
   )
 }
 
-export async function submitCart(params: SubmitCartParams, user: AuthUser): Promise<SubmitCartResponse> {
-  if (!user) {
-    throw new Error("User not authenticated")
-  }
+export async function submitCart(
+  params: SubmitCartParams,
+  user: AuthUser
+): Promise<SubmitCartResponse> {
+  if (!user) throw new Error("User not authenticated")
 
   return apiClient.request<SubmitCartResponse>(
     "/api/method/prosessed_orderit.orderit.submit_cart_quotation",
@@ -204,4 +227,3 @@ export async function submitCart(params: SubmitCartParams, user: AuthUser): Prom
     }
   )
 }
-

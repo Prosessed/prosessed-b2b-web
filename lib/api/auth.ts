@@ -35,6 +35,8 @@ export async function getCompaniesByEmail(email: string): Promise<Company[]> {
 
 export async function login(credentials: AuthCredentials): Promise<AuthResponse> {
   try {
+
+    console.log("Auth credentials", credentials);
     const response = await fetch(`${BASE_URL}/api/method/prosessed_orderit.api.login`, {
       method: "POST",
       headers: {
@@ -53,6 +55,7 @@ export async function login(credentials: AuthCredentials): Promise<AuthResponse>
       throw new Error(data.message?.message || "Authentication failed")
     }
 
+    console.log("Auth success", data);
     return data
   } catch (error) {
     console.error("[v0] login error:", error)
