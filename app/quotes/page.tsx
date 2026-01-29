@@ -1,11 +1,11 @@
-import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import Image from "next/image"
+import { Card } from "@/components/ui/card"
+import { getAuthSession } from "@/lib/auth/storage.client"
 import { QuoteModel } from "@/lib/models/quote"
-import { FileText, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react"
-import { getAuthSession } from "@/lib/auth/storage"
+import { CheckCircle, Clock, FileText, XCircle } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
 import { redirect } from "next/navigation"
 
 export default async function QuotesPage() {
