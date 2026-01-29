@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { getAuthSession } from "@/lib/auth/storage.client"
+import { getAuthSession } from "@/lib/auth/storage"
 import { QuoteModel } from "@/lib/models/quote"
 import { ArrowLeft, CheckCircle, Clock, FileText, XCircle } from "lucide-react"
 import Image from "next/image"
