@@ -1,4 +1,4 @@
-import { getAuthSession } from "@/lib/auth/storage.client"
+import { getAuthSession } from "@/lib/auth/storage"
 import type { Quote } from "@/lib/types"
 
 interface QuotationResponse {
