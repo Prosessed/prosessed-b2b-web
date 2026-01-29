@@ -1,31 +1,131 @@
 import type { Quote } from "@/lib/types"
+import { getAuthSession } from "@/lib/auth/storage"
+
+interface QuotationResponse {
+  name: string
+  party_name: string
+  transaction_date: string
+  valid_till: string
+  grand_total: number
+  workflow_state: string
+  docstatus: number
+  items: QuotationItem[]
+}
+
+interface QuotationItem {
+  name: string
+  item_code: string
+  item_name: string
+  qty: number
+  uom: string
+  rate: number
+  amount: number
+  image?: string
+}
 
 export class QuoteModel {
   static async getAll(): Promise<Quote[]> {
-    // TODO: Replace with actual API call
-    // Example: const response = await fetch('/api/quotes')
-    // return response.json()
+    try {
+      const session = await getAuthSession()
+      if (!session?.user) return []
 
-    return mockQuotes
+      const baseUrl = session.user.baseUrl
+      const response = await fetch(
+        `${baseUrl}/api/method/prosessed_orderit.orderit.get_all_quotations?owner=${encodeURIComponent(
+          session.user.email
+        )}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `token ${session.user.apiKey}:${session.user.apiSecret}`,
+            "Content-Type": "application/json",
+          },
+        }
+      )
+
+      if (!response.ok) throw new Error("Failed to fetch quotations")
+
+      const data = await response.json()
+      const quotations = (data.message || []) as QuotationResponse[]
+
+      return quotations.map((q) => ({
+        id: q.name,
+        date: q.transaction_date,
+        validUntil: q.valid_till,
+        status: this.mapWorkflowState(q.workflow_state, q.docstatus),
+        total: q.grand_total,
+        items: q.items.map((item) => ({
+          id: item.item_code,
+          name: item.item_name,
+          price: item.rate,
+          image: item.image,
+          quantity: item.qty,
+          uom: item.uom,
+        })),
+      }))
+    } catch (error) {
+      console.error("Failed to fetch quotations:", error)
+      return []
+    }
   }
 
   static async getById(id: string): Promise<Quote | null> {
-    // TODO: Replace with actual API call
-    // Example: const response = await fetch(`/api/quotes/${id}`)
-    // return response.json()
+    try {
+      const session = await getAuthSession()
+      if (!session?.user) return null
 
-    const quotes = await this.getAll()
-    return quotes.find((q) => q.id === id) || null
+      const baseUrl = session.user.baseUrl
+      const response = await fetch(
+        `${baseUrl}/api/method/prosessed_orderit.orderit.get_quotation_details?quotation_id=${encodeURIComponent(
+          id
+        )}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `token ${session.user.apiKey}:${session.user.apiSecret}`,
+            "Content-Type": "application/json",
+          },
+        }
+      )
+
+      if (!response.ok) throw new Error("Failed to fetch quotation details")
+
+      const data = await response.json()
+      const q = data.message as QuotationResponse
+
+      return {
+        id: q.name,
+        date: q.transaction_date,
+        validUntil: q.valid_till,
+        status: this.mapWorkflowState(q.workflow_state, q.docstatus),
+        total: q.grand_total,
+        items: q.items.map((item) => ({
+          id: item.item_code,
+          name: item.item_name,
+          price: item.rate,
+          image: item.image,
+          quantity: item.qty,
+          uom: item.uom,
+        })),
+      }
+    } catch (error) {
+      console.error("Failed to fetch quotation details:", error)
+      return null
+    }
+  }
+
+  private static mapWorkflowState(
+    workflow_state: string,
+    docstatus: number
+  ): "pending" | "approved" | "rejected" | "expired" {
+    // docstatus: 0 = Draft, 1 = Submitted, 2 = Cancelled
+    if (docstatus === 2) return "rejected"
+    if (workflow_state === "approved") return "approved"
+    if (workflow_state === "expired") return "expired"
+    return "pending"
   }
 
   static async create(quoteData: Partial<Quote>): Promise<Quote> {
-    // TODO: Replace with actual API call
-    // Example: const response = await fetch('/api/quotes', {
-    //   method: 'POST',
-    //   body: JSON.stringify(quoteData)
-    // })
-    // return response.json()
-
     const newQuote: Quote = {
       id: `QTE-${Date.now()}`,
       date: new Date().toISOString(),
@@ -39,43 +139,3 @@ export class QuoteModel {
     return newQuote
   }
 }
-
-// Mock data - replace with actual API calls
-const mockQuotes: Quote[] = [
-  {
-    id: "QTE-001",
-    date: "2024-01-10",
-    status: "approved",
-    total: 2499.5,
-    validUntil: "2024-01-24",
-    items: [
-      { id: "6", name: "Bulk Rice 25kg", price: 45.99, image: "/rice-bag.png", quantity: 50, uom: "bag" },
-      { id: "3", name: "Premium Olive Oil", price: 24.99, image: "/olive-oil-bottle.png", quantity: 10, uom: "L" },
-    ],
-  },
-  {
-    id: "QTE-002",
-    date: "2024-01-22",
-    status: "pending",
-    total: 1890.0,
-    validUntil: "2024-02-05",
-    items: [
-      {
-        id: "9",
-        name: "Premium Coffee Beans",
-        price: 34.99,
-        image: "/pile-of-coffee-beans.png",
-        quantity: 30,
-        uom: "kg",
-      },
-      {
-        id: "12",
-        name: "Aged Cheddar Cheese",
-        price: 28.99,
-        image: "/aged-cheddar-cheese.png",
-        quantity: 20,
-        uom: "kg",
-      },
-    ],
-  },
-]

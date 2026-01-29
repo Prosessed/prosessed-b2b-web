@@ -222,3 +222,66 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
     },
   )
 }
+
+export function useQuotations() {
+  const { user } = useAuth()
+
+  const key = user ? ["quotations", user.email] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user) return null
+
+      const response = await apiClient.request<any>(
+        `/api/method/prosessed_orderit.orderit.get_all_quotations?owner=${encodeURIComponent(user.email)}`,
+        {
+          method: "GET",
+          auth: {
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            sid: user.sid,
+          },
+        }
+      )
+
+      return response?.message || []
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+    }
+  )
+}
+
+export function useQuotationDetails(quotationId: string | null) {
+  const { user } = useAuth()
+
+  const key = user && quotationId ? ["quotationDetails", quotationId] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user || !quotationId) return null
+
+      const response = await apiClient.request<any>(
+        `/api/method/prosessed_orderit.orderit.get_quotation_details?quotation_id=${encodeURIComponent(
+          quotationId
+        )}`,
+        {
+          method: "GET",
+          auth: {
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            sid: user.sid,
+          },
+        }
+      )
+
+      return response?.message || null
+    },
+    {
+      revalidateOnFocus: false,
+    }
+  )
+}

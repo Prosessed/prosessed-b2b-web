@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation"
 import { useCallback, useState } from "react"
 
 export default function CartPage() {
+  const router = useRouter()
   const {
     cart,
     isLoading,
@@ -32,36 +33,14 @@ export default function CartPage() {
     clearCart,
   } = useCartContext()
 
-  const router = useRouter()
-
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({})
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (!cart) {
-    return (
-      <div className="p-12 text-center">
-        <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <p className="text-muted-foreground mb-4">Your cart is empty</p>
-        <Button asChild>
-          <Link href="/products">Browse Products</Link>
-        </Button>
-      </div>
-    )
-  }
-
   // ✅ EXPLICITLY TYPE cartItems
-  const cartItems: CartItemResponse[] = cart.items
+  const cartItems: CartItemResponse[] = cart?.items || []
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.amount,
@@ -98,8 +77,11 @@ export default function CartPage() {
     try {
       await submitQuotation()
       setSubmitSuccess(true)
-      setTimeout(() => router.push("/quotes"), 2000)
-    } catch {
+      // Wait for animation to complete before redirect
+      await new Promise((resolve) => setTimeout(resolve, 2500))
+      router.push("/quotes")
+    } catch (error) {
+      console.error("Failed to submit quotation:", error)
       setIsSubmitting(false)
     }
   }, [submitQuotation, router])
@@ -119,6 +101,26 @@ export default function CartPage() {
     }
   }, [cartItems, removeItem, clearCart, isClearing])
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!cart) {
+    return (
+      <div className="p-12 text-center">
+        <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <p className="text-muted-foreground mb-4">Your cart is empty</p>
+        <Button asChild>
+          <Link href="/products">Browse Products</Link>
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 min-h-screen">
       <Button variant="ghost" asChild className="mb-4 -ml-4">
@@ -136,7 +138,7 @@ export default function CartPage() {
             variant="outline"
             onClick={handleClearCart}
             disabled={isClearing}
-            className="text-destructive"
+            className="text-destructive bg-transparent"
           >
             {isClearing ? (
               <>
