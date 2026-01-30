@@ -285,3 +285,47 @@ export function useQuotationDetails(quotationId: string | null) {
     }
   )
 }
+
+export interface Banner {
+  title: string
+  subtitle?: string
+  image_url: string
+  redirect_url?: string | null
+}
+
+export interface Deal {
+  title: string
+  tag: string
+  image_url: string
+  redirect_url?: string | null
+}
+
+export interface BannersAndDealsResponse {
+  banners: Banner[]
+  deals: Deal[]
+}
+
+export function useBannersAndDeals() {
+  const key = "bannersAndDeals"
+
+  return useSWR(
+    key,
+    async () => {
+      const response = await apiClient.request<any>(
+        "/api/method/prosessed_order.api.get_b2b_banners_and_deals",
+        {
+          method: "POST",
+          body: JSON.stringify({}),
+        }
+      )
+
+      const data = response?.message || response
+      return data as BannersAndDealsResponse
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      dedupingInterval: 60000, // Cache for 1 minute
+    }
+  )
+}

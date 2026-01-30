@@ -18,9 +18,13 @@ interface ProductCardProps {
   unit?: string
   stock?: number
   rate?: number
+  customerPriceMargin?: {
+    price_margin: number
+    is_custom_price: number
+  }
 }
 
-export function ProductCard({ id, name, price, image, unit = "kg", stock, rate }: ProductCardProps) {
+export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, customerPriceMargin }: ProductCardProps) {
   const { cart, addItem, updateItem, removeItem, isLoading: cartLoading } = useCartContext()
   const { openDrawer } = useCartDrawer()
   const { user } = useAuth()
@@ -113,8 +117,21 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate }
           </Link>
           <div className="flex items-center justify-between mt-2">
             <div>
-              <p className="text-lg font-bold text-foreground">${(price || 0).toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">per {unit}</p>
+              {customerPriceMargin?.is_custom_price === 1 ? (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Custom Pricing</p>
+                  <p className="text-xs text-muted-foreground">Contact for quote</p>
+                </div>
+              ) : customerPriceMargin?.is_custom_price === 0 ? (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Price on Request</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-lg font-bold text-foreground">${(price || 0).toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">per {unit}</p>
+                </div>
+              )}
             </div>
 
             <AnimatePresence mode="wait">
