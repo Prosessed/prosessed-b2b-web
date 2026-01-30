@@ -1,3 +1,5 @@
+"use client"
+
 import { Apple, Coffee, Milk, Wheat, Package, Fish } from "lucide-react"
 import { AnimatedBanner } from "@/components/animated-banner"
 import { CategoryGrid } from "@/components/category-grid"
@@ -5,6 +7,8 @@ import { ProductRow } from "@/components/product-row"
 import { Footer } from "@/components/footer"
 import { HeroCarousel } from "@/components/hero-carousel"
 import { StickyDealCards } from "@/components/sticky-deal-cards"
+import { useBannersAndDeals } from "@/lib/api/hooks"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const categories = [
   { name: "Fruits & Vegetables", icon: Apple, href: "/products?category=fruits" },
@@ -22,7 +26,7 @@ const bannerItems = [
   { text: "💳 Easy payment options available", bgColor: "oklch(0.58 0.2 145)", textColor: "white" },
 ]
 
-const heroBanners = [
+const defaultHeroBanners = [
   {
     id: "1",
     image: "/hero-banner-1.jpg",
@@ -58,12 +62,29 @@ const heroBanners = [
 ]
 
 export default function HomePage() {
+  const { data, isLoading } = useBannersAndDeals()
+  
+  const heroBanners = (data?.banners || []).map((banner, index) => ({
+    id: String(index),
+    image_url: banner.image_url,
+    image: banner.image_url,
+    title: banner.title,
+    subtitle: banner.subtitle,
+    redirect_url: banner.redirect_url,
+  }))
+
+  const displayBanners = heroBanners.length > 0 ? heroBanners : defaultHeroBanners
+
   return (
     <div className="min-h-screen bg-background/50">
       <AnimatedBanner items={bannerItems} />
 
       <div className="container mx-auto px-4 py-6">
-        <HeroCarousel banners={heroBanners} />
+        {isLoading ? (
+          <Skeleton className="aspect-video rounded-lg" />
+        ) : (
+          <HeroCarousel banners={displayBanners} />
+        )}
       </div>
 
       <div className="container mx-auto px-4 pb-12">

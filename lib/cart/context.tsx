@@ -240,15 +240,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const currentQuotationId = quotationId || data?.cart?.name
       if (!currentQuotationId) throw new Error("Cart not found")
 
-      await submitCart(
-        {
-          quotation_id: currentQuotationId,
-          signature_base64: params?.signature_base64,
-        },
-        user
-      )
+      try {
+        await submitCart(
+          {
+            quotation_id: currentQuotationId,
+            signature_base64: params?.signature_base64,
+          },
+          user
+        )
 
-      await mutate()
+        // Clear cart after successful submission
+        setQuotationId(null)
+        await mutate({ cart: null }, false)
+      } catch (error) {
+        console.error("[Cart Context] Failed to submit quotation:", error)
+        throw error
+      }
     },
     [quotationId, data?.cart?.name, mutate, user]
   )

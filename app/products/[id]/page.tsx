@@ -27,9 +27,15 @@ export default function ProductDetailPage() {
   const [isAdding, setIsAdding] = useState(false)
 
   const { user } = useAuth()
-  const { addItem } = useCartContext()
+  const { addItem, cart, updateItem } = useCartContext()
   const { openDrawer } = useCartDrawer()
   const { data, isLoading, error } = useItemDetails(itemCode, quantity)
+
+  // Check if item is already in cart
+  const cartItem = useMemo(() => {
+    if (!cart?.items) return null
+    return cart.items.find((item: any) => item.item_code === itemCode)
+  }, [cart?.items, itemCode])
 
   const product = data
 
@@ -92,14 +98,24 @@ export default function ProductDetailPage() {
     
     setIsAdding(true)
     try {
-      await addItem({
-        item_code: product.item_code,
-        qty: quantity,
-        rate: currentRate,
-        warehouse: user.defaultWarehouse,
-        uom: selectedUom || product.uom || product.stock_uom,
-        custom_quotation_item_details: note || undefined,
-      })
+      if (cartItem) {
+        // Item already in cart - update quantity and note instead of creating duplicate
+        const newQuantity = cartItem.qty + quantity
+        await updateItem(cartItem.name, { 
+          qty: newQuantity,
+          ...(note && { custom_quotation_item_details: note })
+        })
+      } else {
+        // Item not in cart - add it
+        await addItem({
+          item_code: product.item_code,
+          qty: quantity,
+          rate: currentRate,
+          warehouse: user.defaultWarehouse,
+          uom: selectedUom || product.uom || product.stock_uom,
+          custom_quotation_item_details: note || undefined,
+        })
+      }
       // Small delay for smooth UI update
       await new Promise((resolve) => setTimeout(resolve, 200))
       // Open cart drawer instead of redirecting
@@ -199,11 +215,22 @@ export default function ProductDetailPage() {
 
 
           {/* Price */}
-          <Card className="p-6 bg-primary/5 border-primary/20 rounded-xl">
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-black text-primary">${currentRate.toFixed(2)}</span>
-              <span className="text-muted-foreground">per {selectedUom || product.uom || product.stock_uom}</span>
-            </div>
+          <Card className="p-6 bg-primary/5 rounded-2xl border-primary/20">
+            {product.customer_price_margin?.is_custom_price === 1 ? (
+              <div>
+                <p className="text-lg font-bold text-primary mb-2">Custom Pricing</p>
+                <p className="text-sm text-muted-foreground">Price customized based on your volume and account. Contact sales for details.</p>
+              </div>
+            ) : product.customer_price_margin?.is_custom_price === 0 ? (
+              <div>
+                <p className="text-sm text-muted-foreground">Pricing available on request. Please contact us for a quote.</p>
+              </div>
+            ) : (
+              <div className="flex items-baseline gap-3">
+                <span className="text-4xl font-black text-primary">${currentRate.toFixed(2)}</span>
+                <span className="text-muted-foreground">per {selectedUom || product.uom || product.stock_uom}</span>
+              </div>
+            )}
           </Card>
 
           {/* UOM Selector */}
@@ -297,12 +324,15 @@ export default function ProductDetailPage() {
             className="w-full text-lg h-14 rounded-xl font-bold"
             onClick={handleAddToCart}
             disabled={isAdding}
+            variant={cartItem ? "outline" : "default"}
           >
             {isAdding ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Adding...
+                {cartItem ? "Updating..." : "Adding..."}
               </span>
+            ) : cartItem ? (
+              `Update Cart - $${totalPrice.toFixed(2)}`
             ) : (
               `Add to Cart - $${totalPrice.toFixed(2)}`
             )}

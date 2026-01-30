@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Sparkles, Tag, Zap } from "lucide-react"
 import { motion } from "framer-motion"
 import Image from "next/image"
+import { useBannersAndDeals } from "@/lib/api/hooks"
+import { Skeleton } from "@/components/ui/skeleton"
 
-const deals = [
+const defaultDeals = [
   {
     id: "1",
     title: "Flash Sale",
@@ -20,33 +22,40 @@ const deals = [
     icon: Zap,
     gradient: "from-orange-500 to-red-500",
   },
-  {
-    id: "2",
-    title: "New Arrivals",
-    subtitle: "Fresh Stock",
-    description: "Check out our latest products",
-    image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=400&fit=crop",
-    ctaText: "Explore",
-    ctaLink: "/products?deal=new-arrivals",
-    badge: "New",
-    icon: Sparkles,
-    gradient: "from-blue-500 to-purple-500",
-  },
-  {
-    id: "3",
-    title: "Best Sellers",
-    subtitle: "Top Picks",
-    description: "Most loved by our customers",
-    image: "https://images.unsplash.com/photo-1556910096-6f5e72db6803?w=800&h=400&fit=crop",
-    ctaText: "View All",
-    ctaLink: "/products?deal=best-sellers",
-    badge: "Popular",
-    icon: Tag,
-    gradient: "from-green-500 to-emerald-500",
-  },
 ]
 
 export function StickyDealCards() {
+  const { data, isLoading } = useBannersAndDeals()
+  
+  const deals = (data?.deals || []).map((deal, index) => ({
+    id: String(index),
+    title: deal.title,
+    subtitle: "",
+    description: deal.tag || "Special Deal",
+    image: deal.image_url || "/placeholder.svg",
+    ctaText: "View Deal",
+    ctaLink: deal.redirect_url || "/products",
+    badge: deal.tag || "Hot Deal",
+    icon: index % 3 === 0 ? Zap : index % 3 === 1 ? Sparkles : Tag,
+    gradient: index % 3 === 0 ? "from-orange-500 to-red-500" : index % 3 === 1 ? "from-blue-500 to-purple-500" : "from-green-500 to-emerald-500",
+  }))
+
+  const displayDeals = deals.length > 0 ? deals : defaultDeals
+  
+  if (isLoading) {
+    return (
+      <section className="py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-3xl font-black tracking-tight">Special Deals</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="aspect-video rounded-lg" />
+          ))}
+        </div>
+      </section>
+    )
+  }
   return (
     <section className="py-8">
       <div className="flex items-center justify-between mb-6">
@@ -60,7 +69,7 @@ export function StickyDealCards() {
         </Link>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {deals.map((deal, index) => (
+        {displayDeals.map((deal, index) => (
           <motion.div
             key={deal.id}
             initial={{ opacity: 0, y: 20 }}
@@ -73,7 +82,7 @@ export function StickyDealCards() {
                 {/* Background Image */}
                 <div className="absolute inset-0">
                   <Image
-                    src={deal.image}
+                    src={deal.image || "/placeholder.svg"}
                     alt={deal.title}
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
