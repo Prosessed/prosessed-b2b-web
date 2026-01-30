@@ -66,8 +66,8 @@ export function ProductRow({ title, itemGroup, categoryHref = "/products", pageS
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className={pageSize >= 10 
-          ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
-          : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+          ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
+          : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
         }
       >
         {products.map((product: any) => {
@@ -173,12 +173,13 @@ function ProductRowCard({ id, name, price, rate, image, unit = "kg" }: any) {
             <h3 className="font-black text-sm mb-1.5 line-clamp-2 leading-tight group-hover/link:text-primary transition-colors">{name}</h3>
           </Link>
           <p className="text-[9px] text-muted-foreground mb-3 font-bold uppercase tracking-widest opacity-70">{unit}</p>
-          <div className="flex items-end justify-between mt-auto gap-3">
-            <div className="flex flex-col min-w-0 flex-1">
+          
+          <div className="flex flex-col gap-3 mt-auto">
+            <div className="flex items-center justify-start">
               <span className="text-xl font-black text-foreground leading-none">${(price || 0).toFixed(2)}</span>
             </div>
 
-            <div className="relative h-10 w-24 flex items-center justify-center shrink-0">
+            <div className="w-full">
               {quantity === 0 ? (
                 <Button
                   onClick={handleAdd}

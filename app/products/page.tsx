@@ -451,21 +451,6 @@ export default function ProductsPage() {
               <div className="mb-8">
                 <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Categories</h3>
                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
-                  <label className="flex items-center gap-3 group cursor-pointer">
-                    <Checkbox
-                      id="category-all"
-                      checked={!categoryFromUrl}
-                      onCheckedChange={() => handleCategoryChange("")}
-                      className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
-                    />
-                    <span
-                      className={`text-sm font-bold transition-colors ${
-                        !categoryFromUrl ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                      }`}
-                    >
-                      All Categories
-                    </span>
-                  </label>
                   {allCategories.map((category) => (
                     <label key={category} className="flex items-center gap-3 group cursor-pointer">
                       <Checkbox
