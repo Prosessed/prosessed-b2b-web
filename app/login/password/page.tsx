@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, ArrowLeft, Lock, Building2 } from "lucide-react"
 import { apiClient, ApiError } from "@/lib/api/client"
+import { setAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
 import type { Company, AuthUser } from "@/lib/auth/types"
 
@@ -64,6 +65,7 @@ export default function PasswordPage() {
       }
 
       login(user)
+      await setAuthCookie(user)
       sessionStorage.removeItem("login_email")
       sessionStorage.removeItem("login_company")
       router.push("/")

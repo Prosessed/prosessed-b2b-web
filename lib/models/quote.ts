@@ -29,7 +29,7 @@ export class QuoteModel {
       const session = await getAuthSession()
       if (!session?.user) return []
 
-      const baseUrl = session.user.baseUrl
+      const baseUrl = session.user.companyUrl
       const response = await fetch(
         `${baseUrl}/api/method/prosessed_orderit.orderit.get_all_quotations?owner=${encodeURIComponent(
           session.user.email
@@ -74,7 +74,7 @@ export class QuoteModel {
       const session = await getAuthSession()
       if (!session?.user) return null
 
-      const baseUrl = session.user.baseUrl
+      const baseUrl = session.user.companyUrl
       const response = await fetch(
         `${baseUrl}/api/method/prosessed_orderit.orderit.get_quotation_details?quotation_id=${encodeURIComponent(
           id

@@ -1,7 +1,8 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react"
 import { setApiBaseUrl } from "../api/client"
+import { setAuthCookie } from "./actions"
 import { authStorage } from "./storage.client"
 import type { AuthUser } from "./types"
 
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const cookieSyncedRef = useRef(false)
 
   useEffect(() => {
     const storedUser = authStorage.getUser()
@@ -25,6 +27,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (authStorage.isSessionValid(storedUser.apiSecret)) {
         setApiBaseUrl(storedUser.companyUrl)
         setUser(storedUser)
+        // Sync auth cookie so server-rendered pages (e.g. /quotes) have session
+        if (!cookieSyncedRef.current) {
+          cookieSyncedRef.current = true
+          setAuthCookie(storedUser).catch(() => {})
+        }
       } else {
         authStorage.removeUser()
         setUser(null)

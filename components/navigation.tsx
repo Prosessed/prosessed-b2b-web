@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { clearAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
@@ -347,7 +348,13 @@ export function Navigation() {
                   <Link href="/quotes">My Quotes</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                <DropdownMenuItem
+                  onClick={async () => {
+                    await clearAuthCookie()
+                    logout()
+                  }}
+                  className="text-destructive focus:text-destructive"
+                >
                   Logout
                 </DropdownMenuItem>
               </>

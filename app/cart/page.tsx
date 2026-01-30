@@ -77,9 +77,8 @@ export default function CartPage() {
     try {
       await submitQuotation()
       setSubmitSuccess(true)
-      // Wait for animation to complete
-      await new Promise((resolve) => setTimeout(resolve, 2500))
-      // Use router.push with client-side navigation to preserve auth context
+      // Brief success feedback then redirect to My Quotes
+      await new Promise((resolve) => setTimeout(resolve, 800))
       router.push("/quotes")
     } catch (error) {
       console.error("Failed to submit quotation:", error)
