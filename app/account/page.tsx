@@ -7,12 +7,16 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { User, Mail, MapPin, Building, CreditCard, Package, Heart, Bell, Shield, Edit, Camera } from "lucide-react"
+import { User, Mail, MapPin, Building, CreditCard, Package, Heart, Bell, Shield, Edit, Camera, LogOut, ArrowRight } from "lucide-react"
 import { useAuth } from "@/lib/auth/context"
 import { useRouter } from "next/navigation"
+import { useQuotations } from "@/lib/api/hooks"
+import Link from "next/link"
+import { clearAuthCookie } from "@/lib/auth/actions"
 
 export default function AccountPage() {
-  const { user, isAuthenticated, isLoading } = useAuth()
+  const { user, isAuthenticated, isLoading, logout } = useAuth()
+  const { data: quotations = [] } = useQuotations()
   const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
 
@@ -29,6 +33,15 @@ export default function AccountPage() {
       </div>
     )
   }
+
+  const handleLogout = async () => {
+    await clearAuthCookie()
+    logout()
+    router.push("/login")
+  }
+
+  const totalOrders = quotations?.length || 0
+  const totalSpent = quotations?.reduce((sum: number, q: any) => sum + (q.total || 0), 0) || 0
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -67,7 +80,7 @@ export default function AccountPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Building className="h-4 w-4 text-muted-foreground" />
-                    <span>{user.username}</span>
+                    <span>{user.companyName || user.username}</span>
                   </div>
                   <div className="flex items-center gap-2 text-primary font-medium">
                     <Building className="h-4 w-4" />
@@ -75,45 +88,57 @@ export default function AccountPage() {
                   </div>
                 </div>
               </div>
-              <Button
-                onClick={() => setIsEditing(!isEditing)}
-                variant="outline"
-                className="border-primary/30 text-foreground hover:bg-primary/10 hover:text-foreground"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Profile
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={() => setIsEditing(!isEditing)}
+                  variant="outline"
+                  className="border-primary/30 text-foreground hover:bg-primary/10 hover:text-foreground"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Profile
+                </Button>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Account Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Link href="/quotes">
+            <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
+              <CardContent className="pt-6 text-center">
+                <Package className="h-8 w-8 mx-auto mb-2 text-primary" />
+                <div className="text-2xl font-bold">{totalOrders}</div>
+                <div className="text-sm text-muted-foreground">Total Orders</div>
+              </CardContent>
+            </Card>
+          </Link>
           <Card className="border-border/50 hover:border-primary/50 transition-colors">
             <CardContent className="pt-6 text-center">
-              <Package className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <div className="text-2xl font-bold">127</div>
-              <div className="text-sm text-muted-foreground">Total Orders</div>
+              <CreditCard className="h-8 w-8 mx-auto mb-2 text-primary" />
+              <div className="text-2xl font-bold">${(totalSpent / 1000).toFixed(1)}K</div>
+              <div className="text-sm text-muted-foreground">Total Spent</div>
             </CardContent>
           </Card>
           <Card className="border-border/50 hover:border-primary/50 transition-colors">
             <CardContent className="pt-6 text-center">
               <Heart className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <div className="text-2xl font-bold">43</div>
+              <div className="text-2xl font-bold">0</div>
               <div className="text-sm text-muted-foreground">Favorites</div>
             </CardContent>
           </Card>
           <Card className="border-border/50 hover:border-primary/50 transition-colors">
             <CardContent className="pt-6 text-center">
-              <CreditCard className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <div className="text-2xl font-bold">3</div>
-              <div className="text-sm text-muted-foreground">Saved Cards</div>
-            </CardContent>
-          </Card>
-          <Card className="border-border/50 hover:border-primary/50 transition-colors">
-            <CardContent className="pt-6 text-center">
               <MapPin className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <div className="text-2xl font-bold">5</div>
+              <div className="text-2xl font-bold">1</div>
               <div className="text-sm text-muted-foreground">Addresses</div>
             </CardContent>
           </Card>

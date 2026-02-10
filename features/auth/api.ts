@@ -1,7 +1,13 @@
-import type { AuthCredentials, AuthResponse, Company } from "../auth/types"
+// Auth Feature API
+// All authentication-related API calls
+
+import type { AuthCredentials, AuthResponse, Company, OTPResponse, OTPVerifyResponse } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://internal.prosessed.com"
 
+/**
+ * Fetch all companies for a given email
+ */
 export async function getCompaniesByEmail(email: string): Promise<Company[]> {
   try {
     const params = new URLSearchParams({
@@ -28,15 +34,16 @@ export async function getCompaniesByEmail(email: string): Promise<Company[]> {
       company_url: item.company_url || "",
     }))
   } catch (error) {
-    console.error("[v0] getCompaniesByEmail error:", error)
+    console.error("[Auth API] getCompaniesByEmail error:", error)
     throw error
   }
 }
 
+/**
+ * Login with email and password
+ */
 export async function login(credentials: AuthCredentials): Promise<AuthResponse> {
   try {
-
-    console.log("Auth credentials", credentials);
     const response = await fetch(`${BASE_URL}/api/method/prosessed_orderit.api.login`, {
       method: "POST",
       headers: {
@@ -55,15 +62,17 @@ export async function login(credentials: AuthCredentials): Promise<AuthResponse>
       throw new Error(data.message?.message || "Authentication failed")
     }
 
-    console.log("Auth success", data);
     return data
   } catch (error) {
-    console.error("[v0] login error:", error)
+    console.error("[Auth API] login error:", error)
     throw error
   }
 }
 
-export async function requestOTP(email: string): Promise<{ success: boolean; message: string }> {
+/**
+ * Request OTP for password reset
+ */
+export async function requestOTP(email: string): Promise<OTPResponse> {
   try {
     const response = await fetch(`${BASE_URL}/api/method/prosessed_orderit.api.send_otp`, {
       method: "POST",
@@ -85,26 +94,23 @@ export async function requestOTP(email: string): Promise<{ success: boolean; mes
 
     return { success: true, message: "OTP sent successfully" }
   } catch (error) {
-    console.error("[v0] requestOTP error:", error)
+    console.error("[Auth API] requestOTP error:", error)
     throw error
   }
 }
 
-export async function verifyOTP(
-  email: string,
-  otp: string
-): Promise<{ success: boolean; token: string }> {
+/**
+ * Verify OTP sent to user email
+ */
+export async function verifyOTP(email: string, otp: string): Promise<OTPVerifyResponse> {
   try {
-    const response = await fetch(
-      `${BASE_URL}/api/method/prosessed_orderit.api.verify_otp`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, otp }),
-      }
-    )
+    const response = await fetch(`${BASE_URL}/api/method/prosessed_orderit.api.verify_otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, otp }),
+    })
 
     if (!response.ok) {
       throw new Error(`Failed to verify OTP: ${response.statusText}`)
@@ -121,27 +127,27 @@ export async function verifyOTP(
       token: data.message?.token || "",
     }
   } catch (error) {
-    console.error("[v0] verifyOTP error:", error)
+    console.error("[Auth API] verifyOTP error:", error)
     throw error
   }
 }
 
+/**
+ * Reset password using token from OTP verification
+ */
 export async function resetPassword(
   email: string,
   token: string,
   newPassword: string
-): Promise<{ success: boolean; message: string }> {
+): Promise<OTPResponse> {
   try {
-    const response = await fetch(
-      `${BASE_URL}/api/method/prosessed_orderit.api.reset_password`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, token, new_password: newPassword }),
-      }
-    )
+    const response = await fetch(`${BASE_URL}/api/method/prosessed_orderit.api.reset_password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, token, new_password: newPassword }),
+    })
 
     if (!response.ok) {
       throw new Error(`Failed to reset password: ${response.statusText}`)
@@ -155,7 +161,7 @@ export async function resetPassword(
 
     return { success: true, message: "Password reset successfully" }
   } catch (error) {
-    console.error("[v0] resetPassword error:", error)
+    console.error("[Auth API] resetPassword error:", error)
     throw error
   }
 }
