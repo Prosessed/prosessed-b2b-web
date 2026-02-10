@@ -221,7 +221,7 @@ export function Footer() {
 
         {/* Bottom section */}
         <div className="mt-12 pt-8 border-t flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">© prosessed.ai Commerce Private Limited, 2025</p>
+          <p className="text-sm text-muted-foreground">© 2025 B2B Commerce</p>
           <div className="flex items-center gap-4">
             <p className="text-sm font-medium">Download App</p>
             <div className="flex gap-2">
@@ -260,7 +260,7 @@ export function Footer() {
             </div>
             <div className="flex gap-3 ml-4">
               <Link
-                href="https://www.linkedin.com/company/prosessed/"
+                href="#"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -268,7 +268,7 @@ export function Footer() {
                 <Linkedin className="h-5 w-5" />
               </Link>
               <Link
-                href="https://www.youtube.com/@Prosessed-orderit"
+                href="#"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -276,7 +276,7 @@ export function Footer() {
                 <Youtube className="h-5 w-5" />
               </Link>
               <Link
-                href="https://www.instagram.com/prosessed/"
+                href="#"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -289,8 +289,7 @@ export function Footer() {
 
         <div className="mt-6 pt-6 border-t">
           <p className="text-xs text-muted-foreground text-center leading-relaxed">
-            "prosessed.ai" is owned & managed by "prosessed.ai Commerce Private Limited" and is not related, linked or
-            interconnected in whatsoever manner or nature, to any other business entity.
+            B2B Commerce platform.
           </p>
         </div>
       </div>

@@ -62,100 +62,73 @@ export async function login(credentials: AuthCredentials): Promise<AuthResponse>
     throw error
   }
 }
-
-export async function requestOTP(email: string): Promise<{ success: boolean; message: string }> {
+/** Normalize URL to protocol + host only */
+function toBaseUrlOnly(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
   try {
-    const response = await fetch(`${BASE_URL}/api/method/prosessed_orderit.api.send_otp`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to send OTP: ${response.statusText}`)
-    }
-
-    const data = await response.json()
-
-    if (data.message?.success_key !== 1) {
-      throw new Error(data.message?.message || "Failed to send OTP")
-    }
-
-    return { success: true, message: "OTP sent successfully" }
-  } catch (error) {
-    console.error("[v0] requestOTP error:", error)
-    throw error
+    return new URL(url).origin
+  } catch {
+    return url.replace(/\/$/, "").replace(/\/(app|home).*$/, "")
   }
 }
 
-export async function verifyOTP(
+export async function requestOTP(
   email: string,
-  otp: string
-): Promise<{ success: boolean; token: string }> {
-  try {
-    const response = await fetch(
-      `${BASE_URL}/api/method/prosessed_orderit.api.verify_otp`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, otp }),
-      }
-    )
-
-    if (!response.ok) {
-      throw new Error(`Failed to verify OTP: ${response.statusText}`)
-    }
-
-    const data = await response.json()
-
-    if (data.message?.success_key !== 1) {
-      throw new Error(data.message?.message || "Invalid OTP")
-    }
-
-    return {
-      success: true,
-      token: data.message?.token || "",
-    }
-  } catch (error) {
-    console.error("[v0] verifyOTP error:", error)
-    throw error
-  }
-}
-
-export async function resetPassword(
-  email: string,
-  token: string,
-  newPassword: string
+  companyUrl?: string | null
 ): Promise<{ success: boolean; message: string }> {
-  try {
-    const response = await fetch(
-      `${BASE_URL}/api/method/prosessed_orderit.api.reset_password`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, token, new_password: newPassword }),
-      }
-    )
+  const baseUrl = toBaseUrlOnly(companyUrl)
 
-    if (!response.ok) {
-      throw new Error(`Failed to reset password: ${response.statusText}`)
-    }
+  const url =
+    `${baseUrl}/api/method/prosessed_orderit.api.request_password_reset_otp` +
+    `?email=${encodeURIComponent(email)}`
 
-    const data = await response.json()
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain",
+    },
+    credentials: "include", // important for Frappe Guest session
+  })
 
-    if (data.message?.success_key !== 1) {
-      throw new Error(data.message?.message || "Failed to reset password")
-    }
+  const data = await response.json().catch(() => ({}))
 
-    return { success: true, message: "Password reset successfully" }
-  } catch (error) {
-    console.error("[v0] resetPassword error:", error)
-    throw error
+  if (!response.ok) {
+    throw new Error(data?.message || "Failed to send OTP")
+  }
+
+  return {
+    success: true,
+    message: data?.message?.message || "OTP sent successfully",
+  }
+}
+export async function verifyOtpAndResetPassword(
+  email: string,
+  otp: string,
+  newPassword: string,
+  companyUrl?: string | null
+): Promise<{ success: boolean; message: string }> {
+  const baseUrl = toBaseUrlOnly(companyUrl)
+
+  const url =
+    `${baseUrl}/api/method/prosessed_orderit.api.verify_otp_and_reset_password` +
+    `?email=${encodeURIComponent(email)}` +
+    `&otp=${encodeURIComponent(otp)}` +
+    `&new_password=${encodeURIComponent(newPassword)}`
+
+  const response = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+  })
+
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    throw new Error(data?.message || "Failed to reset password")
+  }
+
+  return {
+    success: true,
+    message:
+      data?.message?.message || "Password has been reset successfully",
   }
 }

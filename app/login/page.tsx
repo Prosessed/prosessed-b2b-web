@@ -60,39 +60,13 @@ export default function LoginPage() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[120px]" />
       </div>
 
-      {/* <header className="relative z-10 container mx-auto px-4 h-20 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xl font-bold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            P
-          </div>
-          <span>prosessed.ai</span>
-        </div>
-        <div className="flex items-center gap-6">
-          <Link href="#" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-            About Us
-          </Link>
-          <Link href="#" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-            Products
-          </Link>
-          <Button
-            variant="outline"
-            className="rounded-full border-primary/20 text-primary hover:bg-primary/5 bg-transparent"
-          >
-            Contact
-          </Button>
-        </div>
-      </header> */}
-
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-12 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8">
-          <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-          Powered by AI — Master your Digital Landscape
-        </div>
-
-        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight max-w-5xl mb-6">
-          AI-First <span className="text-primary">Operating System</span> for <br className="hidden md:block" />
-          Cross Border Trade Optimizing <span className="text-primary/70 italic">Cash Flow.</span>
+        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight max-w-3xl mb-3">
+          B2B Ordering Portal for Retailers
         </h1>
+        <p className="text-muted-foreground text-lg mb-10">
+          Place Order · Get Quote · Ledger · Payment
+        </p>
 
         <div className="w-full max-w-md mt-12 bg-card/50 backdrop-blur-xl border border-border/50 rounded-3xl p-8 shadow-2xl">
           <div className="space-y-2 mb-8">
@@ -145,9 +119,6 @@ export default function LoginPage() {
                   )}
                 </Button>
 
-                <p className="text-xs text-muted-foreground pt-4">
-                  This portal is powered by <span className="font-bold text-foreground">prosessed.ai</span>
-                </p>
               </CardContent>
             </form>
           ) : (
@@ -194,8 +165,19 @@ export default function LoginPage() {
         </div>
       </main>
 
-      <footer className="relative z-10 container mx-auto px-4 h-20 flex items-center justify-center border-t border-border/10">
-        <p className="text-sm text-muted-foreground">© 2025 prosessed.ai — The AI-First Operating System for Trade.</p>
+      <footer className="relative z-10 container mx-auto px-4 py-6 flex flex-col items-center justify-center gap-2 border-t border-border/10 text-center">
+        <p className="text-sm text-muted-foreground">
+          This portal is powered by{" "}
+          <a
+            href="https://prosessed.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary font-medium hover:underline"
+          >
+            prosessed.ai
+          </a>
+        </p>
+        <p className="text-xs text-muted-foreground">© 2025 B2B Commerce</p>
       </footer>
     </div>
   )

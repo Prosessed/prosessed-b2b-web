@@ -1,14 +1,16 @@
 "use client"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Plus, Minus, Loader2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
+import { formatPrice } from "@/lib/utils/currency"
 
 interface ProductCardProps {
   id: string
@@ -34,6 +36,10 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
 
   const cartItem = cart?.items?.find((item) => item.item_code === id)
   const quantity = cartItem?.qty || 0
+  const [inputVal, setInputVal] = useState(String(quantity))
+  useEffect(() => {
+    setInputVal(String(quantity))
+  }, [quantity])
 
   const handleAdd = useCallback(async () => {
     if (!user) return
@@ -94,6 +100,45 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
       setIsMutating(false)
     }
   }, [cartItem, quantity, updateItem, removeItem])
+
+  const applyQtyInput = useCallback(
+    async (val: string) => {
+      const n = Math.max(0, Math.floor(parseFloat(val) || 0))
+      setInputVal(String(n))
+      if (!user || n === 0) {
+        if (cartItem) await removeItem(cartItem.name)
+        return
+      }
+      const itemRate = (rate && rate > 0) ? rate : (price && price > 0 ? price : 0)
+      if (cartItem) {
+        await updateItem(cartItem.name, { qty: n })
+      } else if (itemRate > 0) {
+        await addItem({
+          item_code: id,
+          qty: n,
+          rate: itemRate,
+          warehouse: user.defaultWarehouse,
+          uom: unit,
+        })
+      }
+    },
+    [user, cartItem, id, rate, price, unit, addItem, updateItem, removeItem]
+  )
+
+  const handleQtyInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value.replace(/\D/g, "").slice(0, 5)
+    setInputVal(v)
+  }
+
+  const handleQtyInputBlur = () => {
+    const val = inputVal.trim()
+    if (val === "" || val === String(quantity)) {
+      setInputVal(String(quantity))
+      return
+    }
+    setIsMutating(true)
+    applyQtyInput(val).finally(() => setIsMutating(false))
+  }
 
   return (
     <motion.div
@@ -159,7 +204,7 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
                 </div>
               ) : (
                 <div>
-                  <p className="text-lg font-bold text-foreground">${(price || 0).toFixed(2)}</p>
+                  <p className="text-lg font-bold text-foreground">{formatPrice(price ?? 0, user?.defaultCurrency)}</p>
                   <p className="text-xs text-muted-foreground">per {unit}</p>
                 </div>
               )}
@@ -200,13 +245,16 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
                     <Minus className="h-4 w-4" />
                   </Button>
 
-                  <div className="w-8 text-center flex items-center justify-center">
-                    {isMutating ? (
-                      <Loader2 className="h-3 w-3 animate-spin text-primary/70" />
-                    ) : (
-                      <span className="font-bold text-primary text-sm">{quantity}</span>
-                    )}
-                  </div>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={quantity > 0 ? inputVal : quantity}
+                    onChange={handleQtyInputChange}
+                    onBlur={handleQtyInputBlur}
+                    onFocus={() => setInputVal(String(quantity))}
+                    onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                    className="h-9 w-12 text-center text-sm font-bold p-1 border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
 
                   <Button
                     onClick={increment}

@@ -8,15 +8,19 @@ import { Separator } from "@/components/ui/separator"
 import { Minus, Plus, Trash2, ShoppingCart, Loader2, X } from "lucide-react"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
+import { useAuth } from "@/lib/auth/context"
+import { formatPrice } from "@/lib/utils/currency"
 import { motion, AnimatePresence } from "framer-motion"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./ui/sheet"
 
 export function CartDrawer() {
   const { isOpen, closeDrawer } = useCartDrawer()
   const { cart, isLoading, updateItem, removeItem, clearCart } = useCartContext()
+  const { user } = useAuth()
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [isClearing, setIsClearing] = useState(false)
+  const currency = user?.defaultCurrency ?? "AUD"
 
   const cartItems = cart?.items || []
   const grandTotal = cart?.grand_total || 0
@@ -160,7 +164,7 @@ export function CartDrawer() {
                       <div>
                         <h3 className="font-bold text-sm leading-tight line-clamp-2">{item.item_name}</h3>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {item.uom} • ${item.rate.toFixed(2)} each
+                          {item.uom} • {formatPrice(item.rate ?? 0, currency)} each
                         </p>
                       </div>
 
@@ -189,7 +193,7 @@ export function CartDrawer() {
                         </div>
 
                         <div className="text-right">
-                          <p className="font-black text-base text-primary">${item.amount.toFixed(2)}</p>
+                          <p className="font-black text-base text-primary">{formatPrice(item.amount ?? 0, currency)}</p>
                         </div>
                       </div>
 
@@ -219,7 +223,7 @@ export function CartDrawer() {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal ({cartItems.length} items)</span>
                 <span className="font-medium">
-                  ${cartItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
+                  {formatPrice(cartItems.reduce((sum, item) => sum + (item.amount ?? 0), 0), currency)}
                 </span>
               </div>
 
@@ -227,11 +231,7 @@ export function CartDrawer() {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Discount ({cart.additional_discount_percentage}%)</span>
                   <span className="font-medium text-primary">
-                    -$
-                    {(
-                      (cartItems.reduce((sum, item) => sum + item.amount, 0) * cart.additional_discount_percentage) /
-                      100
-                    ).toFixed(2)}
+                    -{formatPrice((cartItems.reduce((sum, item) => sum + (item.amount ?? 0), 0) * cart.additional_discount_percentage) / 100, currency)}
                   </span>
                 </div>
               )}
@@ -240,7 +240,7 @@ export function CartDrawer() {
 
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>
-                <span className="text-primary">${grandTotal.toFixed(2)}</span>
+                <span className="text-primary">{formatPrice(grandTotal, currency)}</span>
               </div>
             </div>
 

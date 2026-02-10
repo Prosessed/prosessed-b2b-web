@@ -6,6 +6,8 @@ import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import type { CartItemResponse } from "@/lib/api/cart"
 import { useCartContext } from "@/lib/cart/context"
+import { useAuth } from "@/lib/auth/context"
+import { formatPrice } from "@/lib/utils/currency"
 import { AnimatePresence, motion } from "framer-motion"
 import {
   ArrowLeft,
@@ -24,6 +26,8 @@ import { useCallback, useState } from "react"
 
 export default function CartPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const currency = user?.defaultCurrency ?? "AUD"
   const {
     cart,
     isLoading,
@@ -188,11 +192,11 @@ export default function CartPage() {
                             {item.item_name}
                           </Link>
                           <p className="text-xs text-muted-foreground">
-                            {item.uom} • ${item.rate.toFixed(2)}
+                            {item.uom} • {formatPrice(item.rate ?? 0, currency)}
                           </p>
                         </div>
                         <p className="font-bold text-primary text-lg">
-                          ${item.amount.toFixed(2)}
+                          {formatPrice(item.amount ?? 0, currency)}
                         </p>
                       </div>
 
@@ -272,7 +276,7 @@ export default function CartPage() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>{formatPrice(subtotal, currency)}</span>
               </div>
 
               {cart.discount_amount !== 0 && (
@@ -289,7 +293,7 @@ export default function CartPage() {
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>
                 <span className="text-primary">
-                  ${cart.grand_total.toFixed(2)}
+                  {formatPrice(cart.grand_total ?? 0, currency)}
                 </span>
               </div>
             </div>

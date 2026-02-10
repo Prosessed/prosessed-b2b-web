@@ -16,6 +16,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { clearAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
+import { formatPrice } from "@/lib/utils/currency"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -74,7 +75,7 @@ export function Navigation() {
             P
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="text-sm font-bold">prosessed.ai</span>
+            <span className="text-sm font-bold">B2B Portal</span>
             {isAuthenticated && user && (
               <span className="text-[10px] text-primary font-medium tracking-tight uppercase truncate max-w-[120px]">
                 {user.companyName || user.companyUrl.replace(/https?:\/\//, "").split(".")[0]}
@@ -171,7 +172,7 @@ export function Navigation() {
                                 </p>
                                 <div className="flex items-center gap-2 mt-0.5">
                                   <p className="text-xs font-black text-primary">
-                                    ${(item.price_list_rate || item.rate || 0).toFixed(2)}
+                                    {formatPrice(item.price_list_rate || item.rate || 0, user?.defaultCurrency)}
                                   </p>
                                   {item.item_group && (
                                     <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">

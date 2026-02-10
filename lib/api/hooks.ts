@@ -1,8 +1,8 @@
 "use client"
 
+import { useAuth } from "@/lib/auth/context"
 import useSWR from "swr"
 import { apiClient } from "./client"
-import { useAuth } from "@/lib/auth/context"
 
 export interface UseItemsParams {
   item_group?: string
@@ -159,8 +159,8 @@ export function useItemDetails(itemCode: string | null, qty: number = 1) {
         },
       })
       console.log(`[Item Details API] POST /api/method/prosessed_orderit.orderit.get_item_details - Item: ${itemCode} - Status: OK`)
-      console.log(`[Item Details API] Response structure:`, { 
-        hasMessage: !!response?.message, 
+      console.log(`[Item Details API] Response structure:`, {
+        hasMessage: !!response?.message,
         hasItemCode: !!response?.item_code,
         messageItemCode: response?.message?.item_code,
         directItemCode: response?.item_code,
@@ -245,7 +245,10 @@ export function useQuotations() {
         }
       )
 
-      return response?.message || []
+      const msg = response?.message
+      if (Array.isArray(msg)) return msg
+      if (msg && typeof msg === "object" && Array.isArray((msg as any).quotations)) return (msg as any).quotations
+      return []
     },
     {
       revalidateOnFocus: false,
@@ -283,6 +286,128 @@ export function useQuotationDetails(quotationId: string | null) {
     {
       revalidateOnFocus: false,
     }
+  )
+}
+
+export function useSalesPersonOrders(page: number = 1, pageSize: number = 20) {
+  const { user } = useAuth()
+  const salesPerson = user?.salesPerson ?? ""
+
+  const key = user ? ["salesPersonOrders", salesPerson, page, pageSize] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user) return { total_sales_order_count: 0, sales_orders: [] }
+      const params = new URLSearchParams({
+        page: String(page),
+        page_size: String(pageSize),
+        sales_person: salesPerson,
+      })
+      const response = await apiClient.request<any>(
+        `/api/method/prosessed_orderit.orderit.get_sales_person_orders?${params}`,
+        {
+          method: "GET",
+          auth: {
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            sid: user.sid,
+          },
+        }
+      )
+      const msg = response?.message
+      if (!msg || typeof msg !== "object") return { total_sales_order_count: 0, sales_orders: [] }
+      const orders = Array.isArray(msg.sales_orders) ? msg.sales_orders : []
+      return { total_sales_order_count: msg.total_sales_order_count ?? orders.length, sales_orders: orders }
+    },
+    { revalidateOnFocus: false }
+  )
+}
+
+export function useOrderDetails(orderId: string | null) {
+  const { user } = useAuth()
+
+  const key = user && orderId ? ["orderDetails", orderId] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user || !orderId) return null
+      const response = await apiClient.request<any>(
+        `/api/method/prosessed_orderit.orderit.get_order_details?order_id=${encodeURIComponent(orderId)}`,
+        {
+          method: "GET",
+          auth: {
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            sid: user.sid,
+          },
+        }
+      )
+      return response?.message ?? null
+    },
+    { revalidateOnFocus: false }
+  )
+}
+
+export function useCustomerDetails(customerId: string | null) {
+  const { user } = useAuth()
+
+  const key = user && customerId ? ["customerDetails", customerId] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user || !customerId) return null
+      const response = await apiClient.request<any>(
+        `/api/method/prosessed_orderit.orderit.get_customer_details?customer_id=${encodeURIComponent(customerId)}`,
+        {
+          method: "GET",
+          auth: {
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            sid: user.sid,
+          },
+        }
+      )
+      return response?.message ?? null
+    },
+    { revalidateOnFocus: false }
+  )
+}
+
+export function useTaggedItems(warehouse?: string) {
+  const { user } = useAuth()
+
+  const key = user ? ["taggedItems", user.customerId, user.companyName, warehouse ?? user.defaultWarehouse] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user) return null
+      const params = new URLSearchParams({
+        customer: user.customerId,
+        qty: "1.0",
+        company: user.companyName || "",
+        sortByQty: "asc",
+        sortQtyField: "actual",
+        warehouse: warehouse || user.defaultWarehouse,
+      })
+      const response = await apiClient.request<any>(
+        `/api/method/prosessed_orderit.orderit_app.apis.quickaccess.tagged_items.tagged_items.get_items_with_tags?${params}`,
+        {
+          method: "GET",
+          auth: {
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            sid: user.sid,
+          },
+        }
+      )
+      const data = response?.message
+      return Array.isArray(data) ? data : []
+    },
+    { revalidateOnFocus: false }
   )
 }
 

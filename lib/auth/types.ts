@@ -22,6 +22,7 @@ export interface LoginResponse {
     company_custom_disable_discount_apply: number
     is_customer: boolean
     customer_id: string
+    company?: string
   }
   home_page: string
   full_name: string
@@ -32,6 +33,7 @@ export interface AuthUser {
   fullName: string
   username: string
   companyName: string
+  salesPerson?: string
   apiKey: string
   apiSecret: string
   sid: string

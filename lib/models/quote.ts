@@ -46,19 +46,26 @@ export class QuoteModel {
       if (!response.ok) throw new Error("Failed to fetch quotations")
 
       const data = await response.json()
-      const quotations = (data.message || []) as QuotationResponse[]
+      const raw = data?.message
+      const list: QuotationResponse[] = Array.isArray(raw)
+        ? raw
+        : Array.isArray((raw as any)?.data)
+          ? (raw as any).data
+          : Array.isArray((raw as any)?.quotations)
+            ? (raw as any).quotations
+            : []
 
-      return quotations.map((q) => ({
+      return list.map((q) => ({
         id: q.name,
         date: q.transaction_date,
         validUntil: q.valid_till,
         status: this.mapWorkflowState(q.workflow_state, q.docstatus),
         total: q.grand_total,
-        items: q.items.map((item) => ({
+        items: (Array.isArray(q.items) ? q.items : []).map((item) => ({
           id: item.item_code,
           name: item.item_name,
           price: item.rate,
-          image: item.image,
+          image: item.image ?? "",
           quantity: item.qty,
           uom: item.uom,
         })),
@@ -91,19 +98,22 @@ export class QuoteModel {
       if (!response.ok) throw new Error("Failed to fetch quotation details")
 
       const data = await response.json()
-      const q = data.message as QuotationResponse
+      const q = (data?.message || data) as QuotationResponse
+      if (!q?.name) return null
+
+      const items = Array.isArray(q.items) ? q.items : []
 
       return {
         id: q.name,
         date: q.transaction_date,
         validUntil: q.valid_till,
         status: this.mapWorkflowState(q.workflow_state, q.docstatus),
-        total: q.grand_total,
-        items: q.items.map((item) => ({
+        total: q.grand_total ?? 0,
+        items: items.map((item) => ({
           id: item.item_code,
           name: item.item_name,
           price: item.rate,
-          image: item.image,
+          image: item.image ?? "",
           quantity: item.qty,
           uom: item.uom,
         })),

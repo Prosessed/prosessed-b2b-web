@@ -15,6 +15,7 @@ import { useItemDetails } from "@/lib/api/hooks"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
+import { formatPrice } from "@/lib/utils/currency"
 import { motion } from "framer-motion"
 
 export default function ProductDetailPage() {
@@ -227,7 +228,7 @@ export default function ProductDetailPage() {
               </div>
             ) : (
               <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-black text-primary">${currentRate.toFixed(2)}</span>
+                <span className="text-4xl font-black text-primary">{formatPrice(currentRate, user?.defaultCurrency)}</span>
                 <span className="text-muted-foreground">per {selectedUom || product.uom || product.stock_uom}</span>
               </div>
             )}
@@ -259,7 +260,7 @@ export default function ProductDetailPage() {
                         )}
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-lg">${uom.price_list_rate.toFixed(2)}</div>
+                        <div className="font-bold text-lg">{formatPrice(uom.price_list_rate ?? 0, user?.defaultCurrency)}</div>
                       </div>
                     </Label>
                   </motion.div>
@@ -299,7 +300,7 @@ export default function ProductDetailPage() {
                 </Button>
               </div>
               <div className="text-lg">
-                Total: <span className="font-black text-primary text-xl">${totalPrice.toFixed(2)}</span>
+                Total: <span className="font-black text-primary text-xl">{formatPrice(totalPrice, user?.defaultCurrency)}</span>
               </div>
             </div>
           </div>
@@ -332,9 +333,9 @@ export default function ProductDetailPage() {
                 {cartItem ? "Updating..." : "Adding..."}
               </span>
             ) : cartItem ? (
-              `Update Cart - $${totalPrice.toFixed(2)}`
+              `Update Cart - ${formatPrice(totalPrice, user?.defaultCurrency)}`
             ) : (
-              `Add to Cart - $${totalPrice.toFixed(2)}`
+              `Add to Cart - ${formatPrice(totalPrice, user?.defaultCurrency)}`
             )}
           </Button>
 

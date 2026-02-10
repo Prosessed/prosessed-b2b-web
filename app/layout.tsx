@@ -14,8 +14,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "prosessed.ai - B2B Commerce",
-  description: "Modern B2B commerce platform for quick ordering",
+  title: "B2B Commerce",
+  description: "B2B commerce platform for quick ordering",
   generator: "v0.app",
   icons: {
     icon: [
