@@ -41,6 +41,8 @@ export default function ProductsPage() {
   const searchQuery = searchParams.get("search") || undefined
   const previouslyBoughtParam = searchParams.get("previously_bought")
   const isPreviouslyBought = previouslyBoughtParam === "true"
+  // Use most-bought API only when no filter is selected; any category/brand/search → use items vtwo API
+  const effectivePreviouslyBought = isPreviouslyBought && !categoryFromUrl && !searchQuery
   
   // Read filter state from URL params
   const brandsFromUrl = searchParams.get("brands")
@@ -100,9 +102,8 @@ export default function ProductsPage() {
     pageSize
   )
 
-  // Fetch products with all filters
-  // Always call API even when no category - pass undefined to fetch all products
-  const shouldFetchItems = !isPreviouslyBought && !searchQuery
+  // Fetch products: use items vtwo when any filter (category/brand) or search; use most-bought only when solely previously_bought
+  const shouldFetchItems = !effectivePreviouslyBought && !searchQuery
   const { data: itemsData, isLoading: itemsLoading, isValidating: itemsValidating, error: itemsError } = useItems({
     item_group: shouldFetchItems ? categoryFromUrl : undefined,
     page: shouldFetchItems ? currentPage : undefined,
@@ -112,30 +113,30 @@ export default function ProductsPage() {
   })
 
   const { data: mostBoughtData, isLoading: mostBoughtLoading, isValidating: mostBoughtValidating, error: mostBoughtError } = useMostBoughtItems({
-    page: isPreviouslyBought ? currentPage : undefined,
-    page_size: isPreviouslyBought ? pageSize : undefined,
-    sortByQty: isPreviouslyBought ? sortByQty : undefined,
-    filterByBrand: isPreviouslyBought && selectedBrands.length > 0 ? selectedBrands : undefined,
-    time_frame: isPreviouslyBought ? "6 months" : undefined,
+    page: effectivePreviouslyBought ? currentPage : undefined,
+    page_size: effectivePreviouslyBought ? pageSize : undefined,
+    sortByQty: effectivePreviouslyBought ? sortByQty : undefined,
+    filterByBrand: effectivePreviouslyBought && selectedBrands.length > 0 ? selectedBrands : undefined,
+    time_frame: effectivePreviouslyBought ? "6 months" : undefined,
   })
 
   const isLoading = searchQuery 
     ? searchLoading 
-    : (isPreviouslyBought ? mostBoughtLoading : itemsLoading)
+    : (effectivePreviouslyBought ? mostBoughtLoading : itemsLoading)
   const isValidating = searchQuery
     ? searchValidating
-    : (isPreviouslyBought ? mostBoughtValidating : itemsValidating)
+    : (effectivePreviouslyBought ? mostBoughtValidating : itemsValidating)
   const error = searchQuery
     ? searchError
-    : (isPreviouslyBought ? mostBoughtError : itemsError)
+    : (effectivePreviouslyBought ? mostBoughtError : itemsError)
   const products = searchQuery
     ? (searchData?.items || [])
-    : (isPreviouslyBought 
+    : (effectivePreviouslyBought 
       ? (mostBoughtData?.message?.items || mostBoughtData?.message?.data || mostBoughtData?.items || []) 
       : (itemsData?.message?.items || itemsData?.message?.data || itemsData?.message?.item_list || itemsData?.items || []))
   const pagination = searchQuery
     ? searchData?.pagination
-    : (isPreviouslyBought 
+    : (effectivePreviouslyBought 
       ? (mostBoughtData?.message?.pagination || mostBoughtData?.pagination) 
       : itemsData?.message?.pagination)
   const hasNextPage = pagination?.has_next_page || false
@@ -145,7 +146,7 @@ export default function ProductsPage() {
     console.log("[Products] Sample product:", { item_code: products[0].item_code, rate: products[0].rate, price_list_rate: products[0].price_list_rate })
   }
   
-  const brandsData = isPreviouslyBought 
+  const brandsData = effectivePreviouslyBought 
     ? (mostBoughtData?.message?.brands || mostBoughtData?.brands) 
     : itemsData?.message?.brands
   const brands: Array<{ name: string; count: number }> = useMemo(() => {
@@ -278,7 +279,7 @@ export default function ProductsPage() {
     }
   }, [hasNextPage, isLoading, isLoadingMore, isCategoryChanging])
 
-  // Helper to update URL with current filter state
+  // Helper to update URL with current filter state; when any filter is set, drop previously_bought so we use items vtwo API
   const updateUrlParams = useCallback((updates: {
     category?: string | null
     brands?: string[]
@@ -289,6 +290,7 @@ export default function ProductsPage() {
     if (updates.category !== undefined) {
       if (updates.category) {
         params.set("category", updates.category)
+        params.delete("previously_bought")
       } else {
         params.delete("category")
       }
@@ -297,6 +299,7 @@ export default function ProductsPage() {
     if (updates.brands !== undefined) {
       if (updates.brands.length > 0) {
         params.set("brands", updates.brands.join(","))
+        params.delete("previously_bought")
       } else {
         params.delete("brands")
       }
@@ -498,7 +501,7 @@ export default function ProductsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div className="space-y-1">
               <h1 className="text-3xl font-black tracking-tighter">
-                {isPreviouslyBought ? "Previously Bought Items" : (categoryFromUrl || "All Products")}
+                {effectivePreviouslyBought ? "Previously Bought Items" : (categoryFromUrl || "All Products")}
               </h1>
               <p className="text-sm font-medium text-muted-foreground">
                 {isLoading && currentPage === 1
