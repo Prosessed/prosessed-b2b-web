@@ -69,19 +69,13 @@ export function Navigation() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center gap-4 px-4">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 text-xl font-bold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            P
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-sm font-bold">B2B Portal</span>
-            {isAuthenticated && user && (
-              <span className="text-[10px] text-primary font-medium tracking-tight uppercase truncate max-w-[120px]">
-                {user.companyName || user.companyUrl.replace(/https?:\/\//, "").split(".")[0]}
-              </span>
-            )}
-          </div>
+        {/* Company name only - no P / Prosessed branding */}
+        <Link href="/" className="flex items-center min-w-0">
+          <span className="text-lg font-bold truncate">
+            {isAuthenticated && user
+              ? (user.companyName || user.companyUrl.replace(/https?:\/\//, "").split(".")[0] || "B2B Portal")
+              : "B2B Portal"}
+          </span>
         </Link>
 
         {/* Search bar */}
@@ -274,7 +268,7 @@ export function Navigation() {
           <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
             Home
           </Link>
-          <Link href="/products" className="text-sm font-medium hover:text-primary transition-colors">
+          <Link href="/products?previously_bought=true" className="text-sm font-medium hover:text-primary transition-colors">
             Products
           </Link>
           <Link href="/cart" className="text-sm font-medium hover:text-primary transition-colors">

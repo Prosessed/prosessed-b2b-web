@@ -269,17 +269,17 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          {/* Quantity Selector */}
+          {/* Quantity Selector - type in box, Enter or blur to apply; Arrow Up/Down to change */}
           <div className="space-y-3">
             <Label className="text-base font-bold">Quantity</Label>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 border-2 rounded-xl overflow-hidden">
+              <div className="flex items-center gap-0 border-2 rounded-xl overflow-hidden bg-background">
                 <Button
                   onClick={decrement}
                   variant="ghost"
                   size="icon"
                   className="h-12 w-12 rounded-none"
-                  disabled={quantity <= 1}
+                  disabled={quantity <= 1 || isAdding}
                 >
                   <Minus className="h-5 w-5" />
                 </Button>
@@ -287,7 +287,21 @@ export default function ProductDetailPage() {
                   type="number"
                   value={quantity}
                   onChange={(e) => setQuantity(Math.max(1, Number.parseInt(e.target.value) || 1))}
-                  className="w-20 text-center text-lg font-bold bg-transparent border-none focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleAddToCart()
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault()
+                      setQuantity((prev) => prev + 1)
+                    }
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault()
+                      setQuantity((prev) => (prev > 1 ? prev - 1 : 1))
+                    }
+                  }}
+                  className="w-20 text-center text-lg font-bold bg-transparent border-none focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   min="1"
                 />
                 <Button
@@ -295,6 +309,7 @@ export default function ProductDetailPage() {
                   variant="ghost"
                   size="icon"
                   className="h-12 w-12 rounded-none"
+                  disabled={isAdding}
                 >
                   <Plus className="h-5 w-5" />
                 </Button>

@@ -41,18 +41,11 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
     setInputVal(String(quantity))
   }, [quantity])
 
-  const handleAdd = useCallback(async () => {
+  // First-time add: add 1 quantity, then stepper (- [box] +) appears
+  const handleAddOne = useCallback(async () => {
     if (!user) return
-    
-    // Use rate if available, otherwise fall back to price (which already has fallback logic)
-    // Prioritize rate as it's the actual API field, but use price as fallback
     const itemRate = (rate && rate > 0) ? rate : (price && price > 0 ? price : 0)
-    
-    if (!itemRate || itemRate <= 0) {
-      console.error(`Cannot add item ${id}: Invalid rate. Rate: ${rate}, Price: ${price}`)
-      return
-    }
-    
+    if (!itemRate || itemRate <= 0) return
     setIsMutating(true)
     try {
       await addItem({
@@ -62,12 +55,10 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
         warehouse: user.defaultWarehouse,
         uom: unit,
       })
-      // Small delay to ensure UI updates smoothly
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      // Open cart drawer after adding item
+      await new Promise((r) => setTimeout(r, 100))
       openDrawer()
-    } catch (error) {
-      console.error("Failed to add item:", error)
+    } catch (e) {
+      console.error("Failed to add item:", e)
     } finally {
       setIsMutating(false)
     }
@@ -138,6 +129,26 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
     }
     setIsMutating(true)
     applyQtyInput(val).finally(() => setIsMutating(false))
+  }
+
+  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      ;(e.target as HTMLInputElement).blur()
+      return
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault()
+      const n = Math.max(0, Math.floor(parseFloat(inputVal) || 0) + 1)
+      setInputVal(String(n))
+      return
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      const n = Math.max(0, Math.floor(parseFloat(inputVal) || 0) - 1)
+      setInputVal(String(n))
+      return
+    }
   }
 
   return (
@@ -217,14 +228,19 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
+                  className="flex items-center"
                 >
                   <Button
-                    onClick={handleAdd}
+                    onClick={handleAddOne}
                     disabled={isMutating}
                     size="sm"
-                    className="h-9 px-6 bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-sm active:scale-95 transition-all"
+                    className="h-9 px-6 bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-sm active:scale-95 transition-all rounded-lg"
                   >
-                    ADD
+                    {isMutating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "ADD"
+                    )}
                   </Button>
                 </motion.div>
               ) : (
@@ -233,35 +249,43 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
-                  className="flex items-center gap-1 border rounded-lg border-primary bg-primary/5 shadow-inner"
+                  className="relative flex items-center gap-0 border rounded-lg border-primary bg-primary/5 shadow-inner overflow-hidden"
                 >
                   <Button
                     onClick={decrement}
                     variant="ghost"
                     size="icon"
                     disabled={isMutating}
-                    className="h-9 w-9 hover:bg-primary/10 text-primary transition-colors"
+                    className="h-9 w-9 shrink-0 hover:bg-primary/10 text-primary transition-colors rounded-l-lg rounded-r-none"
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
 
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    value={quantity > 0 ? inputVal : quantity}
-                    onChange={handleQtyInputChange}
-                    onBlur={handleQtyInputBlur}
-                    onFocus={() => setInputVal(String(quantity))}
-                    onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-                    className="h-9 w-12 text-center text-sm font-bold p-1 border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
+                  <div className="relative flex items-center justify-center min-w-[3rem] h-9">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={inputVal}
+                      onChange={handleQtyInputChange}
+                      onBlur={handleQtyInputBlur}
+                      onFocus={() => setInputVal(String(quantity))}
+                      onKeyDown={handleQtyKeyDown}
+                      disabled={isMutating}
+                      className="h-9 w-12 text-center text-sm font-bold p-1 border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-70"
+                    />
+                    {isMutating && (
+                      <span className="absolute pointer-events-none flex items-center justify-center inset-0 bg-primary/5">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      </span>
+                    )}
+                  </div>
 
                   <Button
                     onClick={increment}
                     variant="ghost"
                     size="icon"
                     disabled={isMutating}
-                    className="h-9 w-9 hover:bg-primary/10 text-primary transition-colors"
+                    className="h-9 w-9 shrink-0 hover:bg-primary/10 text-primary transition-colors rounded-r-lg rounded-l-none"
                   >
                     <Plus className="h-4 w-4" />
                   </Button>

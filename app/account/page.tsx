@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useQuotations, useCustomerDetails } from "@/lib/api/hooks"
 import { clearAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
-import { Bell, Building, Camera, CreditCard, Edit, Heart, LogOut, Mail, MapPin, Package, Shield, User, Phone, Users } from "lucide-react"
+import { Building, Camera, CreditCard, Edit, LogOut, Mail, MapPin, Package, User, Phone, Users } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -129,7 +129,7 @@ export default function AccountPage() {
         </Card>
 
         {/* Account Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
           <Link href="/orders">
             <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
               <CardContent className="pt-6 text-center">
@@ -150,13 +150,6 @@ export default function AccountPage() {
           </Card>
           <Card className="border-border/50 hover:border-primary/50 transition-colors">
             <CardContent className="pt-6 text-center">
-              <MapPin className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <div className="text-2xl font-bold">{addressList.length || 0}</div>
-              <div className="text-sm text-muted-foreground">Addresses</div>
-            </CardContent>
-          </Card>
-          <Card className="border-border/50 hover:border-primary/50 transition-colors">
-            <CardContent className="pt-6 text-center">
               <Users className="h-8 w-8 mx-auto mb-2 text-primary" />
               <div className="text-sm font-bold">
                 {c?.last_order_date ? new Date(c.last_order_date).toLocaleDateString() : "—"}
@@ -166,13 +159,10 @@ export default function AccountPage() {
           </Card>
         </div>
 
-        {/* Account Details Tabs */}
+        {/* Account Details - Personal Info only (address included) */}
         <Tabs defaultValue="personal" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-muted/50">
+          <TabsList className="grid w-full grid-cols-1 bg-muted/50 max-w-xs">
             <TabsTrigger value="personal">Personal Info</TabsTrigger>
-            <TabsTrigger value="addresses">Addresses</TabsTrigger>
-            <TabsTrigger value="payment">Payment Methods</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           {/* Personal Information Tab */}
@@ -226,6 +216,39 @@ export default function AccountPage() {
                     <p className="text-sm text-muted-foreground">{c.sales_persons_involved.join(", ")}</p>
                   </div>
                 )}
+                {/* Addresses included in Personal Info */}
+                <div className="pt-4 border-t">
+                  <h4 className="font-medium mb-2 flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    Addresses
+                  </h4>
+                  {customerLoading ? (
+                    <Skeleton className="h-24 w-full" />
+                  ) : addressList.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No addresses on file</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {addressList.map((addr: any) => (
+                        <div
+                          key={addr.name}
+                          className="flex items-start gap-3 p-4 border border-border/50 rounded-lg hover:border-primary/50 transition-colors"
+                        >
+                          <MapPin className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium">{addr.address_type || "Address"}</span>
+                              {addr.is_primary_address === 1 && (
+                                <Badge variant="secondary" className="text-xs">Primary</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">{addr.address_line1}{addr.address_line2 ? `, ${addr.address_line2}` : ""}</p>
+                            <p className="text-sm text-muted-foreground">{[addr.city, addr.state, addr.pincode, addr.country].filter(Boolean).join(", ")}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {isEditing && (
                   <div className="flex gap-3 pt-4">
                     <Button className="bg-primary text-primary-foreground hover:bg-primary/90">Save Changes</Button>
@@ -256,207 +279,6 @@ export default function AccountPage() {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          {/* Addresses Tab */}
-          <TabsContent value="addresses">
-            <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
-                  Saved Addresses
-                </CardTitle>
-                <CardDescription>Your billing and shipping addresses</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {customerLoading ? (
-                    <Skeleton className="h-24 w-full" />
-                  ) : addressList.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No addresses on file</p>
-                  ) : (
-                    addressList.map((addr: any) => (
-                      <div
-                        key={addr.name}
-                        className="flex items-start justify-between p-4 border border-border/50 rounded-lg hover:border-primary/50 transition-colors"
-                      >
-                        <div className="flex gap-3">
-                          <MapPin className="h-5 w-5 text-primary mt-1 shrink-0" />
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium">{addr.address_type || "Address"}</span>
-                              {addr.is_primary_address === 1 && (
-                                <Badge variant="secondary" className="text-xs">Primary</Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground">{addr.address_line1}{addr.address_line2 ? `, ${addr.address_line2}` : ""}</p>
-                            <p className="text-sm text-muted-foreground">{[addr.city, addr.state, addr.pincode, addr.country].filter(Boolean).join(", ")}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Payment Methods Tab */}
-          <TabsContent value="payment">
-            <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Payment Methods
-                </CardTitle>
-                <CardDescription>Manage your saved payment methods</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {[
-                    { type: "Visa", last4: "4242", expiry: "12/25", isDefault: true },
-                    { type: "Mastercard", last4: "8888", expiry: "08/26", isDefault: false },
-                  ].map((card, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-4 border border-border/50 rounded-lg hover:border-primary/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-16 bg-gradient-to-br from-primary/20 to-primary/10 rounded flex items-center justify-center">
-                          <CreditCard className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium">
-                              {card.type} •••• {card.last4}
-                            </span>
-                            {card.isDefault && (
-                              <Badge variant="secondary" className="text-xs">
-                                Default
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">Expires {card.expiry}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-foreground hover:bg-accent hover:text-foreground"
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    variant="outline"
-                    className="w-full border-dashed border-primary/30 text-foreground hover:bg-primary/10 hover:text-foreground bg-transparent"
-                  >
-                    + Add New Card
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Settings Tab */}
-          <TabsContent value="settings">
-            <div className="space-y-6">
-              <Card className="border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Bell className="h-5 w-5" />
-                    Notifications
-                  </CardTitle>
-                  <CardDescription>Manage your notification preferences</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {[
-                    { label: "Order updates", description: "Get notified about your order status" },
-                    { label: "Promotional offers", description: "Receive special deals and discounts" },
-                    { label: "Newsletter", description: "Weekly updates about new products" },
-                    { label: "Price alerts", description: "Get notified when prices drop" },
-                  ].map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between py-3 border-b border-border/50 last:border-0"
-                    >
-                      <div>
-                        <div className="font-medium mb-1">{item.label}</div>
-                        <div className="text-sm text-muted-foreground">{item.description}</div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-foreground hover:bg-accent hover:text-foreground bg-transparent"
-                      >
-                        Enable
-                      </Button>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Security
-                  </CardTitle>
-                  <CardDescription>Manage your account security settings</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between py-3 border-b border-border/50">
-                    <div>
-                      <div className="font-medium mb-1">Change Password</div>
-                      <div className="text-sm text-muted-foreground">Update your password regularly</div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-foreground hover:bg-accent hover:text-foreground bg-transparent"
-                    >
-                      Change
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between py-3 border-b border-border/50">
-                    <div>
-                      <div className="font-medium mb-1">Two-Factor Authentication</div>
-                      <div className="text-sm text-muted-foreground">Add an extra layer of security</div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-foreground hover:bg-accent hover:text-foreground bg-transparent"
-                    >
-                      Enable
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between py-3">
-                    <div>
-                      <div className="font-medium mb-1">Login History</div>
-                      <div className="text-sm text-muted-foreground">View recent account activity</div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-foreground hover:bg-accent hover:text-foreground bg-transparent"
-                    >
-                      View
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
         </Tabs>
       </div>

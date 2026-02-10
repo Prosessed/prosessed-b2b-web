@@ -57,14 +57,15 @@ export default function QuoteDetailPage() {
 
   const q = quote as any
   const name = q.name ?? q.quotation_id ?? id
-  const creation = q.creation ?? q.transaction_date ?? q.date
+  const creation = q.creation ?? q.transaction_date ?? q.quotation_date ?? q.date
   const validTill = q.valid_till ?? q.valid_until
-  const status = q.workflow_state ?? q.status ?? "—"
-  const grandTotal = q.grand_total ?? q.total ?? 0
+  const status = q.workflow_state ?? q.quotation_status ?? q.status ?? "—"
+  const grandTotal = q.grand_total ?? q.quotation_grand_total ?? q.total ?? 0
   const inWords = q.in_words ?? ""
   const addressHtml = q.address_display ?? ""
-  const address = addressHtml.replace(/<br\s*\/?>/gi, "\n").trim() || "—"
-  const items = Array.isArray(q.items) ? q.items : (q.order_items ?? [])
+  const addressText = q.customer_address ?? ""
+  const address = addressText || addressHtml.replace(/<br\s*\/?>/gi, "\n").trim() || "—"
+  const items = Array.isArray(q.quotation_items) ? q.quotation_items : (Array.isArray(q.items) ? q.items : (q.order_items ?? []))
 
   return (
     <div className="min-h-screen bg-background">
@@ -127,7 +128,7 @@ export default function QuoteDetailPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{item.item_name ?? item.item_code}</p>
                         <p className="text-sm text-muted-foreground">
-                          Qty: {item.qty ?? item.quantity ?? 0} {item.uom ?? item.stock_uom ?? ""}
+                          Qty: {item.qty ?? item.quantity ?? item.item_quantity ?? 0} {item.uom ?? item.stock_uom ?? ""}
                         </p>
                       </div>
                       <div className="text-right shrink-0">

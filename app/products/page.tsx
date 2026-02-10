@@ -6,7 +6,6 @@ import { ProductCard } from "@/components/product-card"
 import { SkeletonCard } from "@/components/skeleton-card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card } from "@/components/ui/card"
 import { useItems, useMostBoughtItems, useSearch } from "@/lib/api/hooks"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
@@ -45,7 +44,6 @@ export default function ProductsPage() {
   
   // Read filter state from URL params
   const brandsFromUrl = searchParams.get("brands")
-  const inStockFromUrl = searchParams.get("inStock")
   const sortFromUrl = searchParams.get("sort")
   
   const observerTarget = useRef<HTMLDivElement>(null)
@@ -68,7 +66,6 @@ export default function ProductsPage() {
     }
     return []
   })
-  const [inStockOnly, setInStockOnly] = useState(() => inStockFromUrl === "true")
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
   const [allProducts, setAllProducts] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -82,6 +79,12 @@ export default function ProductsPage() {
   // Get categories from API
   const { data: categoryTree } = useItemGroupTree(false)
   const allCategories = useMemo(() => getAllCategories(categoryTree || []), [categoryTree])
+
+  // When opening Products from nav (no params), show most bought items so user can start from there
+  useEffect(() => {
+    if (categoryFromUrl || searchQuery || isPreviouslyBought) return
+    router.replace("/products?previously_bought=true", { scroll: false })
+  }, [categoryFromUrl, searchQuery, isPreviouslyBought, router])
 
   // Map sortBy to API sortByQty
   const sortByQty = useMemo(() => {
@@ -106,7 +109,6 @@ export default function ProductsPage() {
     page_size: shouldFetchItems ? pageSize : undefined,
     sortByQty: shouldFetchItems ? sortByQty : undefined,
     filterByBrand: shouldFetchItems && selectedBrands.length > 0 ? selectedBrands : undefined,
-    inStockOnly: shouldFetchItems ? inStockOnly : undefined,
   })
 
   const { data: mostBoughtData, isLoading: mostBoughtLoading, isValidating: mostBoughtValidating, error: mostBoughtError } = useMostBoughtItems({
@@ -114,7 +116,6 @@ export default function ProductsPage() {
     page_size: isPreviouslyBought ? pageSize : undefined,
     sortByQty: isPreviouslyBought ? sortByQty : undefined,
     filterByBrand: isPreviouslyBought && selectedBrands.length > 0 ? selectedBrands : undefined,
-    inStockOnly: isPreviouslyBought ? inStockOnly : undefined,
     time_frame: isPreviouslyBought ? "6 months" : undefined,
   })
 
@@ -130,8 +131,8 @@ export default function ProductsPage() {
   const products = searchQuery
     ? (searchData?.items || [])
     : (isPreviouslyBought 
-      ? (mostBoughtData?.message?.items || mostBoughtData?.items || []) 
-      : (itemsData?.message?.items || []))
+      ? (mostBoughtData?.message?.items || mostBoughtData?.message?.data || mostBoughtData?.items || []) 
+      : (itemsData?.message?.items || itemsData?.message?.data || itemsData?.message?.item_list || itemsData?.items || []))
   const pagination = searchQuery
     ? searchData?.pagination
     : (isPreviouslyBought 
@@ -163,26 +164,21 @@ export default function ProductsPage() {
   
   // Create filter key for comparison
   const currentFiltersKey = useMemo(() => {
-    return `${categoryFromUrl || ""}|${selectedBrandsKey}|${inStockOnly}|${sortBy}|${searchQuery || ""}`
-  }, [categoryFromUrl, selectedBrandsKey, inStockOnly, sortBy, searchQuery])
+    return `${categoryFromUrl || ""}|${selectedBrandsKey}|${sortBy}|${searchQuery || ""}`
+  }, [categoryFromUrl, selectedBrandsKey, sortBy, searchQuery])
 
   // Sync state from URL params when they change (e.g., browser back/forward)
   useEffect(() => {
     const newBrands = brandsFromUrl ? brandsFromUrl.split(",").filter(Boolean) : []
-    const newInStock = inStockFromUrl === "true"
     const newSort = (sortFromUrl as typeof sortBy) || "relevance"
     
-    // Only update if values actually changed to prevent unnecessary resets
     if (JSON.stringify(newBrands.sort()) !== JSON.stringify(selectedBrands.sort())) {
       setSelectedBrands(newBrands)
-    }
-    if (newInStock !== inStockOnly) {
-      setInStockOnly(newInStock)
     }
     if (newSort !== sortBy) {
       setSortBy(newSort)
     }
-  }, [brandsFromUrl, inStockFromUrl, sortFromUrl])
+  }, [brandsFromUrl, sortFromUrl])
 
   // Reset when category, search, or filters change
   useEffect(() => {
@@ -212,11 +208,6 @@ export default function ProductsPage() {
   const prevFiltersKeyRef = useRef("")
   
   useEffect(() => {
-    // If filters changed, wait for reset to complete
-    if (isResettingRef.current && currentPage === 1) {
-      return
-    }
-    
     const productsChanged = products.length !== prevProductsLengthRef.current
     const pageChanged = currentPage !== prevPageRef.current
     const filtersChanged = prevFiltersKeyRef.current !== currentFiltersKey
@@ -228,13 +219,25 @@ export default function ProductsPage() {
       prevPageRef.current = 1
     }
     
+    // When we have new data for page 1, always apply it (even during reset window) so products show after category/nav click
+    if (currentPage === 1 && products.length > 0) {
+      setAllProducts(products)
+      setIsCategoryChanging(false)
+      prevProductsLengthRef.current = products.length
+      prevPageRef.current = currentPage
+      return
+    }
+    
+    if (isResettingRef.current && currentPage === 1) {
+      return
+    }
+    
     if (!productsChanged && !pageChanged && !filtersChanged) return
     
     prevProductsLengthRef.current = products.length
     prevPageRef.current = currentPage
     
     if (currentPage === 1) {
-      // For page 1, replace all products
       setAllProducts(products)
       setIsCategoryChanging(false)
     } else if (products.length > 0) {
@@ -279,7 +282,6 @@ export default function ProductsPage() {
   const updateUrlParams = useCallback((updates: {
     category?: string | null
     brands?: string[]
-    inStock?: boolean
     sort?: string
   }) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -297,14 +299,6 @@ export default function ProductsPage() {
         params.set("brands", updates.brands.join(","))
       } else {
         params.delete("brands")
-      }
-    }
-    
-    if (updates.inStock !== undefined) {
-      if (updates.inStock) {
-        params.set("inStock", "true")
-      } else {
-        params.delete("inStock")
       }
     }
     
@@ -338,33 +332,15 @@ export default function ProductsPage() {
     })
   }, [updateUrlParams])
 
-  const handleInStockToggle = useCallback((checked: boolean | "indeterminate") => {
-    const newValue = checked === true
-    setInStockOnly((prev) => {
-      if (prev === newValue) return prev
-      // Update URL immediately
-      updateUrlParams({ inStock: newValue })
-      return newValue
-    })
-  }, [updateUrlParams])
-
-  const handleSortChange = useCallback((value: string) => {
-    const newSort = value as typeof sortBy
-    setSortBy(newSort)
-    // Update URL immediately
-    updateUrlParams({ sort: newSort })
-  }, [updateUrlParams])
-
   const handleClearFilters = useCallback(() => {
     updateUrlParams({
       category: null,
       brands: [],
-      inStock: false,
       sort: "relevance"
     })
   }, [updateUrlParams])
 
-  const hasActiveFilters = selectedBrands.length > 0 || inStockOnly || categoryFromUrl
+  const hasActiveFilters = selectedBrands.length > 0 || categoryFromUrl
 
   // Client-side price sorting (since API doesn't support it directly)
   const sortedProducts = useMemo(() => {
@@ -419,7 +395,7 @@ export default function ProductsPage() {
             Filters
             {hasActiveFilters && (
               <span className="ml-2 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
-                {selectedBrands.length + (inStockOnly ? 1 : 0) + (categoryFromUrl ? 1 : 0)}
+                {selectedBrands.length + (categoryFromUrl ? 1 : 0)}
               </span>
             )}
           </Button>
@@ -505,26 +481,6 @@ export default function ProductsPage() {
               </div>
             )}
 
-            {/* In Stock Only Filter */}
-            <div className="mb-8">
-              <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Availability</h3>
-              <label className="flex items-center gap-3 group cursor-pointer">
-                <Checkbox
-                  id="in-stock-only"
-                  checked={inStockOnly}
-                  onCheckedChange={handleInStockToggle}
-                  className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
-                />
-                <span
-                  className={`text-sm font-bold transition-colors ${
-                    inStockOnly ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                  }`}
-                >
-                  In Stock Only
-                </span>
-              </label>
-            </div>
-
             {hasActiveFilters && (
               <Button
                 variant="outline"
@@ -553,19 +509,6 @@ export default function ProductsPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <Select value={sortBy} onValueChange={handleSortChange}>
-                <SelectTrigger className="w-48 h-11 rounded-xl border-primary/10 bg-background shadow-sm font-bold">
-                  <SelectValue placeholder="Sort By" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl border-primary/10">
-                  <SelectItem value="relevance">Recommended</SelectItem>
-                  <SelectItem value="price-low">Price: Low to High</SelectItem>
-                  <SelectItem value="price-high">Price: High to Low</SelectItem>
-                  <SelectItem value="qty-desc">Stock: High to Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <AnimatePresence mode="popLayout">
