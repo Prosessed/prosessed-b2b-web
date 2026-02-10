@@ -279,8 +279,11 @@ export function Navigation() {
           <Link href="/cart" className="text-sm font-medium hover:text-primary transition-colors">
             Cart
           </Link>
+          <Link href="/orders" className="text-sm font-medium hover:text-primary transition-colors">
+            Orders
+          </Link>
           <Link href="/quotes" className="text-sm font-medium hover:text-primary transition-colors">
-            My Quotes
+            Quotes
           </Link>
         </nav>
 
@@ -343,6 +346,9 @@ export function Navigation() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/account">My Account</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/orders">My Orders</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/quotes">My Quotes</Link>
