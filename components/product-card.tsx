@@ -22,9 +22,11 @@ interface ProductCardProps {
     price_margin: number
     is_custom_price: number
   }
+  tag?: "hot-deal" | "best-seller" | "new" | "limited"
+  discount?: number
 }
 
-export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, customerPriceMargin }: ProductCardProps) {
+export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, customerPriceMargin, tag, discount }: ProductCardProps) {
   const { cart, addItem, updateItem, removeItem, isLoading: cartLoading } = useCartContext()
   const { openDrawer } = useCartDrawer()
   const { user } = useAuth()
@@ -100,7 +102,36 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.2 }}
     >
-      <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 border-border/50 group">
+      <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 border-border/50 group relative">
+        {tag && (
+          <div className="absolute top-2 right-2 z-10">
+            {tag === "hot-deal" && (
+              <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-pulse">
+                🔥 Hot Deal
+              </div>
+            )}
+            {tag === "best-seller" && (
+              <div className="bg-yellow-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                ⭐ Best Seller
+              </div>
+            )}
+            {tag === "new" && (
+              <div className="bg-blue-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                ✨ New
+              </div>
+            )}
+            {tag === "limited" && (
+              <div className="bg-purple-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                ⏰ Limited
+              </div>
+            )}
+          </div>
+        )}
+        {discount && discount > 0 && (
+          <div className="absolute top-2 left-2 z-10 bg-green-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg">
+            -{discount}%
+          </div>
+        )}
         <Link href={`/products/${id}`}>
           <div className="relative aspect-square bg-muted/30 group-hover:bg-muted/50 transition-colors overflow-hidden">
             <Image
