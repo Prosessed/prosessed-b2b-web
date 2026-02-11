@@ -4,6 +4,8 @@ import Image from "next/image"
 import Link from "next/link"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { getApiBaseUrl } from "@/lib/api/client"
+import { getDisplayImageUrl } from "@/lib/utils/image-url"
 
 interface HeroBanner {
   id?: string
@@ -47,7 +49,7 @@ export function HeroCarousel({ banners }: HeroCarouselProps) {
         style={{ transform: `translateX(-${currentIndex * 100}%)` }}
       >
         {banners.map((banner, index) => {
-          const imageSrc = banner.image_url || banner.image || "/placeholder.svg"
+          const imageSrc = getDisplayImageUrl(banner.image_url || banner.image, getApiBaseUrl()) || "/placeholder.svg"
           const linkHref = banner.redirect_url || banner.ctaLink || "/products"
           
           return (

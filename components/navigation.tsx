@@ -25,6 +25,8 @@ import { useDebounce } from "@/hooks/use-debounce"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AnimatePresence, motion } from "framer-motion"
 import Image from "next/image"
+import { getApiBaseUrl } from "@/lib/api/client"
+import { getDisplayImageUrl } from "@/lib/utils/image-url"
 
 export function Navigation() {
   const { user, logout, isAuthenticated } = useAuth()
@@ -154,7 +156,7 @@ export function Navigation() {
                             >
                               <div className="h-14 w-14 rounded-xl bg-muted/50 relative overflow-hidden shrink-0 border border-border/50">
                                 <Image
-                                  src={item.image || "/placeholder.svg"}
+                                  src={getDisplayImageUrl(item.image, getApiBaseUrl()) || "/placeholder.svg"}
                                   alt={item.item_name || "Product"}
                                   fill
                                   className="object-contain p-2 group-hover:scale-110 transition-transform"

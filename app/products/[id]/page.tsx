@@ -15,7 +15,9 @@ import { useItemDetails } from "@/lib/api/hooks"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
+import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
+import { getDisplayImageUrl } from "@/lib/utils/image-url"
 import { motion } from "framer-motion"
 
 export default function ProductDetailPage() {
@@ -170,7 +172,7 @@ export default function ProductDetailPage() {
           <Card className="overflow-hidden rounded-2xl border-2 border-primary/10">
             <div className="relative aspect-square bg-muted/30">
               <Image
-                src={product.image || "/placeholder.svg"}
+                src={getDisplayImageUrl(product.image, getApiBaseUrl()) || "/placeholder.svg"}
                 alt={product.item_name || "Product image"}
                 fill
                 className="object-contain p-8"

@@ -9,7 +9,9 @@ import { Minus, Plus, Trash2, ShoppingCart, Loader2, X } from "lucide-react"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
+import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
+import { getDisplayImageUrl } from "@/lib/utils/image-url"
 import { motion, AnimatePresence } from "framer-motion"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./ui/sheet"
 
@@ -147,7 +149,7 @@ export function CartDrawer() {
                     {/* Product Image */}
                     <div className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-muted/40">
                       <Image
-                        src={item.image || "/placeholder.svg"}
+                        src={getDisplayImageUrl(item.image, getApiBaseUrl()) || "/placeholder.svg"}
                         alt={item.item_name || "Product"}
                         fill
                         className="object-contain p-2"

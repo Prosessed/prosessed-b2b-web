@@ -291,18 +291,18 @@ export function useQuotationDetails(quotationId: string | null) {
 
 export function useSalesPersonOrders(page: number = 1, pageSize: number = 20) {
   const { user } = useAuth()
-  const salesPerson = user?.salesPerson ?? ""
+  const customerId = user?.customerId ?? ""
 
-  const key = user ? ["salesPersonOrders", salesPerson, page, pageSize] : null
+  const key = user && customerId ? ["salesPersonOrders", customerId, page, pageSize] : null
 
   return useSWR(
     key,
     async () => {
-      if (!user) return { total_sales_order_count: 0, sales_orders: [] }
+      if (!user || !customerId) return { total_sales_order_count: 0, sales_orders: [] }
       const params = new URLSearchParams({
         page: String(page),
         page_size: String(pageSize),
-        sales_person: salesPerson,
+        customer_name: customerId,
       })
       const response = await apiClient.request<any>(
         `/api/method/prosessed_orderit.orderit.get_sales_person_orders?${params}`,

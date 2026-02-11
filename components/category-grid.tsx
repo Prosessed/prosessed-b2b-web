@@ -4,6 +4,8 @@ import Link from "next/link"
 import Image from "next/image"
 import { CategoryGridSkeleton } from "./category-grid-skeleton"
 import { useItemGroupTree, type ItemGroupNode } from "@/hooks/useItemGroupTree"
+import { getApiBaseUrl } from "@/lib/api/client"
+import { getDisplayImageUrl } from "@/lib/utils/image-url"
 
 // Helper function to recursively flatten all children
 const flattenChildren = (node: ItemGroupNode): ItemGroupNode[] => {
@@ -97,7 +99,7 @@ export function CategoryGrid() {
                 >
                   <div className="relative h-20 w-20 rounded-full overflow-hidden bg-muted">
                     <Image
-                      src={subcategory.image || "/placeholder.svg"}
+                      src={getDisplayImageUrl(subcategory.image, getApiBaseUrl()) || "/placeholder.svg"}
                       alt={subcategory.label || subcategory.title || subcategory.value}
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-200"
@@ -127,7 +129,7 @@ export function CategoryGrid() {
               >
                 <div className="relative h-20 w-20 rounded-full overflow-hidden bg-muted">
                   <Image
-                    src={category.image || "/placeholder.svg"}
+                    src={getDisplayImageUrl(category.image, getApiBaseUrl()) || "/placeholder.svg"}
                     alt={category.label || category.title || category.value}
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-200"

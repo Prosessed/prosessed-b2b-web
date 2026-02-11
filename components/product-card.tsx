@@ -10,7 +10,9 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
+import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
+import { getDisplayImageUrl } from "@/lib/utils/image-url"
 
 interface ProductCardProps {
   id: string
@@ -191,7 +193,7 @@ export function ProductCard({ id, name, price, image, unit = "kg", stock, rate, 
         <Link href={`/products/${id}`}>
           <div className="relative aspect-square bg-muted/30 group-hover:bg-muted/50 transition-colors overflow-hidden">
             <Image
-              src={image || "/placeholder.svg"}
+              src={getDisplayImageUrl(image, getApiBaseUrl()) || "/placeholder.svg"}
               alt={name}
               fill
               className="object-contain p-4 group-hover:scale-105 transition-transform duration-500"

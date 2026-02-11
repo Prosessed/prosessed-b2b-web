@@ -7,7 +7,9 @@ import Link from "next/link"
 import Image from "next/image"
 import { useOrderDetails } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
+import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice, formatDate } from "@/lib/utils/currency"
+import { getDisplayImageUrl } from "@/lib/utils/image-url"
 import { ArrowLeft, Package, FileText, User, MapPin, Phone, Mail } from "lucide-react"
 import { useParams } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -158,7 +160,7 @@ export default function OrderDetailPage() {
                     <div key={item.item_code || idx} className="flex items-center gap-4 p-3 border rounded-lg">
                       <div className="relative h-16 w-16 rounded overflow-hidden bg-muted shrink-0">
                         <Image
-                          src={item.image || "/placeholder.svg"}
+                          src={getDisplayImageUrl(item.image, getApiBaseUrl()) || "/placeholder.svg"}
                           alt={item.item_name || "Item"}
                           fill
                           className="object-contain p-1"

@@ -8,6 +8,8 @@ import { motion } from "framer-motion"
 import Image from "next/image"
 import { useBannersAndDeals } from "@/lib/api/hooks"
 import { Skeleton } from "@/components/ui/skeleton"
+import { getApiBaseUrl } from "@/lib/api/client"
+import { getDisplayImageUrl } from "@/lib/utils/image-url"
 
 const defaultDeals = [
   {
@@ -82,7 +84,7 @@ export function StickyDealCards() {
                 {/* Background Image */}
                 <div className="absolute inset-0">
                   <Image
-                    src={deal.image || "/placeholder.svg"}
+                    src={getDisplayImageUrl(deal.image, getApiBaseUrl()) || "/placeholder.svg"}
                     alt={deal.title}
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
