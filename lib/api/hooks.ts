@@ -376,6 +376,41 @@ export function useCustomerDetails(customerId: string | null) {
   )
 }
 
+export function useCustomerName(customerId: string | null) {
+  const { user } = useAuth()
+
+  const key = user && customerId ? ["customerName", customerId] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user || !customerId) return null
+
+      const response = await apiClient.request<any>(
+        `/api/method/prosessed_orderit.orderit.get_customer_name?customer_id=${encodeURIComponent(
+          customerId
+        )}`,
+        {
+          method: "GET",
+          auth: {
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            sid: user.sid,
+          },
+        }
+      )
+
+      // API returns message with the customer name string or object { customer_name: '...' }
+      const msg = response?.message
+      if (!msg) return null
+      if (typeof msg === "string") return msg
+      if (msg.customer_name) return msg.customer_name
+      return null
+    },
+    { revalidateOnFocus: false }
+  )
+}
+
 export function useTaggedItems(warehouse?: string) {
   const { user } = useAuth()
 
@@ -451,6 +486,41 @@ export function useBannersAndDeals() {
       revalidateOnFocus: false,
       revalidateOnReconnect: true,
       dedupingInterval: 60000, // Cache for 1 minute
+    }
+  )
+}
+
+export function useCustomerStatement(
+  customer: string | null,
+  startDate: string | null,
+  endDate: string | null
+) {
+  const { user } = useAuth()
+
+  const key = customer && startDate && endDate
+    ? ["statement", customer, startDate, endDate]
+    : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!customer || !startDate || !endDate) return null
+
+      try {
+        const response = await apiClient.getCustomerStatementUrl(
+          customer,
+          startDate,
+          endDate
+        )
+        return response?.message || response
+      } catch (error) {
+        console.error("Error fetching statement URL:", error)
+        throw error
+      }
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
     }
   )
 }

@@ -1,14 +1,15 @@
 "use client"
 
-import { Apple, Coffee, Milk, Wheat, Package, Fish } from "lucide-react"
 import { AnimatedBanner } from "@/components/animated-banner"
 import { CategoryGrid } from "@/components/category-grid"
-import { ProductRow } from "@/components/product-row"
 import { Footer } from "@/components/footer"
 import { HeroCarousel } from "@/components/hero-carousel"
+import { ProductRow } from "@/components/product-row"
 import { StickyDealCards } from "@/components/sticky-deal-cards"
-import { useBannersAndDeals } from "@/lib/api/hooks"
+import { TaggedProductsRow } from "@/components/tagged-products-row"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useBannersAndDeals } from "@/lib/api/hooks"
+import { Apple, Coffee, Fish, Milk, Package, Wheat } from "lucide-react"
 
 const categories = [
   { name: "Fruits & Vegetables", icon: Apple, href: "/products?category=fruits" },
@@ -63,7 +64,7 @@ const defaultHeroBanners = [
 
 export default function HomePage() {
   const { data, isLoading } = useBannersAndDeals()
-  
+
   const heroBanners = (data?.banners || []).map((banner, index) => ({
     id: String(index),
     image_url: banner.image_url,
@@ -89,11 +90,17 @@ export default function HomePage() {
 
       <div className="container mx-auto px-4 pb-12">
         <StickyDealCards />
-        <ProductRow 
-          title="Previously Bought Items" 
-          itemGroup="" 
+        <ProductRow
+          title="Previously Bought Items"
+          itemGroup=""
           categoryHref="/products?previously_bought=true"
           pageSize={10}
+        />
+        <TaggedProductsRow
+          title="Hot Deals & Trending Products"
+          categoryHref="/products?sort=trending"
+          pageSize={10}
+          showTagFilter={false}
         />
         <CategoryGrid />
 

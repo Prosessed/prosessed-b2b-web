@@ -38,4 +38,9 @@ export const endpoints = {
     register: `${API_BASE_URL}/auth/register`,
     profile: `${API_BASE_URL}/auth/profile`,
   },
+
+  // Statements
+  statements: {
+    getUrl: `${API_BASE_URL}/api/method/prosessed_orderit.orderit.get_customer_statement_url`,
+  },
 }

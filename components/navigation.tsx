@@ -1,7 +1,7 @@
 "use client"
 
-import Link from "next/link"
-import { Search, ShoppingCart, User, Moon, Sun, X, Package, Tag, ArrowRight } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,22 +11,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useDebounce } from "@/hooks/use-debounce"
+import { getApiBaseUrl } from "@/lib/api/client"
+import { useSearch } from "@/lib/api/hooks"
 import { clearAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
-import { formatPrice } from "@/lib/utils/currency"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { useSearch } from "@/lib/api/hooks"
-import { useDebounce } from "@/hooks/use-debounce"
-import { Skeleton } from "@/components/ui/skeleton"
-import { AnimatePresence, motion } from "framer-motion"
-import Image from "next/image"
-import { getApiBaseUrl } from "@/lib/api/client"
+import { formatPrice } from "@/lib/utils/currency"
 import { getDisplayImageUrl } from "@/lib/utils/image-url"
+import { AnimatePresence, motion } from "framer-motion"
+import { ArrowRight, Moon, Package, Search, ShoppingCart, Sun, Tag, User, X } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
 export function Navigation() {
   const { user, logout, isAuthenticated } = useAuth()
@@ -349,6 +349,9 @@ export function Navigation() {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/quotes">My Quotes</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/statements">My Statements</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
