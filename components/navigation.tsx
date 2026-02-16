@@ -375,7 +375,6 @@
 //     </header>
 //   )
 // }
-
 "use client"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -459,21 +458,21 @@ export function Navigation() {
         {/* Company Logo & Name */}
         <Link href="/" className="flex items-center gap-3 min-w-0 shrink-0">
           {companyLogo ? (
-            <div className="flex items-center gap-2.5">
-              <div className="relative h-10 w-10 rounded-lg overflow-hidden bg-muted/30 border border-border/50 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="relative h-12 w-12 sm:h-14 sm:w-14 rounded-xl overflow-hidden bg-background border-2 border-border/60 shrink-0 shadow-sm">
                 <Image
                   src={companyLogo}
                   alt={companyName}
                   fill
-                  className="object-contain p-1"
+                  className="object-contain p-1.5"
                   priority
                 />
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-bold truncate leading-tight">
+              <div className="hidden sm:flex flex-col min-w-0">
+                <span className="text-base font-bold truncate leading-tight">
                   {companyName}
                 </span>
-                <span className="text-[10px] text-muted-foreground truncate leading-tight">
+                <span className="text-xs text-muted-foreground truncate leading-tight">
                   B2B Portal
                 </span>
               </div>
