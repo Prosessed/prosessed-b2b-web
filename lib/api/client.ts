@@ -574,64 +574,101 @@ export const apiClient = {
   },
 
     /* ------------------ Statements ------------------ */
-  async getCustomerStatementUrl(
-    customer: string,
-    startDate: string,
-    endDate: string
-  ): Promise<any> {
-    const baseUrl = getApiBaseUrl()
+ /* ------------------ Statements ------------------ */
+async getCustomerStatementUrl(
+  customer: string,
+  startDate: string,
+  endDate: string
+): Promise<any> {
+  const baseUrl = getApiBaseUrl()
+  const auth = getAuthFromStorage()
 
-    // Build headers including auth if available
-    const auth = getAuthFromStorage()
-    const headers = new Headers({
-      "Content-Type": "application/json",
-      Accept: "application/pdf, application/octet-stream, */*",
-    })
-    if (auth.apiKey && auth.apiSecret) {
-      headers.set("Authorization", `token ${auth.apiKey}:${auth.apiSecret}`)
-    }
+  const url = `${baseUrl}/api/method/prosessed_orderit.orderit.get_customer_statement_url`
 
-    const url = `${baseUrl}/api/method/prosessed_orderit.orderit.get_customer_statement_url`
+  const headers = new Headers({
+    "Content-Type": "application/json",
+    Accept: "application/pdf, application/octet-stream, */*",
+  })
 
-    apiLogger.request("POST", url, headers, { customer, start_date: startDate, end_date: endDate })
+  // 🔐 Same token logic as request()
+  if (auth.apiKey && auth.apiSecret) {
+    headers.set("Authorization", `token ${auth.apiKey}:${auth.apiSecret}`)
+  }
 
-    const start = performance.now()
+  const body = JSON.stringify({
+    customer,
+    start_date: startDate,
+    end_date: endDate,
+  })
+
+  apiLogger.request("POST", url, headers, {
+    customer,
+    start_date: startDate,
+    end_date: endDate,
+  })
+
+  const start = performance.now()
+
+  try {
     const resp = await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ customer, start_date: startDate, end_date: endDate }),
-     credentials: "omit",
+      body,
+      credentials: "omit", // ✅ SAME as request()
     })
+
     const timeMs = Math.round(performance.now() - start)
 
-    // If response is not OK, try to parse JSON error, otherwise throw
     if (!resp.ok) {
       let errMsg = resp.statusText
       try {
         const errJson = await resp.json()
         errMsg = errJson?.message || JSON.stringify(errJson)
       } catch {}
+
       apiLogger.response(url, resp.status, errMsg, timeMs)
-      if (resp.status === 403) throw new ApiError(403, "Authentication failed. Please login again.")
+
+      if (resp.status === 403) {
+        throw new ApiError(
+          403,
+          "Authentication failed. Please login again."
+        )
+      }
+
       throw new ApiError(resp.status, errMsg)
     }
 
-    // Check content type
     const contentType = resp.headers.get("content-type") || ""
-    apiLogger.response(url, resp.status, `[${contentType}] binary response`, timeMs)
 
-    if (contentType.includes("application/pdf") || contentType.includes("application/octet-stream") || contentType.includes("application/x-pdf")) {
+    apiLogger.response(
+      url,
+      resp.status,
+      `[${contentType}] binary response`,
+      timeMs
+    )
+
+    // ✅ Handle PDF / file
+    if (
+      contentType.includes("application/pdf") ||
+      contentType.includes("application/octet-stream") ||
+      contentType.includes("application/x-pdf")
+    ) {
       const blob = await resp.blob()
       const objectUrl = URL.createObjectURL(blob)
       return { url: objectUrl, blob, contentType }
     }
 
-    // Fallback: if server returns JSON with a URL inside
+    // ✅ Handle JSON fallback
     try {
-      const json = await resp.json()
-      return json
+      return await resp.json()
     } catch {
       return { url: "", contentType }
     }
-  },
+  } catch (err) {
+    const timeMs = Math.round(performance.now() - start)
+    apiLogger.error(url, err, timeMs)
+    throw err
+  }
+}
+
 }
