@@ -17,7 +17,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: 'https://prosessed-b2b-ecommerce.vercel.app',
+            value: 'https://store.prosessed.com',
           },
           {
             key: 'Access-Control-Allow-Credentials',
