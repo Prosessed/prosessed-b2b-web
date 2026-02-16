@@ -572,4 +572,66 @@ export const apiClient = {
       throw err
     }
   },
+
+    /* ------------------ Statements ------------------ */
+  async getCustomerStatementUrl(
+    customer: string,
+    startDate: string,
+    endDate: string
+  ): Promise<any> {
+    const baseUrl = getApiBaseUrl()
+
+    // Build headers including auth if available
+    const auth = getAuthFromStorage()
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      Accept: "application/pdf, application/octet-stream, */*",
+    })
+    if (auth.apiKey && auth.apiSecret) {
+      headers.set("Authorization", `token ${auth.apiKey}:${auth.apiSecret}`)
+    }
+
+    const url = `${baseUrl}/api/method/prosessed_orderit.orderit.get_customer_statement_url`
+
+    apiLogger.request("POST", url, headers, { customer, start_date: startDate, end_date: endDate })
+
+    const start = performance.now()
+    const resp = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ customer, start_date: startDate, end_date: endDate }),
+     credentials: "omit",
+    })
+    const timeMs = Math.round(performance.now() - start)
+
+    // If response is not OK, try to parse JSON error, otherwise throw
+    if (!resp.ok) {
+      let errMsg = resp.statusText
+      try {
+        const errJson = await resp.json()
+        errMsg = errJson?.message || JSON.stringify(errJson)
+      } catch {}
+      apiLogger.response(url, resp.status, errMsg, timeMs)
+      if (resp.status === 403) throw new ApiError(403, "Authentication failed. Please login again.")
+      throw new ApiError(resp.status, errMsg)
+    }
+
+    // Check content type
+    const contentType = resp.headers.get("content-type") || ""
+    apiLogger.response(url, resp.status, `[${contentType}] binary response`, timeMs)
+
+    if (contentType.includes("application/pdf") || contentType.includes("application/octet-stream") || contentType.includes("application/x-pdf")) {
+      const blob = await resp.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      return { url: objectUrl, blob, contentType }
+    }
+
+    // Fallback: if server returns JSON with a URL inside
+    try {
+      const json = await resp.json()
+      return json
+    } catch {
+      return { url: "", contentType }
+    }
+  },
 }
