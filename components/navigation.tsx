@@ -455,27 +455,17 @@ export function Navigation() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center gap-4 px-4">
-        {/* Company Logo & Name */}
-        <Link href="/" className="flex items-center gap-3 min-w-0 shrink-0">
+        {/* Company Logo */}
+        <Link href="/" className="flex items-center min-w-0 shrink-0">
           {companyLogo ? (
-            <div className="flex items-center gap-3">
-              <div className="relative h-12 w-12 sm:h-14 sm:w-14 rounded-xl overflow-hidden bg-background border-2 border-border/60 shrink-0 shadow-sm">
-                <Image
-                  src={companyLogo}
-                  alt={companyName}
-                  fill
-                  className="object-contain p-1.5"
-                  priority
-                />
-              </div>
-              <div className="hidden sm:flex flex-col min-w-0">
-                <span className="text-base font-bold truncate leading-tight">
-                  {companyName}
-                </span>
-                <span className="text-xs text-muted-foreground truncate leading-tight">
-                  B2B Portal
-                </span>
-              </div>
+            <div className="relative h-14 w-14 sm:h-16 sm:w-16">
+              <Image
+                src={companyLogo}
+                alt={companyName}
+                fill
+                className="object-contain"
+                priority
+              />
             </div>
           ) : (
             <span className="text-lg font-bold truncate">
