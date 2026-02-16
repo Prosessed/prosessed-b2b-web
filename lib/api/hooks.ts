@@ -459,8 +459,8 @@ export interface Deal {
   image_url: string
   redirect_url?: string | null
 }
-
 export interface BannersAndDealsResponse {
+  company_logo?: string
   banners: Banner[]
   deals: Deal[]
 }
