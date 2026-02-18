@@ -439,7 +439,8 @@ export function useTaggedItems(warehouse?: string) {
           },
         }
       )
-      const data = response?.message
+      const raw = response?.message
+      const data = Array.isArray(raw) ? raw : (raw?.items ?? [])
       return Array.isArray(data) ? data : []
     },
     { revalidateOnFocus: false }

@@ -18,6 +18,8 @@ import { useAuth } from "@/lib/auth/context"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
 import { getDisplayImageUrl } from "@/lib/utils/image-url"
+import { parseTags } from "@/lib/utils/tags"
+import { TagBadge } from "@/components/tag-badge"
 import { motion } from "framer-motion"
 
 export default function ProductDetailPage() {
@@ -180,15 +182,6 @@ export default function ProductDetailPage() {
               />
             </div>
           </Card>
-          {product.tags && (
-            <div className="flex flex-wrap gap-2">
-              {product.tags.split(",").map((tag: string) => (
-                <Badge key={tag.trim()} variant="secondary" className="rounded-full">
-                  {tag.trim()}
-                </Badge>
-              ))}
-            </div>
-          )}
         </motion.div>
 
         {/* Product Details */}
@@ -211,6 +204,13 @@ export default function ProductDetailPage() {
               )}
             </div>
             <h1 className="text-4xl font-black mb-3 tracking-tight">{product.item_name}</h1>
+            {parseTags(product.tags).length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3" aria-label="Product tags">
+                {parseTags(product.tags).map((tagLabel) => (
+                  <TagBadge key={tagLabel} tag={tagLabel} variant="chip" />
+                ))}
+              </div>
+            )}
             {product.description && (
               <p className="text-muted-foreground leading-relaxed">{product.description}</p>
             )}

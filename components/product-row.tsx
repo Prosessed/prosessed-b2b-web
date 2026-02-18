@@ -31,7 +31,7 @@ export function ProductRow({ title, itemGroup, categoryHref = "/products", pageS
 
   const isLoading = isPreviouslyBought ? mostBoughtLoading : itemsLoading
   const products = isPreviouslyBought 
-    ? (mostBoughtData?.message?.items || mostBoughtData?.message?.data || mostBoughtData?.items || []) 
+     ? (mostBoughtData?.message?.items || mostBoughtData?.message?.data || mostBoughtData?.items || []) 
     : (itemsData?.message?.items || itemsData?.message?.data || itemsData?.items || [])
 
   if (isPreviouslyBought && process.env.NODE_ENV === "development") {
@@ -77,8 +77,9 @@ export function ProductRow({ title, itemGroup, categoryHref = "/products", pageS
               price={displayPrice}
               rate={cartRate}
               image={product.image}
-              unit={product.stock_uom || product.uom}
+              unit={product.default_sales_uom || product.stock_uom || product.uom}
               stock={product.actual_qty}
+              tags={product.tags}
             />
           )
         })}

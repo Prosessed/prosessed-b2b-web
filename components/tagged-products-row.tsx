@@ -3,6 +3,7 @@ import { ProductCard } from "@/components/product-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTaggedItems } from "@/lib/api/hooks"
+import { parseTags } from "@/lib/utils/tags"
 import { motion } from "framer-motion"
 import { ChevronRight } from "lucide-react"
 import Link from "next/link"
@@ -31,10 +32,7 @@ export function TaggedProductsRow({
   const tagGroups = new Map<string, typeof products>()
 
   products.forEach((product) => {
-    const tags = product.tags
-      ? product.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag)
-      : []
-
+    const tags = parseTags(product.tags)
     tags.forEach((tag: string) => {
       if (!tagGroups.has(tag)) {
         tagGroups.set(tag, [])
@@ -68,35 +66,18 @@ export function TaggedProductsRow({
           {products.slice(0, pageSize).map((product: any) => {
             const displayPrice = product.price_list_rate ?? product.rate ?? 0
             const cartRate = product.rate ?? product.price_list_rate ?? 0
-            const tags = product.tags
-              ? product.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag)
-              : []
-
             return (
-              <div key={product.item_code} className="relative">
-                <ProductCard
-                  id={product.item_code}
-                  name={product.item_name}
-                  price={displayPrice}
-                  rate={cartRate}
-                  image={product.image}
-                  unit={product.stock_uom || product.uom}
-                  stock={product.actual_qty}
-                />
-                {tags.length > 0 && (
-                  <div className="absolute top-2 left-2 flex flex-wrap gap-1">
-                    {tags.slice(0, 2).map((tag: string) => (
-                      <Badge
-                        key={tag}
-                        variant="secondary"
-                        className="text-xs bg-primary text-white hover:bg-primary/90"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ProductCard
+                key={product.item_code}
+                id={product.item_code}
+                name={product.item_name}
+                price={displayPrice}
+                rate={cartRate}
+                image={product.image}
+                unit={product.default_sales_uom || product.stock_uom || product.uom}
+                stock={product.actual_qty}
+                tags={product.tags}
+              />
             )
           })}
         </motion.div>
@@ -129,7 +110,6 @@ export function TaggedProductsRow({
                 {tagProducts.slice(0, 5).map((product: any) => {
                   const displayPrice = product.price_list_rate ?? product.rate ?? 0
                   const cartRate = product.rate ?? product.price_list_rate ?? 0
-
                   return (
                     <ProductCard
                       key={product.item_code}
@@ -138,8 +118,9 @@ export function TaggedProductsRow({
                       price={displayPrice}
                       rate={cartRate}
                       image={product.image}
-                      unit={product.stock_uom || product.uom}
+                      unit={product.default_sales_uom || product.stock_uom || product.uom}
                       stock={product.actual_qty}
+                      tags={product.tags}
                     />
                   )
                 })}

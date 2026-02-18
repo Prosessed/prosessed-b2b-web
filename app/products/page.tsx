@@ -7,7 +7,8 @@ import { SkeletonCard } from "@/components/skeleton-card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card } from "@/components/ui/card"
-import { useItems, useMostBoughtItems, useSearch } from "@/lib/api/hooks"
+import { parseTags } from "@/lib/utils/tags"
+import { useItems, useMostBoughtItems, useSearch, useTaggedItems } from "@/lib/api/hooks"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
 import { motion, AnimatePresence } from "framer-motion"
 import { Filter, X, Loader2 } from "lucide-react"
@@ -39,11 +40,13 @@ export default function ProductsPage() {
   const router = useRouter()
   const categoryFromUrl = searchParams.get("category") || undefined
   const searchQuery = searchParams.get("search") || undefined
+  const tagFromUrl = searchParams.get("tag") || undefined
+  const taggedFromUrl = searchParams.get("tagged") === "true"
   const previouslyBoughtParam = searchParams.get("previously_bought")
   const isPreviouslyBought = previouslyBoughtParam === "true"
-  // Use most-bought API only when no filter is selected; any category/brand/search → use items vtwo API
-  const effectivePreviouslyBought = isPreviouslyBought && !categoryFromUrl && !searchQuery
-  
+  // Use most-bought API only when no filter is selected; any category/brand/search/tag/tagged → use other APIs
+  const effectivePreviouslyBought = isPreviouslyBought && !categoryFromUrl && !searchQuery && !tagFromUrl && !taggedFromUrl
+
   // Read filter state from URL params
   const brandsFromUrl = searchParams.get("brands")
   const sortFromUrl = searchParams.get("sort")
@@ -84,9 +87,9 @@ export default function ProductsPage() {
 
   // When opening Products from nav (no params), show most bought items so user can start from there
   useEffect(() => {
-    if (categoryFromUrl || searchQuery || isPreviouslyBought) return
+    if (categoryFromUrl || searchQuery || isPreviouslyBought || tagFromUrl || taggedFromUrl) return
     router.replace("/products?previously_bought=true", { scroll: false })
-  }, [categoryFromUrl, searchQuery, isPreviouslyBought, router])
+  }, [categoryFromUrl, searchQuery, isPreviouslyBought, tagFromUrl, taggedFromUrl, router])
 
   // Map sortBy to API sortByQty
   const sortByQty = useMemo(() => {
@@ -120,26 +123,37 @@ export default function ProductsPage() {
     time_frame: effectivePreviouslyBought ? "6 months" : undefined,
   })
 
-  const isLoading = searchQuery 
-    ? searchLoading 
+  const { data: taggedItemsData, isLoading: taggedLoading, error: taggedError } = useTaggedItems()
+
+  const useTaggedView = tagFromUrl || taggedFromUrl
+  const productsWhenTag = useMemo(() => {
+    if (!useTaggedView || !taggedItemsData || !Array.isArray(taggedItemsData)) return []
+    if (tagFromUrl) return taggedItemsData.filter((p: any) => parseTags(p.tags).includes(tagFromUrl))
+    return taggedItemsData
+  }, [useTaggedView, tagFromUrl, taggedItemsData])
+
+  const isLoading = useTaggedView
+    ? taggedLoading
+    : searchQuery
+    ? searchLoading
     : (effectivePreviouslyBought ? mostBoughtLoading : itemsLoading)
-  const isValidating = searchQuery
-    ? searchValidating
-    : (effectivePreviouslyBought ? mostBoughtValidating : itemsValidating)
-  const error = searchQuery
-    ? searchError
-    : (effectivePreviouslyBought ? mostBoughtError : itemsError)
-  const products = searchQuery
+  const isValidating = useTaggedView ? false : (searchQuery ? searchValidating : (effectivePreviouslyBought ? mostBoughtValidating : itemsValidating))
+  const error = useTaggedView ? taggedError : (searchQuery ? searchError : (effectivePreviouslyBought ? mostBoughtError : itemsError))
+  const products = useTaggedView
+    ? productsWhenTag
+    : searchQuery
     ? (searchData?.items || [])
-    : (effectivePreviouslyBought 
-      ? (mostBoughtData?.message?.items || mostBoughtData?.message?.data || mostBoughtData?.items || []) 
+    : (effectivePreviouslyBought
+      ? (mostBoughtData?.message?.items || mostBoughtData?.message?.data || mostBoughtData?.items || [])
       : (itemsData?.message?.items || itemsData?.message?.data || itemsData?.message?.item_list || itemsData?.items || []))
-  const pagination = searchQuery
+  const pagination = useTaggedView
+    ? { total_records: productsWhenTag.length, has_next_page: false }
+    : searchQuery
     ? searchData?.pagination
-    : (effectivePreviouslyBought 
-      ? (mostBoughtData?.message?.pagination || mostBoughtData?.pagination) 
+    : (effectivePreviouslyBought
+      ? (mostBoughtData?.message?.pagination || mostBoughtData?.pagination)
       : itemsData?.message?.pagination)
-  const hasNextPage = pagination?.has_next_page || false
+  const hasNextPage = useTaggedView ? false : (pagination?.has_next_page || false)
   
   // Debug: Log first product to check rate field
   if (products.length > 0 && process.env.NODE_ENV === "development") {
@@ -165,8 +179,8 @@ export default function ProductsPage() {
   
   // Create filter key for comparison
   const currentFiltersKey = useMemo(() => {
-    return `${categoryFromUrl || ""}|${selectedBrandsKey}|${sortBy}|${searchQuery || ""}`
-  }, [categoryFromUrl, selectedBrandsKey, sortBy, searchQuery])
+    return `${categoryFromUrl || ""}|${selectedBrandsKey}|${sortBy}|${searchQuery || ""}|${tagFromUrl || ""}|${taggedFromUrl}`
+  }, [categoryFromUrl, selectedBrandsKey, sortBy, searchQuery, tagFromUrl, taggedFromUrl])
 
   // Sync state from URL params when they change (e.g., browser back/forward)
   useEffect(() => {
@@ -284,27 +298,33 @@ export default function ProductsPage() {
     category?: string | null
     brands?: string[]
     sort?: string
+    tag?: string | null
+    tagged?: string | null
   }) => {
     const params = new URLSearchParams(searchParams.toString())
-    
+
     if (updates.category !== undefined) {
       if (updates.category) {
         params.set("category", updates.category)
         params.delete("previously_bought")
+        params.delete("tagged")
+        params.delete("tag")
       } else {
         params.delete("category")
       }
     }
-    
+
     if (updates.brands !== undefined) {
       if (updates.brands.length > 0) {
         params.set("brands", updates.brands.join(","))
         params.delete("previously_bought")
+        params.delete("tagged")
+        params.delete("tag")
       } else {
         params.delete("brands")
       }
     }
-    
+
     if (updates.sort !== undefined) {
       if (updates.sort && updates.sort !== "relevance") {
         params.set("sort", updates.sort)
@@ -312,7 +332,25 @@ export default function ProductsPage() {
         params.delete("sort")
       }
     }
-    
+
+    if (updates.tag !== undefined) {
+      if (updates.tag) {
+        params.set("tag", updates.tag)
+        params.delete("previously_bought")
+      } else {
+        params.delete("tag")
+      }
+    }
+
+    if (updates.tagged !== undefined) {
+      if (updates.tagged) {
+        params.set("tagged", "true")
+        params.delete("previously_bought")
+      } else {
+        params.delete("tagged")
+      }
+    }
+
     router.push(`/products?${params.toString()}`, { scroll: false })
   }, [searchParams, router])
 
@@ -339,30 +377,39 @@ export default function ProductsPage() {
     updateUrlParams({
       category: null,
       brands: [],
-      sort: "relevance"
+      sort: "relevance",
+      tag: null,
+      tagged: null,
     })
   }, [updateUrlParams])
 
-  const hasActiveFilters = selectedBrands.length > 0 || categoryFromUrl
+  const hasActiveFilters = selectedBrands.length > 0 || categoryFromUrl || !!tagFromUrl || taggedFromUrl
 
-  // Client-side price sorting (since API doesn't support it directly)
+  // Filter by tag (client-side); then client-side price sorting
   const sortedProducts = useMemo(() => {
+    let list = allProducts
+    if (tagFromUrl) {
+      list = list.filter((p: any) => {
+        const tags = parseTags(p.tags)
+        return tags.includes(tagFromUrl)
+      })
+    }
     if (sortBy === "price-low") {
-      return [...allProducts].sort((a: any, b: any) => {
+      return [...list].sort((a: any, b: any) => {
         const priceA = a.price_list_rate ?? a.rate ?? 0
         const priceB = b.price_list_rate ?? b.rate ?? 0
         return priceA - priceB
       })
     }
     if (sortBy === "price-high") {
-      return [...allProducts].sort((a: any, b: any) => {
+      return [...list].sort((a: any, b: any) => {
         const priceA = a.price_list_rate ?? a.rate ?? 0
         const priceB = b.price_list_rate ?? b.rate ?? 0
         return priceB - priceA
       })
     }
-    return allProducts
-  }, [allProducts, sortBy])
+    return list
+  }, [allProducts, sortBy, tagFromUrl])
 
   return (
     <div className="container mx-auto px-4 py-8 bg-background/50 min-h-screen relative">
@@ -500,9 +547,30 @@ export default function ProductsPage() {
         <div className="flex-1">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div className="space-y-1">
-              <h1 className="text-3xl font-black tracking-tighter">
-                {effectivePreviouslyBought ? "Previously Bought Items" : (categoryFromUrl || "All Products")}
-              </h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-3xl font-black tracking-tighter">
+                  {tagFromUrl
+                    ? `Tag: ${tagFromUrl}`
+                    : taggedFromUrl
+                    ? "Hot Deals & Trending Products"
+                    : effectivePreviouslyBought
+                    ? "Previously Bought Items"
+                    : (categoryFromUrl || "All Products")}
+                </h1>
+                {tagFromUrl && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
+                    Tag: {tagFromUrl}
+                    <button
+                      type="button"
+                      onClick={() => updateUrlParams({ tag: null })}
+                      className="rounded-full p-0.5 hover:bg-primary/20 focus-visible:outline focus-visible:ring-2 focus-visible:ring-primary"
+                      aria-label={`Clear tag filter ${tagFromUrl}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                )}
+              </div>
               <p className="text-sm font-medium text-muted-foreground">
                 {isLoading && currentPage === 1
                   ? "Fetching latest inventory..."
@@ -564,8 +632,9 @@ export default function ProductsPage() {
                         price={displayPrice}
                         rate={cartRate}
                         image={product.image}
-                        unit={product.stock_uom || product.uom}
+                        unit={product.default_sales_uom || product.stock_uom || product.uom}
                         stock={product.actual_qty}
+                        tags={product.tags}
                       />
                     )
                   })}

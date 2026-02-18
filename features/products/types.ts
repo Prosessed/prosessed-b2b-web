@@ -10,6 +10,8 @@ export interface Product {
   uom?: string
   stock?: number
   brand?: string
+  /** Comma-separated tags from API (get_items_with_tags, item_detail, vtwo). */
+  tags?: string
 }
 
 export interface ProductTag {

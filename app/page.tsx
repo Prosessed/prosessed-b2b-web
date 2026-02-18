@@ -98,7 +98,7 @@ export default function HomePage() {
         />
         <TaggedProductsRow
           title="Hot Deals & Trending Products"
-          categoryHref="/products?sort=trending"
+          categoryHref="/products?tagged=true"
           pageSize={10}
           showTagFilter={false}
         />
