@@ -20,7 +20,7 @@ interface QuotationItem {
   uom: string
   rate: number
   amount: number
-  image?: string
+  image?: string | string[]
 }
 
 export class QuoteModel {
@@ -65,7 +65,7 @@ export class QuoteModel {
           id: item.item_code,
           name: item.item_name,
           price: item.rate,
-          image: item.image ?? "",
+          image: Array.isArray(item.image) ? item.image[0] ?? "" : (item.image ?? ""),
           quantity: item.qty,
           uom: item.uom,
         })),
@@ -113,7 +113,7 @@ export class QuoteModel {
           id: item.item_code,
           name: item.item_name,
           price: item.rate,
-          image: item.image ?? "",
+          image: Array.isArray(item.image) ? item.image[0] ?? "" : (item.image ?? ""),
           quantity: item.qty,
           uom: item.uom,
         })),

@@ -156,7 +156,7 @@
 //                             >
 //                               <div className="h-14 w-14 rounded-xl bg-muted/50 relative overflow-hidden shrink-0 border border-border/50">
 //                                 <Image
-//                                   src={getDisplayImageUrl(item.image, getApiBaseUrl()) || "/placeholder.svg"}
+//                                   src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
 //                                   alt={item.item_name || "Product"}
 //                                   fill
 //                                   className="object-contain p-2 group-hover:scale-110 transition-transform"
@@ -550,7 +550,7 @@ export function Navigation() {
                             >
                               <div className="h-14 w-14 rounded-xl bg-muted/50 relative overflow-hidden shrink-0 border border-border/50">
                                 <Image
-                                  src={getDisplayImageUrl(item.image, getApiBaseUrl()) || "/placeholder.svg"}
+                                  src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
                                   alt={item.item_name || "Product"}
                                   fill
                                   className="object-contain p-2 group-hover:scale-110 transition-transform"

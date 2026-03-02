@@ -3,6 +3,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ChevronRight } from "lucide-react"
 import { useItems, useMostBoughtItems } from "@/lib/api/hooks"
+import { getFirstImageUrl } from "@/lib/utils/image-url"
 import { SkeletonProductRow } from "./skeleton-card"
 import { ProductCard } from "@/components/product-card"
 import { motion } from "framer-motion"
@@ -76,7 +77,7 @@ export function ProductRow({ title, itemGroup, categoryHref = "/products", pageS
               name={product.item_name}
               price={displayPrice}
               rate={cartRate}
-              image={product.image}
+              image={getFirstImageUrl(product.image) ?? ""}
               unit={product.default_sales_uom || product.stock_uom || product.uom}
               stock={product.actual_qty}
               tags={product.tags}

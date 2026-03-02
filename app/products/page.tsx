@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card } from "@/components/ui/card"
 import { parseTags } from "@/lib/utils/tags"
 import { useItems, useMostBoughtItems, useSearch, useTaggedItems } from "@/lib/api/hooks"
+import { getFirstImageUrl } from "@/lib/utils/image-url"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
 import { motion, AnimatePresence } from "framer-motion"
 import { Filter, X, Loader2 } from "lucide-react"
@@ -631,7 +632,7 @@ export default function ProductsPage() {
                         name={product.item_name}
                         price={displayPrice}
                         rate={cartRate}
-                        image={product.image}
+                        image={getFirstImageUrl(product.image) ?? ""}
                         unit={product.default_sales_uom || product.stock_uom || product.uom}
                         stock={product.actual_qty}
                         tags={product.tags}

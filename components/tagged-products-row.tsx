@@ -3,6 +3,7 @@ import { ProductCard } from "@/components/product-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTaggedItems } from "@/lib/api/hooks"
+import { getFirstImageUrl } from "@/lib/utils/image-url"
 import { parseTags } from "@/lib/utils/tags"
 import { motion } from "framer-motion"
 import { ChevronRight } from "lucide-react"
@@ -73,7 +74,7 @@ export function TaggedProductsRow({
                 name={product.item_name}
                 price={displayPrice}
                 rate={cartRate}
-                image={product.image}
+                image={getFirstImageUrl(product.image) ?? ""}
                 unit={product.default_sales_uom || product.stock_uom || product.uom}
                 stock={product.actual_qty}
                 tags={product.tags}
@@ -117,7 +118,7 @@ export function TaggedProductsRow({
                       name={product.item_name}
                       price={displayPrice}
                       rate={cartRate}
-                      image={product.image}
+                      image={getFirstImageUrl(product.image) ?? ""}
                       unit={product.default_sales_uom || product.stock_uom || product.uom}
                       stock={product.actual_qty}
                       tags={product.tags}

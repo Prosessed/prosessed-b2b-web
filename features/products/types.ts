@@ -5,7 +5,8 @@ export interface Product {
   item_name: string
   rate: number
   price_list_rate?: number
-  image?: string
+  /** Image URLs from API (listing and item detail). */
+  image?: string[]
   item_group?: string
   uom?: string
   stock?: number

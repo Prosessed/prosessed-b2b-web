@@ -9,7 +9,7 @@ import { useCartContext } from "@/lib/cart/context"
 import { useAuth } from "@/lib/auth/context"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
-import { getDisplayImageUrl } from "@/lib/utils/image-url"
+import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { AnimatePresence, motion } from "framer-motion"
 import {
   ArrowLeft,
@@ -177,7 +177,7 @@ export default function CartPage() {
                   <div className="flex gap-6">
                     <div className="relative w-28 h-28 bg-muted rounded-xl overflow-hidden">
                       <Image
-                        src={getDisplayImageUrl(item.image, getApiBaseUrl()) || "/placeholder.svg"}
+                        src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
                         alt={item.item_name}
                         fill
                         className="object-contain p-2"

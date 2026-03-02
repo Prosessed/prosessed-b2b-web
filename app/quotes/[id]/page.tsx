@@ -8,7 +8,7 @@ import { useQuotationDetails } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice, formatDate } from "@/lib/utils/currency"
-import { getDisplayImageUrl } from "@/lib/utils/image-url"
+import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { ArrowLeft, FileText, MapPin, Package } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -121,7 +121,7 @@ export default function QuoteDetailPage() {
                     <div key={item.name ?? item.item_code ?? idx} className="flex items-center gap-4 p-3 border rounded-lg">
                       <div className="relative h-14 w-14 rounded overflow-hidden bg-muted shrink-0">
                         <Image
-                          src={getDisplayImageUrl(item.image, getApiBaseUrl()) || "/placeholder.svg"}
+                          src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
                           alt={item.item_name || "Item"}
                           fill
                           className="object-contain p-1"

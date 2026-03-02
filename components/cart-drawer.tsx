@@ -11,7 +11,7 @@ import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
-import { getDisplayImageUrl } from "@/lib/utils/image-url"
+import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { motion, AnimatePresence } from "framer-motion"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./ui/sheet"
 
@@ -149,7 +149,7 @@ export function CartDrawer() {
                     {/* Product Image */}
                     <div className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-muted/40">
                       <Image
-                        src={getDisplayImageUrl(item.image, getApiBaseUrl()) || "/placeholder.svg"}
+                        src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
                         alt={item.item_name || "Product"}
                         fill
                         className="object-contain p-2"
