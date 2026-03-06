@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Navigation } from "@/components/navigation"
+import { Footer } from "@/components/footer"
 import { AuthProvider } from "@/lib/auth/context"
 import { CartProvider } from "@/lib/cart/context"
 import { CartDrawerProvider } from "@/lib/cart/drawer-context"
@@ -37,6 +38,7 @@ export default function RootLayout({
               <AuthGuard>
                 <Navigation />
                 {children}
+                <Footer />
                 <CartDrawer />
                 <Analytics />
               </AuthGuard>

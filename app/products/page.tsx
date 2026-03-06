@@ -7,12 +7,19 @@ import { SkeletonCard } from "@/components/skeleton-card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card } from "@/components/ui/card"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { parseTags } from "@/lib/utils/tags"
 import { useItems, useMostBoughtItems, useSearch, useTaggedItems } from "@/lib/api/hooks"
 import { getFirstImageUrl } from "@/lib/utils/image-url"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
 import { motion, AnimatePresence } from "framer-motion"
-import { Filter, X, Loader2 } from "lucide-react"
+import { Filter, LayoutGrid, List, Loader2, X } from "lucide-react"
 
 // Helper to flatten all categories from tree
 const getAllCategories = (tree: any[]): string[] => {
@@ -51,16 +58,36 @@ export default function ProductsPage() {
   // Read filter state from URL params
   const brandsFromUrl = searchParams.get("brands")
   const sortFromUrl = searchParams.get("sort")
+  const pageSizeFromUrl = searchParams.get("page_size")
+  const viewFromUrl = searchParams.get("view")
+  const gridColsFromUrl = searchParams.get("cols")
   
   const observerTarget = useRef<HTMLDivElement>(null)
 
   // Initialize state from URL params
-  type SortByType = "relevance" | "price-low" | "price-high" | "qty-desc"
+  type SortByType = "featured" | "price-low" | "price-high" | "name-asc" | "name-desc"
   const [sortBy, setSortBy] = useState<SortByType>(() => {
-    if (sortFromUrl && ["relevance", "price-low", "price-high", "qty-desc"].includes(sortFromUrl)) {
+    if (!sortFromUrl) return "featured"
+    if (sortFromUrl === "relevance" || sortFromUrl === "qty-desc") return "featured"
+    if (["featured", "price-low", "price-high", "name-asc", "name-desc"].includes(sortFromUrl)) {
       return sortFromUrl as SortByType
     }
-    return "relevance"
+    return "featured"
+  })
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const n = Number(pageSizeFromUrl)
+    if (!Number.isFinite(n)) return 20
+    if (n === 20 || n === 50 || n === 100) return n
+    return 20
+  })
+  const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+    if (viewFromUrl === "list") return "list"
+    return "grid"
+  })
+  const [gridCols, setGridCols] = useState<2 | 3 | 4>(() => {
+    const n = Number(gridColsFromUrl)
+    if (n === 2 || n === 3 || n === 4) return n
+    return 4
   })
   const [selectedBrands, setSelectedBrands] = useState<string[]>(() => {
     if (brandsFromUrl) {
@@ -80,24 +107,11 @@ export default function ProductsPage() {
   const isResettingRef = useRef(false)
   const prevFiltersRef = useRef<string>("")
 
-  const pageSize = 20
-
   // Get categories from API
   const { data: categoryTree } = useItemGroupTree(false)
   const allCategories = useMemo(() => getAllCategories(categoryTree || []), [categoryTree])
 
-  // When opening Products from nav (no params), show most bought items so user can start from there
-  useEffect(() => {
-    if (categoryFromUrl || searchQuery || isPreviouslyBought || tagFromUrl || taggedFromUrl) return
-    router.replace("/products?previously_bought=true", { scroll: false })
-  }, [categoryFromUrl, searchQuery, isPreviouslyBought, tagFromUrl, taggedFromUrl, router])
-
-  // Map sortBy to API sortByQty
-  const sortByQty = useMemo(() => {
-    if (sortBy === "qty-desc") return "desc"
-    if (sortBy === "price-low" || sortBy === "price-high") return "asc"
-    return "asc"
-  }, [sortBy])
+  const sortByQty: "asc" | "desc" = "asc"
 
   // Search results
   const { data: searchData, isLoading: searchLoading, isValidating: searchValidating, error: searchError } = useSearch(
@@ -180,21 +194,49 @@ export default function ProductsPage() {
   
   // Create filter key for comparison
   const currentFiltersKey = useMemo(() => {
-    return `${categoryFromUrl || ""}|${selectedBrandsKey}|${sortBy}|${searchQuery || ""}|${tagFromUrl || ""}|${taggedFromUrl}`
-  }, [categoryFromUrl, selectedBrandsKey, sortBy, searchQuery, tagFromUrl, taggedFromUrl])
+    return `${categoryFromUrl || ""}|${selectedBrandsKey}|${searchQuery || ""}|${tagFromUrl || ""}|${taggedFromUrl}|${pageSize}`
+  }, [categoryFromUrl, selectedBrandsKey, searchQuery, tagFromUrl, taggedFromUrl, pageSize])
 
   // Sync state from URL params when they change (e.g., browser back/forward)
   useEffect(() => {
     const newBrands = brandsFromUrl ? brandsFromUrl.split(",").filter(Boolean) : []
-    const newSort = (sortFromUrl as typeof sortBy) || "relevance"
+    const newSort: SortByType = (() => {
+      if (!sortFromUrl) return "featured"
+      if (sortFromUrl === "relevance" || sortFromUrl === "qty-desc") return "featured"
+      if (["featured", "price-low", "price-high", "name-asc", "name-desc"].includes(sortFromUrl)) {
+        return sortFromUrl as SortByType
+      }
+      return "featured"
+    })()
+    const newPageSize = (() => {
+      const n = Number(pageSizeFromUrl)
+      if (!Number.isFinite(n)) return 20
+      if (n === 20 || n === 50 || n === 100) return n
+      return 20
+    })()
+    const newViewMode = viewFromUrl === "list" ? "list" : "grid"
+    const newGridCols = (() => {
+      const n = Number(gridColsFromUrl)
+      if (n === 2 || n === 3 || n === 4) return n
+      return 4
+    })()
     
-    if (JSON.stringify(newBrands.sort()) !== JSON.stringify(selectedBrands.sort())) {
+    if (JSON.stringify([...newBrands].sort()) !== JSON.stringify([...selectedBrands].sort())) {
       setSelectedBrands(newBrands)
     }
     if (newSort !== sortBy) {
       setSortBy(newSort)
     }
-  }, [brandsFromUrl, sortFromUrl])
+    if (newPageSize !== pageSize) {
+      setPageSize(newPageSize)
+    }
+    if (newViewMode !== viewMode) {
+      setViewMode(newViewMode)
+    }
+    if (newGridCols !== gridCols) {
+      setGridCols(newGridCols)
+    }
+  }, [brandsFromUrl, sortFromUrl, pageSizeFromUrl, viewFromUrl, gridColsFromUrl])
 
   // Reset when category, search, or filters change
   useEffect(() => {
@@ -298,7 +340,10 @@ export default function ProductsPage() {
   const updateUrlParams = useCallback((updates: {
     category?: string | null
     brands?: string[]
-    sort?: string
+    sort?: SortByType
+    pageSize?: number
+    view?: "grid" | "list"
+    cols?: 2 | 3 | 4
     tag?: string | null
     tagged?: string | null
   }) => {
@@ -327,10 +372,34 @@ export default function ProductsPage() {
     }
 
     if (updates.sort !== undefined) {
-      if (updates.sort && updates.sort !== "relevance") {
+      if (updates.sort && updates.sort !== "featured") {
         params.set("sort", updates.sort)
       } else {
         params.delete("sort")
+      }
+    }
+
+    if (updates.pageSize !== undefined) {
+      if (updates.pageSize && updates.pageSize !== 20) {
+        params.set("page_size", String(updates.pageSize))
+      } else {
+        params.delete("page_size")
+      }
+    }
+
+    if (updates.view !== undefined) {
+      if (updates.view === "list") {
+        params.set("view", "list")
+      } else {
+        params.delete("view")
+      }
+    }
+
+    if (updates.cols !== undefined) {
+      if (updates.cols && updates.cols !== 4) {
+        params.set("cols", String(updates.cols))
+      } else {
+        params.delete("cols")
       }
     }
 
@@ -378,15 +447,40 @@ export default function ProductsPage() {
     updateUrlParams({
       category: null,
       brands: [],
-      sort: "relevance",
+      sort: "featured",
       tag: null,
       tagged: null,
     })
   }, [updateUrlParams])
 
+  const handleSortByChange = useCallback((value: string) => {
+    if (!["featured", "price-low", "price-high", "name-asc", "name-desc"].includes(value)) return
+    const next = value as SortByType
+    setSortBy(next)
+    updateUrlParams({ sort: next })
+  }, [updateUrlParams])
+
+  const handlePageSizeChange = useCallback((value: string) => {
+    const next = Number(value)
+    if (!(next === 20 || next === 50 || next === 100)) return
+    setPageSize(next)
+    updateUrlParams({ pageSize: next })
+  }, [updateUrlParams])
+
+  const handleViewModeChange = useCallback((next: "grid" | "list") => {
+    setViewMode(next)
+    updateUrlParams({ view: next })
+  }, [updateUrlParams])
+
+  const handleGridColsChange = useCallback((next: 2 | 3 | 4) => {
+    setGridCols(next)
+    updateUrlParams({ cols: next })
+  }, [updateUrlParams])
+
   const hasActiveFilters = selectedBrands.length > 0 || categoryFromUrl || !!tagFromUrl || taggedFromUrl
 
-  // Filter by tag (client-side); then client-side price sorting
+
+  // Filter by tag (client-side); then client-side sorting
   const sortedProducts = useMemo(() => {
     let list = allProducts
     if (tagFromUrl) {
@@ -397,20 +491,41 @@ export default function ProductsPage() {
     }
     if (sortBy === "price-low") {
       return [...list].sort((a: any, b: any) => {
-        const priceA = a.price_list_rate ?? a.rate ?? 0
-        const priceB = b.price_list_rate ?? b.rate ?? 0
+        const priceA = a.price_list_rate ?? a.rate ?? a.price ?? 0
+        const priceB = b.price_list_rate ?? b.rate ?? b.price ?? 0
         return priceA - priceB
       })
     }
     if (sortBy === "price-high") {
       return [...list].sort((a: any, b: any) => {
-        const priceA = a.price_list_rate ?? a.rate ?? 0
-        const priceB = b.price_list_rate ?? b.rate ?? 0
+        const priceA = a.price_list_rate ?? a.rate ?? a.price ?? 0
+        const priceB = b.price_list_rate ?? b.rate ?? b.price ?? 0
         return priceB - priceA
+      })
+    }
+    if (sortBy === "name-asc") {
+      return [...list].sort((a: any, b: any) => {
+        const nameA = (a.item_name ?? a.name ?? "").toString()
+        const nameB = (b.item_name ?? b.name ?? "").toString()
+        return nameA.localeCompare(nameB, undefined, { sensitivity: "base" })
+      })
+    }
+    if (sortBy === "name-desc") {
+      return [...list].sort((a: any, b: any) => {
+        const nameA = (a.item_name ?? a.name ?? "").toString()
+        const nameB = (b.item_name ?? b.name ?? "").toString()
+        return nameB.localeCompare(nameA, undefined, { sensitivity: "base" })
       })
     }
     return list
   }, [allProducts, sortBy, tagFromUrl])
+
+  const gridClassName = useMemo(() => {
+    if (viewMode !== "grid") return ""
+    if (gridCols === 2) return "grid grid-cols-2 gap-6"
+    if (gridCols === 3) return "grid grid-cols-2 md:grid-cols-3 gap-6"
+    return "grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6"
+  }, [gridCols, viewMode])
 
   return (
     <div className="container mx-auto px-4 py-8 bg-background/50 min-h-screen relative">
@@ -421,7 +536,7 @@ export default function ProductsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-background/80 backdrop-blur-sm flex items-center justify-center"
+            className="fixed inset-0 z-200 bg-background/80 backdrop-blur-sm flex items-center justify-center"
           >
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
@@ -458,12 +573,12 @@ export default function ProductsPage() {
         {/* Filters Sidebar */}
         <aside
           className={`
-          fixed inset-0 z-[100] lg:relative lg:inset-auto lg:block w-full lg:w-72 shrink-0
+          fixed inset-0 z-100 lg:relative lg:inset-auto lg:block w-full lg:w-72 shrink-0
           bg-background lg:bg-transparent transition-transform duration-300
           ${isMobileFiltersOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
         `}
         >
-          <Card className="h-full lg:h-auto p-6 lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border shadow-none lg:shadow-xl shadow-primary/5 overflow-y-auto">
+          <Card className="h-full lg:h-[calc(100vh-6rem)] p-6 lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border shadow-none lg:shadow-xl shadow-primary/5 overflow-y-auto overscroll-contain scroll-smooth">
             <div className="flex items-center justify-between mb-6 lg:hidden">
               <h2 className="text-xl font-bold">Filters</h2>
               <Button variant="ghost" size="icon" onClick={() => setIsMobileFiltersOpen(false)}>
@@ -580,7 +695,106 @@ export default function ProductsPage() {
                     : "Loading..."}
               </p>
             </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                  Items per page
+                </span>
+                <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                  <SelectTrigger size="sm" className="w-[88px] rounded-lg">
+                    <SelectValue placeholder="20" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                  Sort by
+                </span>
+                <Select value={sortBy} onValueChange={handleSortByChange}>
+                  <SelectTrigger size="sm" className="w-[170px] rounded-lg">
+                    <SelectValue placeholder="Featured" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="featured">Featured</SelectItem>
+                    <SelectItem value="price-low">Price: Low → High</SelectItem>
+                    <SelectItem value="price-high">Price: High → Low</SelectItem>
+                    <SelectItem value="name-asc">A → Z</SelectItem>
+                    <SelectItem value="name-desc">Z → A</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-muted/20 p-1">
+                <Button
+                  type="button"
+                  variant={viewMode === "grid" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => handleViewModeChange("grid")}
+                  className="h-8 rounded-lg px-3 font-bold cursor-pointer"
+                  aria-label="Grid view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Grid
+                </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => handleViewModeChange("list")}
+                  className="h-8 rounded-lg px-3 font-bold cursor-pointer"
+                  aria-label="List view"
+                >
+                  <List className="h-4 w-4" />
+                  List
+                </Button>
+              </div>
+
+              {viewMode === "grid" && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                    View as
+                  </span>
+                  <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-muted/20 p-1">
+                    <Button
+                      type="button"
+                      variant={gridCols === 2 ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => handleGridColsChange(2)}
+                      className="h-8 rounded-lg px-3 font-black cursor-pointer"
+                      aria-label="2 columns"
+                    >
+                      2
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={gridCols === 3 ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => handleGridColsChange(3)}
+                      className="h-8 rounded-lg px-3 font-black cursor-pointer"
+                      aria-label="3 columns"
+                    >
+                      3
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={gridCols === 4 ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => handleGridColsChange(4)}
+                      className="h-8 rounded-lg px-3 font-black cursor-pointer"
+                      aria-label="4 columns"
+                    >
+                      4
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <AnimatePresence mode="popLayout">
@@ -611,30 +825,49 @@ export default function ProductsPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-6"
+                className={viewMode === "grid"
+                  ? gridClassName
+                  : "space-y-3"
+                }
               >
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <SkeletonCard key={i} />
+                {Array.from({ length: viewMode === "grid" ? 12 : 8 }).map((_, i) => (
+                  viewMode === "grid" ? (
+                    <SkeletonCard key={i} />
+                  ) : (
+                    <div
+                      key={i}
+                      className="h-[124px] rounded-2xl border border-border/60 bg-linear-to-r from-muted/40 via-muted/20 to-muted/40 animate-pulse"
+                    />
+                  )
                 ))}
               </motion.div>
             ) : sortedProducts.length > 0 ? (
               <>
-                <motion.div key="product-grid" layout className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-6">
+                <motion.div
+                  key="product-grid"
+                  layout
+                  className={viewMode === "grid"
+                    ? gridClassName
+                    : "flex flex-col gap-3"
+                  }
+                >
                   {sortedProducts.map((product: any) => {
                     // Determine the display price and rate for cart
-                    const displayPrice = product.price_list_rate ?? product.rate ?? 0
-                    const cartRate = product.rate ?? product.price_list_rate ?? 0
+                    const displayPrice = product.price_list_rate ?? product.rate ?? product.price ?? 0
+                    const cartRate = product.rate ?? product.price_list_rate ?? product.price ?? 0
+                    const unit = product.default_sales_uom || product.stock_uom || product.uom || product.uoms?.[0]?.uom
                     
                     return (
                       <ProductCard
                         key={product.item_code}
+                        view={viewMode}
                         id={product.item_code}
-                        name={product.item_name}
+                        name={product.item_name ?? product.name ?? ""}
                         price={displayPrice}
                         rate={cartRate}
                         image={getFirstImageUrl(product.image) ?? ""}
-                        unit={product.default_sales_uom || product.stock_uom || product.uom}
-                        stock={product.actual_qty}
+                        unit={unit}
+                        stock={product.actual_qty ?? product.uoms?.[0]?.reserved ?? product.reserved ?? 0}
                         tags={product.tags}
                       />
                     )
@@ -643,12 +876,36 @@ export default function ProductsPage() {
 
                 {/* Infinite Scroll Trigger */}
                 {hasNextPage && (
-                  <div ref={observerTarget} className="h-20 flex items-center justify-center mt-8">
-                    {isLoadingMore && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        <span className="text-sm font-medium">Loading more products...</span>
+                  <div ref={observerTarget} className="mt-8">
+                    {isLoadingMore ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span className="text-sm font-semibold">Loading more products…</span>
+                        </div>
+                        {sortedProducts.length >= 20 && (
+                          <div
+                            className={viewMode === "grid"
+                              ? gridClassName
+                              : "space-y-3"
+                            }
+                            aria-label="Loading more products"
+                          >
+                            {Array.from({ length: viewMode === "grid" ? 8 : 4 }).map((_, i) => (
+                              viewMode === "grid" ? (
+                                <SkeletonCard key={i} />
+                              ) : (
+                                <div
+                                  key={i}
+                                  className="h-[124px] rounded-2xl border border-border/60 bg-linear-to-r from-primary/10 via-muted/20 to-primary/10 animate-pulse"
+                                />
+                              )
+                            ))}
+                          </div>
+                        )}
                       </div>
+                    ) : (
+                      <div className="h-10" />
                     )}
                   </div>
                 )}

@@ -94,6 +94,7 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = async () => {
     if (!user || !product) return
+    const shouldAutoOpenCart = (cart?.items?.length ?? 0) === 0
     
     // Ensure we have a valid rate before adding to cart
     if (!currentRate || currentRate <= 0) {
@@ -123,8 +124,10 @@ export default function ProductDetailPage() {
       }
       // Small delay for smooth UI update
       await new Promise((resolve) => setTimeout(resolve, 200))
-      // Open cart drawer instead of redirecting
-      openDrawer()
+      // Open cart drawer only on first item add
+      if (shouldAutoOpenCart) {
+        openDrawer()
+      }
     } catch (error) {
       console.error("Failed to add to cart:", error)
     } finally {
@@ -339,7 +342,7 @@ export default function ProductDetailPage() {
           {/* Add to Cart Button */}
           <Button
             size="lg"
-            className="w-full text-lg h-14 rounded-xl font-bold"
+            className="w-full text-lg h-14 rounded-xl font-bold cursor-pointer"
             onClick={handleAddToCart}
             disabled={isAdding}
             variant={cartItem ? "outline" : "default"}

@@ -68,18 +68,19 @@ export function ProductRow({ title, itemGroup, categoryHref = "/products", pageS
         }
       >
         {products.map((product: any) => {
-          const displayPrice = product.price_list_rate ?? product.rate ?? 0
-          const cartRate = product.rate ?? product.price_list_rate ?? 0
+          const displayPrice = product.price_list_rate ?? product.rate ?? product.price ?? 0
+          const cartRate = product.rate ?? product.price_list_rate ?? product.price ?? 0
+          const unit = product.default_sales_uom || product.stock_uom || product.uom || product.uoms?.[0]?.uom
           return (
             <ProductCard
               key={product.item_code}
               id={product.item_code}
-              name={product.item_name}
+              name={product.item_name ?? product.name ?? ""}
               price={displayPrice}
               rate={cartRate}
               image={getFirstImageUrl(product.image) ?? ""}
-              unit={product.default_sales_uom || product.stock_uom || product.uom}
-              stock={product.actual_qty}
+              unit={unit}
+              stock={product.actual_qty ?? product.uoms?.[0]?.reserved ?? product.reserved ?? 0}
               tags={product.tags}
             />
           )

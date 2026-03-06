@@ -62,13 +62,13 @@ export function StickyDealCards() {
     <section className="py-8">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-3xl font-black tracking-tight">Special Deals</h2>
-        <Link
-          href="/products"
-          className="text-sm font-bold text-primary hover:text-primary/90 flex items-center gap-1.5 transition-colors"
+        <span
+          aria-disabled="true"
+          className="text-sm font-bold text-muted-foreground/70 flex items-center gap-1.5 select-none cursor-not-allowed"
         >
           View all
           <ArrowRight className="h-4 w-4" />
-        </Link>
+        </span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {displayDeals.map((deal, index) => (
@@ -89,8 +89,8 @@ export function StickyDealCards() {
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
                   />
-                  <div className={`absolute inset-0 bg-gradient-to-br ${deal.gradient} opacity-60 group-hover:opacity-70 transition-opacity`} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                  <div className={`absolute inset-0 bg-linear-to-br ${deal.gradient} opacity-60 group-hover:opacity-70 transition-opacity`} />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent" />
                 </div>
                 
                 {/* Content */}

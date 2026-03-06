@@ -6,7 +6,7 @@ export function Footer() {
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col items-center justify-center gap-2 text-center">
           <p className="text-sm text-muted-foreground">
-            Place Order · Get Quote · Ledger · Payment
+          Place Order . Get Quote . View Orders . Track Dispatch . Download Invoice . Ledger Statement
           </p>
           <p className="text-xs text-muted-foreground">
             This portal is powered by{" "}

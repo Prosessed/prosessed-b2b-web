@@ -32,7 +32,11 @@ export function useItems(params: UseItemsParams) {
         filterByBrand = undefined
       }
 
-      return apiClient.request<any>("/api/method/prosessed_orderit.orderit.get_items_from_item_group_vtwo", {
+      const endpoint = params.item_group
+        ? "/api/method/prosessed_orderit.orderit.get_items_from_item_group_vtwo"
+        : "/api/method/prosessed_orderit.orderit_app.apis.quickaccess.all_items.all_items.get_all_items_card_v2"
+
+      const response = await apiClient.request<any>(endpoint, {
         method: "POST",
         body: JSON.stringify({
           item_group: params.item_group,
@@ -51,9 +55,44 @@ export function useItems(params: UseItemsParams) {
         auth: {
           apiKey: user.apiKey,
           apiSecret: user.apiSecret,
-          sid: user.sid,
         },
-      })
+        }
+      )
+
+      // Normalize response so UI can rely on message.items + message.pagination
+      const raw = response?.message || response
+      const items = Array.isArray(raw?.items) ? raw.items : []
+      const totalRecords =
+        typeof raw?.total_records === "number"
+          ? raw.total_records
+          : typeof raw?.totalRecords === "number"
+            ? raw.totalRecords
+            : undefined
+
+      const page = params.page || 1
+      const pageSize = params.page_size || 20
+      const derivedPagination =
+        typeof totalRecords === "number"
+          ? {
+              total_records: totalRecords,
+              has_next_page: page * pageSize < totalRecords,
+            }
+          : undefined
+
+      const existingMessage = response?.message && typeof response.message === "object" ? response.message : undefined
+      const normalizedMessage = {
+        ...(existingMessage as any),
+        items: existingMessage?.items ?? raw?.items ?? items,
+        pagination: existingMessage?.pagination ?? raw?.pagination ?? derivedPagination,
+        brands: existingMessage?.brands ?? raw?.brands,
+      }
+
+      return {
+        ...response,
+        items: response?.items ?? raw?.items ?? items,
+        total_records: response?.total_records ?? raw?.total_records ?? totalRecords,
+        message: normalizedMessage,
+      }
     },
     {
       revalidateOnFocus: false,
@@ -96,7 +135,6 @@ export function useSearch(term: string, page: number = 1, pageSize: number = 10)
         auth: {
           apiKey: user.apiKey,
           apiSecret: user.apiSecret,
-          sid: user.sid,
         },
       })
 
@@ -155,7 +193,6 @@ export function useItemDetails(itemCode: string | null, qty: number = 1) {
         auth: {
           apiKey: user.apiKey,
           apiSecret: user.apiSecret,
-          sid: user.sid,
         },
       })
       console.log(`[Item Details API] POST /api/method/prosessed_orderit.orderit.get_item_details - Item: ${itemCode} - Status: OK`)
@@ -209,7 +246,6 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
         auth: {
           apiKey: user.apiKey,
           apiSecret: user.apiSecret,
-          sid: user.sid,
         },
       })
       const items = response?.message?.items || response?.items || []
@@ -240,7 +276,6 @@ export function useQuotations() {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
-            sid: user.sid,
           },
         }
       )
@@ -276,7 +311,6 @@ export function useQuotationDetails(quotationId: string | null) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
-            sid: user.sid,
           },
         }
       )
@@ -311,7 +345,6 @@ export function useSalesPersonOrders(page: number = 1, pageSize: number = 20) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
-            sid: user.sid,
           },
         }
       )
@@ -340,7 +373,6 @@ export function useOrderDetails(orderId: string | null) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
-            sid: user.sid,
           },
         }
       )
@@ -366,7 +398,6 @@ export function useCustomerDetails(customerId: string | null) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
-            sid: user.sid,
           },
         }
       )
@@ -395,7 +426,6 @@ export function useCustomerName(customerId: string | null) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
-            sid: user.sid,
           },
         }
       )
@@ -435,7 +465,6 @@ export function useTaggedItems(warehouse?: string) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
-            sid: user.sid,
           },
         }
       )

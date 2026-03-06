@@ -19,6 +19,7 @@ import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 
 interface ProductCardProps {
+  view?: "grid" | "list"
   id: string
   name: string
   price: number
@@ -36,7 +37,19 @@ interface ProductCardProps {
   discount?: number
 }
 
-export function ProductCard({ id, name, price, image, unit, stock, rate, customerPriceMargin, tags, discount }: ProductCardProps) {
+export function ProductCard({
+  view = "grid",
+  id,
+  name,
+  price,
+  image,
+  unit,
+  stock,
+  rate,
+  customerPriceMargin,
+  tags,
+  discount,
+}: ProductCardProps) {
   const displayUnit = unit || "unit"
   const tagList = parseTags(tags)
   const { cart, addItem, updateItem, removeItem, isLoading: cartLoading } = useCartContext()
@@ -54,6 +67,7 @@ export function ProductCard({ id, name, price, image, unit, stock, rate, custome
   // First-time add: add 1 quantity, then stepper (- [box] +) appears
   const handleAddOne = useCallback(async () => {
     if (!user) return
+    const shouldAutoOpenCart = (cart?.items?.length ?? 0) === 0
     const itemRate = (rate && rate > 0) ? rate : (price && price > 0 ? price : 0)
     if (!itemRate || itemRate <= 0) return
     setIsMutating(true)
@@ -66,13 +80,15 @@ export function ProductCard({ id, name, price, image, unit, stock, rate, custome
         uom: displayUnit,
       })
       await new Promise((r) => setTimeout(r, 100))
-      openDrawer()
+      if (shouldAutoOpenCart) {
+        openDrawer()
+      }
     } catch (e) {
       console.error("Failed to add item:", e)
     } finally {
       setIsMutating(false)
     }
-  }, [id, price, rate, displayUnit, user, addItem, openDrawer])
+  }, [cart?.items?.length, id, price, rate, displayUnit, user, addItem, openDrawer])
 
   const increment = useCallback(async () => {
     if (!user || !cartItem) return
@@ -167,9 +183,14 @@ export function ProductCard({ id, name, price, image, unit, stock, rate, custome
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="h-full"
+      className={view === "grid" ? "h-full" : ""}
     >
-      <Card className="flex flex-col h-full overflow-hidden rounded-2xl border border-border/60 bg-background hover:border-primary/30 hover:shadow-xl transition-all duration-300 group relative">
+      <Card
+        className={[
+          "overflow-hidden rounded-2xl border border-border/60 bg-background hover:border-primary/30 hover:shadow-xl transition-all duration-300 group relative",
+          view === "grid" ? "flex flex-col h-full" : "flex flex-row",
+        ].join(" ")}
+      >
         {/* Tags – top-left overlay, grocery-style; click → /products?tag= */}
         {tagList.length > 0 && (
           <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-1.5 max-w-[70%]" aria-label={`Tags: ${tagList.join(", ")}`}>
@@ -187,8 +208,13 @@ export function ProductCard({ id, name, price, image, unit, stock, rate, custome
         )}
 
         {/* Product Image Container - Fixed aspect ratio */}
-        <Link href={`/products/${id}`} className="block">
-          <div className="relative w-full aspect-square bg-gradient-to-br from-muted/30 to-muted/10 overflow-hidden">
+        <Link href={`/products/${id}`} className={view === "grid" ? "block" : "block shrink-0"}>
+          <div
+            className={[
+              "relative aspect-square bg-linear-to-br from-muted/30 to-muted/10 overflow-hidden",
+              view === "grid" ? "w-full" : "w-28 sm:w-32",
+            ].join(" ")}
+          >
             <Image
               src={getDisplayImageUrl(image, getApiBaseUrl()) || "/placeholder.svg"}
               alt={name}
@@ -200,19 +226,27 @@ export function ProductCard({ id, name, price, image, unit, stock, rate, custome
         </Link>
 
         {/* Product Info - Flexible content area */}
-        <CardContent className="flex flex-col flex-1 p-3 sm:p-4 gap-2">
+        <CardContent
+          className={view === "grid"
+            ? "flex flex-col flex-1 p-3 sm:p-4 gap-2"
+            : "flex flex-col justify-between flex-1 p-4 gap-2"
+          }
+        >
           {/* Product Name */}
           <Link href={`/products/${id}`} className="block group/name">
-            <h3 className="font-semibold text-sm leading-tight line-clamp-2 min-h-[2.5rem] text-foreground group-hover/name:text-primary transition-colors">
+            <h3 className={view === "grid"
+              ? "font-semibold text-sm leading-tight line-clamp-2 min-h-10 text-foreground group-hover/name:text-primary transition-colors"
+              : "font-semibold text-sm leading-tight line-clamp-2 text-foreground group-hover/name:text-primary transition-colors"}
+            >
               {name}
             </h3>
           </Link>
 
           {/* Spacer to push price and button to bottom */}
-          <div className="flex-1" />
+          {view === "grid" && <div className="flex-1" />}
 
           {/* Price Section */}
-          <div className="mb-2">
+          <div className={view === "grid" ? "mb-2" : "mb-0"}>
             {customerPriceMargin?.is_custom_price === 1 ? (
               <div className="space-y-0.5">
                 <p className="text-[11px] font-medium text-amber-600 dark:text-amber-500">Custom Pricing</p>
@@ -246,12 +280,17 @@ export function ProductCard({ id, name, price, image, unit, stock, rate, custome
                   onClick={handleAddOne}
                   disabled={isMutating}
                   size="sm"
-                  className="w-full h-9 sm:h-10 bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-sm hover:shadow-md active:scale-[0.98] transition-all rounded-xl border-2 border-primary/20"
+                  className={[
+                    "font-black shadow-sm active:scale-[0.98] transition-all cursor-pointer",
+                    view === "grid"
+                      ? "w-full h-9 sm:h-10 rounded-full border-2 border-border/70 bg-background text-foreground hover:bg-accent hover:border-primary/30"
+                      : "w-32 h-9 rounded-full border-2 border-border/70 bg-background text-foreground hover:bg-accent hover:border-primary/30",
+                  ].join(" ")}
                 >
                   {isMutating ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <span className="text-sm tracking-wide">ADD</span>
+                    <span className="text-sm tracking-wide">Add</span>
                   )}
                 </Button>
               </motion.div>
@@ -269,9 +308,9 @@ export function ProductCard({ id, name, price, image, unit, stock, rate, custome
                   variant="ghost"
                   size="icon"
                   disabled={isMutating}
-                  className="h-full w-10 sm:w-11 shrink-0 hover:bg-primary/10 text-primary transition-colors rounded-none border-r border-primary/20"
+                  className="h-full w-10 sm:w-11 shrink-0 hover:bg-primary/10 text-primary transition-colors rounded-none border-r border-primary/20 cursor-pointer"
                 >
-                  <Minus className="h-4 w-4 stroke-[3]" />
+                  <Minus className="h-4 w-4 stroke-3" />
                 </Button>
 
                 <div className="relative flex items-center justify-center flex-1 h-full px-1">
@@ -298,9 +337,9 @@ export function ProductCard({ id, name, price, image, unit, stock, rate, custome
                   variant="ghost"
                   size="icon"
                   disabled={isMutating}
-                  className="h-full w-10 sm:w-11 shrink-0 hover:bg-primary/10 text-primary transition-colors rounded-none border-l border-primary/20"
+                  className="h-full w-10 sm:w-11 shrink-0 hover:bg-primary/10 text-primary transition-colors rounded-none border-l border-primary/20 cursor-pointer"
                 >
-                  <Plus className="h-4 w-4 stroke-[3]" />
+                  <Plus className="h-4 w-4 stroke-3" />
                 </Button>
               </motion.div>
             )}

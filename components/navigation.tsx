@@ -69,7 +69,7 @@
 //   }
 
 //   return (
-//     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+//     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
 //       <div className="container mx-auto flex h-16 items-center gap-4 px-4">
 //         {/* Company name only - no P / Prosessed branding */}
 //         <Link href="/" className="flex items-center min-w-0">
@@ -123,7 +123,7 @@
 //                 animate={{ opacity: 1, y: 0, scale: 1 }}
 //                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
 //                 transition={{ duration: 0.2 }}
-//                 className="absolute top-full left-0 right-0 mt-2 bg-background border-2 border-primary/20 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden z-[100]"
+//                 className="absolute top-full left-0 right-0 mt-2 bg-background border-2 border-primary/20 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden z-100"
 //                 onClick={(e) => e.stopPropagation()}
 //               >
 //                 <div className="max-h-[500px] overflow-y-auto">
@@ -397,7 +397,7 @@ import { useAuth } from "@/lib/auth/context"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { formatPrice } from "@/lib/utils/currency"
-import { getDisplayImageUrl } from "@/lib/utils/image-url"
+import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowRight, Moon, Package, Search, ShoppingCart, Sun, Tag, User, X } from "lucide-react"
 import Image from "next/image"
@@ -453,7 +453,7 @@ export function Navigation() {
     : "B2B Portal"
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="container mx-auto flex h-16 items-center gap-4 px-4">
         {/* Company Logo */}
         <Link href="/" className="flex items-center min-w-0 shrink-0">
@@ -479,7 +479,7 @@ export function Navigation() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
           <Input
             type="search"
-            placeholder="Search for organic tomatoes, milk, eggs..."
+            placeholder="Search for product name or categories..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={(e) => {
@@ -517,7 +517,7 @@ export function Navigation() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-background border-2 border-primary/20 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden z-[100]"
+                className="absolute top-full left-0 right-0 mt-2 bg-background border-2 border-primary/20 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden z-100"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="max-h-[500px] overflow-y-auto">
@@ -664,11 +664,8 @@ export function Navigation() {
           <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
             Home
           </Link>
-          <Link href="/products?previously_bought=true" className="text-sm font-medium hover:text-primary transition-colors">
+          <Link href="/products" className="text-sm font-medium hover:text-primary transition-colors">
             Products
-          </Link>
-          <Link href="/cart" className="text-sm font-medium hover:text-primary transition-colors">
-            Cart
           </Link>
           <Link href="/orders" className="text-sm font-medium hover:text-primary transition-colors">
             Orders
@@ -735,8 +732,8 @@ export function Navigation() {
                   </div>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/account">My Account</Link>
+                <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
+                  My Account
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/orders">My Orders</Link>
@@ -744,8 +741,8 @@ export function Navigation() {
                 <DropdownMenuItem asChild>
                   <Link href="/quotes">My Quotes</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/statements">My Statements</Link>
+                <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
+                  My Statements
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
