@@ -13,7 +13,8 @@ import { Loader2, ArrowLeft, Lock, Building2 } from "lucide-react"
 import { apiClient, ApiError } from "@/lib/api/client"
 import { setAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
-import type { Company, AuthUser } from "@/lib/auth/types"
+import { mapLoginResponseToAuthUser } from "@/lib/auth/utils"
+import type { Company } from "@/lib/auth/types"
 
 export default function PasswordPage() {
   const router = useRouter()
@@ -22,6 +23,7 @@ export default function PasswordPage() {
   const [company, setCompany] = useState<Company | null>(null)
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isOtpLoading, setIsOtpLoading] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
@@ -46,26 +48,7 @@ export default function PasswordPage() {
 
     try {
       const response = await apiClient.login(email, password, company.company_url)
-
-      const user: AuthUser = {
-        email: response.message.email,
-        fullName: response.full_name,
-        username: response.message.username,
-        companyName: response.message.company ?? company.company_name,
-        salesPerson: response.message.sales_person ?? "",
-        apiKey: response.message.api_key,
-        apiSecret: response.message.api_secret,
-        sid: response.message.sid,
-        customerId: response.message.customer_id,
-        isCustomer: response.message.is_customer,
-        defaultWarehouse: response.message.default_warehouse,
-        defaultPaymentTerm: response.message.default_payment_term,
-        defaultCurrency: response.message.default_currency,
-        companyUrl: company.company_url,
-        disablePriceEdit: response.message.company_custom_disable_price_edit === 1,
-        disableDiscountApply: response.message.company_custom_disable_discount_apply === 1,
-      }
-
+      const user = mapLoginResponseToAuthUser(response, company)
       login(user)
       await setAuthCookie(user)
       sessionStorage.removeItem("login_email")
@@ -79,6 +62,24 @@ export default function PasswordPage() {
       }
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleLoginViaOtp = async () => {
+    if (!company) return
+    setError("")
+    setIsOtpLoading(true)
+    try {
+      await apiClient.requestLoginOtp(email, company.company_url)
+      router.push("/login/otp")
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message)
+      } else {
+        setError("Failed to send OTP. Please try again.")
+      }
+    } finally {
+      setIsOtpLoading(false)
     }
   }
 
@@ -148,10 +149,27 @@ export default function PasswordPage() {
 
             <Button
               type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleLoginViaOtp}
+              disabled={isLoading || isOtpLoading}
+            >
+              {isOtpLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Sending OTP...
+                </>
+              ) : (
+                "Login via OTP"
+              )}
+            </Button>
+
+            <Button
+              type="button"
               variant="ghost"
               className="w-full"
               onClick={() => router.push("/login")}
-              disabled={isLoading}
+              disabled={isLoading || isOtpLoading}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to company selection

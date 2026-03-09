@@ -186,6 +186,87 @@ export const apiClient = {
     return data
   },
 
+  /* ------------------ OTP Login ------------------ */
+  async requestLoginOtp(email: string, companyUrl: string): Promise<{ success: boolean; message: string }> {
+    setApiBaseUrl(companyUrl)
+    const data = await this.request<{ success?: boolean; message?: string }>(
+      "/api/method/prosessed_orderit.auth.generate_and_send_otp",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+        auth: {},
+      }
+    )
+    const success = data?.success ?? true
+    const message =
+      typeof data?.message === "string" ? data.message : "OTP sent to your email"
+    return { success: Boolean(success), message }
+  },
+
+  async resendLoginOtp(email: string, companyUrl: string): Promise<{ success: boolean; message: string }> {
+    setApiBaseUrl(companyUrl)
+    const data = await this.request<{ success?: boolean; message?: string }>(
+      "/api/method/prosessed_orderit.auth.resend_otp",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+        auth: {},
+      }
+    )
+    const success = data?.success ?? true
+    const message =
+      typeof data?.message === "string" ? data.message : "New OTP sent"
+    return { success: Boolean(success), message }
+  },
+
+  async loginWithOtp(
+    email: string,
+    otpCode: string,
+    companyUrl: string
+  ): Promise<LoginResponse> {
+    setApiBaseUrl(companyUrl)
+    const data = await this.request<LoginResponse>(
+      "/api/method/prosessed_orderit.auth.verify_otp_and_login",
+      {
+        method: "POST",
+        body: JSON.stringify({ email, otp_code: otpCode }),
+        auth: {},
+      }
+    )
+    if (data.message.success_key !== 1) {
+      throw new ApiError(401, data.message.message || "Authentication failed")
+    }
+    return data
+  },
+
+  /* ------------------ Company details (branding) ------------------ */
+  async getCompanyDetails(): Promise<{
+    company_name: string
+    company_currency: string
+    abn: string
+    mobile: string
+    email: string
+    website: string
+    address: string
+  }> {
+    const data = await this.request<{
+      message?: Record<string, string>
+    }>("/api/method/prosessed_orderit.api.get_company_details", {
+      method: "GET",
+      auth: {},
+    })
+    const msg = data?.message ?? (data as Record<string, string>)
+    return {
+      company_name: msg?.company_name ?? "",
+      company_currency: msg?.company_currency ?? "",
+      abn: msg?.abn ?? "",
+      mobile: msg?.mobile ?? "",
+      email: msg?.email ?? "",
+      website: msg?.website ?? "",
+      address: msg?.address ?? "",
+    }
+  },
+
   /* ------------------ Generic Request ------------------ */
   async request<T>(
     endpoint: string,

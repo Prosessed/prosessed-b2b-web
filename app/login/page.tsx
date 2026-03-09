@@ -11,6 +11,9 @@ import { apiClient, ApiError } from "@/lib/api/client"
 import type { Company } from "@/lib/auth/types"
 import Link from "next/link"
 
+const LOGIN_EMAIL_KEY = "login_email"
+const LOGIN_COMPANY_KEY = "login_company"
+
 export default function LoginPage() {
   const router = useRouter()
   const [step, setStep] = useState<"email" | "company">("email")
@@ -33,6 +36,13 @@ export default function LoginPage() {
         return
       }
 
+      if (companiesData.length === 1) {
+        sessionStorage.setItem(LOGIN_EMAIL_KEY, email)
+        sessionStorage.setItem(LOGIN_COMPANY_KEY, JSON.stringify(companiesData[0]))
+        router.push("/login/password")
+        return
+      }
+
       setCompanies(companiesData)
       setStep("company")
     } catch (err) {
@@ -47,9 +57,8 @@ export default function LoginPage() {
   }
 
   const handleCompanySelect = (company: Company) => {
-    // Store email and company in sessionStorage for the password page
-    sessionStorage.setItem("login_email", email)
-    sessionStorage.setItem("login_company", JSON.stringify(company))
+    sessionStorage.setItem(LOGIN_EMAIL_KEY, email)
+    sessionStorage.setItem(LOGIN_COMPANY_KEY, JSON.stringify(company))
     router.push("/login/password")
   }
 
@@ -164,21 +173,6 @@ export default function LoginPage() {
           )}
         </div>
       </main>
-
-      <footer className="relative z-10 container mx-auto px-4 py-6 flex flex-col items-center justify-center gap-2 border-t border-border/10 text-center">
-        <p className="text-sm text-muted-foreground">
-          This portal is powered by{" "}
-          <a
-            href="https://prosessed.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary font-medium hover:underline"
-          >
-            prosessed.ai
-          </a>
-        </p>
-        <p className="text-xs text-muted-foreground">© 2025 B2B Commerce</p>
-      </footer>
     </div>
   )
 }

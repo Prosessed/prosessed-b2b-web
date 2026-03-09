@@ -501,16 +501,25 @@ export function useBannersAndDeals() {
   return useSWR(
     key,
     async () => {
-      const response = await apiClient.request<any>(
-        "/api/method/prosessed_order.api.get_b2b_banners_and_deals",
-        {
-          method: "POST",
-          body: JSON.stringify({}),
-        }
-      )
+      try {
+        const response = await apiClient.request<any>(
+          "/api/method/prosessed_order.api.get_b2b_banners_and_deals",
+          {
+            method: "POST",
+            body: JSON.stringify({}),
+          }
+        )
 
-      const data = response?.message || response
-      return data as BannersAndDealsResponse
+        const data = response?.message || response
+        return data as BannersAndDealsResponse
+      } catch (error) {
+        console.error("[useBannersAndDeals] Failed to load banners and deals:", error)
+        return {
+          company_logo: undefined,
+          banners: [],
+          deals: [],
+        } as BannersAndDealsResponse
+      }
     },
     {
       revalidateOnFocus: false,

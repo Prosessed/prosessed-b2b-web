@@ -2,7 +2,6 @@
 
 import { AnimatedBanner } from "@/components/animated-banner"
 import { CategoryGrid } from "@/components/category-grid"
-import { Footer } from "@/components/footer"
 import { HeroCarousel } from "@/components/hero-carousel"
 import { ProductRow } from "@/components/product-row"
 import { StickyDealCards } from "@/components/sticky-deal-cards"
@@ -114,8 +113,6 @@ export default function HomePage() {
           categoryHref="/products?category=fruits"
         /> */}
       </div>
-
-      <Footer />
     </div>
   )
 }
