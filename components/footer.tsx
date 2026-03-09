@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { apiClient } from "@/lib/api/client"
+import { usePathname } from "next/navigation"
 import { Mail, Phone, Globe, MapPin } from "lucide-react"
+import { apiClient } from "@/lib/api/client"
+import { useAuth } from "@/lib/auth/context"
 
 interface CompanyDetails {
   company_name: string
@@ -34,8 +36,15 @@ const FooterColumn = ({
 
 export function Footer() {
   const [branding, setBranding] = useState<CompanyDetails | null>(null)
+  const { isAuthenticated } = useAuth()
+  const pathname = usePathname()
+
+  const isLoginRoute = pathname.startsWith("/login")
 
   useEffect(() => {
+    if (!isAuthenticated || isLoginRoute) return
+    if (branding) return
+
     const loadBranding = async () => {
       try {
         const details = await apiClient.getCompanyDetails()
@@ -47,7 +56,11 @@ export function Footer() {
       }
     }
     loadBranding()
-  }, [])
+  }, [isAuthenticated, isLoginRoute, branding])
+
+  if (isLoginRoute) {
+    return null
+  }
 
   const websiteUrl =
     branding?.website?.startsWith("http") ? branding.website : `https://${branding?.website ?? ""}`
