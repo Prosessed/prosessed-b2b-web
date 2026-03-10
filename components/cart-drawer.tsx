@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Minus, Plus, Trash2, ShoppingCart, Loader2, X } from "lucide-react"
@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./ui/sheet"
 
 export function CartDrawer() {
+  const pathname = usePathname()
   const { isOpen, closeDrawer } = useCartDrawer()
   const { cart, isLoading, setUseFullCart, updateItem, removeItem, clearCart } =
     useCartContext()
@@ -26,8 +27,12 @@ export function CartDrawer() {
   const currency = user?.defaultCurrency ?? "AUD"
 
   useEffect(() => {
-    setUseFullCart(isOpen)
-  }, [isOpen, setUseFullCart])
+    if (isOpen) {
+      setUseFullCart(true)
+    } else if (pathname !== "/cart") {
+      setUseFullCart(false)
+    }
+  }, [isOpen, pathname, setUseFullCart])
 
   const cartItems = cart?.items || []
   const grandTotal = cart?.grand_total || 0

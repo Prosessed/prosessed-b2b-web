@@ -145,7 +145,7 @@ export default function CartPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">Shopping Cart</h1>
 
-        {cartItems.length > 0 && (
+        {/* {cartItems.length > 0 && (
           <Button
             variant="outline"
             onClick={handleClearCart}
@@ -164,7 +164,7 @@ export default function CartPage() {
               </>
             )}
           </Button>
-        )}
+        )} */}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8 items-start">

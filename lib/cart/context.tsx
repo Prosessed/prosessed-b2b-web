@@ -103,6 +103,42 @@ export function CartProvider({ children }: { children: ReactNode }) {
     await mutate()
   }, [mutate])
 
+  /** After add/remove/update: refetch with get_full_cart when useFullCart so cart page/sidebar get full info. */
+  const revalidateAfterModify = useCallback(async () => {
+    if (!user) return
+    const qId = quotationId || data?.cart?.name
+    const fetcher = async () => {
+      try {
+        if (useFullCart) {
+          const res = await getFullCart(
+            qId || undefined,
+            user.customerId,
+            user
+          )
+          const wrapped = res as GetFullCartResponse & {
+            message?: { cart?: GetFullCartResponse["cart"] }
+          }
+          const cartData = wrapped?.message?.cart ?? wrapped?.cart ?? null
+          return { cart: cartData }
+        }
+        const res = await getCart(
+          qId || undefined,
+          user.customerId,
+          user
+        )
+        const wrapped = res as GetCartResponse & {
+          message?: { cart?: GetCartResponse["cart"] }
+        }
+        const cartData = wrapped?.message?.cart ?? wrapped?.cart ?? null
+        return { cart: cartData as GetFullCartResponse["cart"] | null }
+      } catch (err) {
+        console.error("[Cart Context] Revalidate failed:", err)
+        return { cart: data?.cart ?? null }
+      }
+    }
+    await mutate(fetcher)
+  }, [user, quotationId, data?.cart?.name, data?.cart, useFullCart, mutate])
+
   const addItem = useCallback(
     async (item: CartItem) => {
       if (!user) throw new Error("User not authenticated")
@@ -137,21 +173,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
             await new Promise((r) => setTimeout(r, 200))
           }
 
-          await mutate()
+          await revalidateAfterModify()
         } else {
           await modifyCart(
             { quotation_id: currentQuotationId, add_item: validatedItem },
             user
           )
-          await mutate()
+          await revalidateAfterModify()
         }
       } catch (err) {
         console.error("[Cart Context] Failed to add item:", err)
-        await mutate()
+        await revalidateAfterModify()
         throw err
       }
     },
-    [user, quotationId, data?.cart, mutate]
+    [user, quotationId, data?.cart, revalidateAfterModify]
   )
 
   const updateItem = useCallback(
@@ -188,14 +224,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
           user
         )
 
-        await mutate()
+        await revalidateAfterModify()
       } catch (err) {
         console.error("Failed to update item:", err)
-        await mutate()
+        await revalidateAfterModify()
         throw err
       }
     },
-    [quotationId, data?.cart, mutate, user]
+    [quotationId, data?.cart, revalidateAfterModify, user]
   )
 
   const removeItem = useCallback(
@@ -228,14 +264,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
           user
         )
 
-        await mutate()
+        await revalidateAfterModify()
       } catch (err) {
         console.error("Failed to remove item:", err)
-        await mutate()
+        await revalidateAfterModify()
         throw err
       }
     },
-    [quotationId, data?.cart, mutate, user]
+    [quotationId, data?.cart, revalidateAfterModify, user]
   )
 
   const updateCart = useCallback(
@@ -250,9 +286,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         user
       )
 
-      await mutate()
+      await revalidateAfterModify()
     },
-    [quotationId, data?.cart?.name, mutate, user]
+    [quotationId, data?.cart?.name, revalidateAfterModify, user]
   )
 
   const submitQuotation = useCallback(
