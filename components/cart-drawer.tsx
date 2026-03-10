@@ -239,14 +239,14 @@ export function CartDrawer() {
                 </span>
               </div>
 
-              {cart?.additional_discount_percentage && cart.additional_discount_percentage > 0 && (
+              {/* {cart?.additional_discount_percentage && cart.additional_discount_percentage > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Discount ({cart.additional_discount_percentage}%)</span>
                   <span className="font-medium text-primary">
                     -{formatPrice((cartItems.reduce((sum, item) => sum + (item.amount ?? 0), 0) * cart.additional_discount_percentage) / 100, currency)}
                   </span>
                 </div>
-              )}
+              )} */}
 
               <Separator />
 

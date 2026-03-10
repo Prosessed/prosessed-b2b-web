@@ -287,15 +287,7 @@ export default function CartPage() {
                 <span>{formatPrice(subtotal, currency)}</span>
               </div>
 
-              {cart.discount_amount !== 0 && (
-                <div className="flex justify-between text-primary">
-                  <span>Discount</span>
-                  <span>
-                    {/* -${Math.abs(cart.discount_amount).toFixed(2)} */}
-                  </span>
-                </div>
-              )}
-
+              
               <Separator />
 
               <div className="flex justify-between text-lg font-bold">
