@@ -259,18 +259,38 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
   )
 }
 
-export function useQuotations() {
-  const { user } = useAuth()
+/** Formats YYYY-MM-DD to DD-MM-YYYY for API. */
+function toApiDate(isoDate: string): string {
+  if (!isoDate || isoDate.length < 10) return ""
+  const [y, m, d] = isoDate.slice(0, 10).split("-")
+  return [d, m, y].join("-")
+}
 
-  const key = user ? ["quotations", user.email] : null
+export interface UseQuotationsParams {
+  startDate?: string
+  endDate?: string
+}
+
+export function useQuotations(params?: UseQuotationsParams) {
+  const { user } = useAuth()
+  const startDate = params?.startDate ?? ""
+  const endDate = params?.endDate ?? ""
+
+  const key = user ? ["quotations", user.email, startDate, endDate] : null
 
   return useSWR(
     key,
     async () => {
       if (!user) return null
 
+      const search = new URLSearchParams({
+        owner: user.email,
+      })
+      if (startDate) search.set("startDate", toApiDate(startDate))
+      if (endDate) search.set("endDate", toApiDate(endDate))
+
       const response = await apiClient.request<any>(
-        `/api/method/prosessed_orderit.orderit.get_all_quotations?owner=${encodeURIComponent(user.email)}`,
+        `/api/method/prosessed_orderit.orderit.get_all_quotations?${search}`,
         {
           method: "GET",
           auth: {
@@ -323,23 +343,40 @@ export function useQuotationDetails(quotationId: string | null) {
   )
 }
 
-export function useSalesPersonOrders(page: number = 1, pageSize: number = 20) {
-  const { user } = useAuth()
-  const customerId = user?.customerId ?? ""
+export interface UseSalesPersonOrdersParams {
+  page?: number
+  pageSize?: number
+  salesPerson?: string
+  startDate?: string
+  endDate?: string
+}
 
-  const key = user && customerId ? ["salesPersonOrders", customerId, page, pageSize] : null
+export function useSalesPersonOrders(params?: UseSalesPersonOrdersParams) {
+  const { user } = useAuth()
+  const page = params?.page ?? 1
+  const pageSize = params?.pageSize ?? 20
+  const salesPerson = params?.salesPerson ?? user?.salesPerson ?? ""
+  const startDate = params?.startDate ?? ""
+  const endDate = params?.endDate ?? ""
+
+  const key =
+    user && salesPerson
+      ? ["salesPersonOrders", salesPerson, page, pageSize, startDate, endDate]
+      : null
 
   return useSWR(
     key,
     async () => {
-      if (!user || !customerId) return { total_sales_order_count: 0, sales_orders: [] }
-      const params = new URLSearchParams({
+      if (!user || !salesPerson) return { total_sales_order_count: 0, sales_orders: [] }
+      const search = new URLSearchParams({
         page: String(page),
         page_size: String(pageSize),
-        customer_name: customerId,
+        sales_person: salesPerson,
       })
+      if (startDate) search.set("startDate", toApiDate(startDate))
+      if (endDate) search.set("endDate", toApiDate(endDate))
       const response = await apiClient.request<any>(
-        `/api/method/prosessed_orderit.orderit.get_sales_person_orders?${params}`,
+        `/api/method/prosessed_orderit.orderit.get_sales_person_orders?${search}`,
         {
           method: "GET",
           auth: {
@@ -351,7 +388,10 @@ export function useSalesPersonOrders(page: number = 1, pageSize: number = 20) {
       const msg = response?.message
       if (!msg || typeof msg !== "object") return { total_sales_order_count: 0, sales_orders: [] }
       const orders = Array.isArray(msg.sales_orders) ? msg.sales_orders : []
-      return { total_sales_order_count: msg.total_sales_order_count ?? orders.length, sales_orders: orders }
+      return {
+        total_sales_order_count: msg.total_sales_order_count ?? orders.length,
+        sales_orders: orders,
+      }
     },
     { revalidateOnFocus: false }
   )
