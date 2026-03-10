@@ -19,12 +19,12 @@ const categories = [
   { name: "Fresh Seafood", icon: Fish, href: "/products?category=seafood" },
 ]
 
-const bannerItems = [
-  { text: "🎉 Welcome Offer: Get 40% OFF on your first order!", bgColor: "oklch(0.52 0.18 145)", textColor: "white" },
-  { text: "⚡ Free Delivery on orders above $100", bgColor: "oklch(0.58 0.2 145)", textColor: "white" },
-  { text: "🚀 10-minute delivery for urgent orders", bgColor: "oklch(0.52 0.18 145)", textColor: "white" },
-  { text: "💳 Easy payment options available", bgColor: "oklch(0.58 0.2 145)", textColor: "white" },
-]
+// const bannerItems = [
+//   { text: "🎉 Welcome Offer: Get 40% OFF on your first order!", bgColor: "oklch(0.52 0.18 145)", textColor: "white" },
+//   { text: "⚡ Free Delivery on orders above $100", bgColor: "oklch(0.58 0.2 145)", textColor: "white" },
+//   { text: "🚀 10-minute delivery for urgent orders", bgColor: "oklch(0.52 0.18 145)", textColor: "white" },
+//   { text: "💳 Easy payment options available", bgColor: "oklch(0.58 0.2 145)", textColor: "white" },
+// ]
 
 const defaultHeroBanners = [
   {
@@ -77,7 +77,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background/50">
-      <AnimatedBanner items={bannerItems} />
+      {/* <AnimatedBanner items={bannerItems} /> */}
 
       <div className="container mx-auto px-4 py-6">
         {isLoading ? (
