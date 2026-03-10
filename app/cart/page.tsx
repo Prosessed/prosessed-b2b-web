@@ -24,7 +24,7 @@ import {
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 export default function CartPage() {
   const router = useRouter()
@@ -33,11 +33,17 @@ export default function CartPage() {
   const {
     cart,
     isLoading,
+    setUseFullCart,
     updateItem,
     removeItem,
     submitQuotation,
     clearCart,
   } = useCartContext()
+
+  useEffect(() => {
+    setUseFullCart(true)
+    return () => setUseFullCart(false)
+  }, [setUseFullCart])
 
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)

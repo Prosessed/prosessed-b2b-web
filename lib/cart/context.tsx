@@ -3,10 +3,12 @@
 import {
   createCart,
   getCart,
+  getFullCart,
   modifyCart,
   submitCart,
   type CartItem,
   type GetCartResponse,
+  type GetFullCartResponse,
 } from "@/lib/api/cart"
 import { useAuth } from "@/lib/auth/context"
 import {
@@ -22,10 +24,13 @@ import {
 import useSWR from "swr"
 
 interface CartContextType {
-  cart: GetCartResponse["cart"] | null
+  /** Full cart when on cart page or sidebar (get_full_cart); otherwise get_cart_v2. */
+  cart: GetFullCartResponse["cart"] | null
   isLoading: boolean
   isValidating: boolean
   error: Error | null
+  /** Set true on cart page and when sidebar is open so fetcher uses get_full_cart. */
+  setUseFullCart: (use: boolean) => void
   addItem: (item: CartItem) => Promise<void>
   updateItem: (itemId: string, updates: Partial<CartItem>) => Promise<void>
   removeItem: (itemId: string) => Promise<void>
@@ -40,25 +45,34 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [quotationId, setQuotationId] = useState<string | null>(null)
+  const [useFullCart, setUseFullCart] = useState(false)
   const prevCartNameRef = useRef<string | null>(null)
 
-  const { data, error, isLoading, isValidating, mutate } = useSWR<GetCartResponse>(
-    user ? ["cart", user.customerId, quotationId] : null,
+  const { data, error, isLoading, isValidating, mutate } = useSWR<{
+    cart: GetFullCartResponse["cart"] | null
+  }>(
+    user ? ["cart", user.customerId, quotationId, useFullCart] : null,
     async () => {
       if (!user) return { cart: null }
 
       try {
-        const response = await getCart(
+        if (useFullCart) {
+          const response = (await getFullCart(
+            quotationId || undefined,
+            user.customerId,
+            user
+          )) as GetFullCartResponse & { message?: { cart?: GetFullCartResponse["cart"] } }
+          const cartData = response?.message?.cart ?? response?.cart ?? null
+          return { cart: cartData }
+        }
+
+        const response = (await getCart(
           quotationId || undefined,
           user.customerId,
           user
-        )
-
-        // Normalize backend response - handle both direct and wrapped formats
-        const cartData = response?.message?.cart || response?.cart || null
-        return {
-          cart: cartData,
-        }
+        )) as GetCartResponse & { message?: { cart?: GetCartResponse["cart"] } }
+        const cartData = response?.message?.cart ?? response?.cart ?? null
+        return { cart: cartData as GetFullCartResponse["cart"] | null }
       } catch (err) {
         console.error("[Cart Context] Failed to fetch cart:", err)
         return { cart: null }
@@ -71,12 +85,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   )
 
-  // Sync quotationId from fetched cart
+  // Sync quotationId from fetched cart when we get a definite cart name.
+  // Never set quotationId to null here (handled by clearCart/submitQuotation)
+  // to avoid a loop: key includes quotationId, so setting null refetches and can
+  // briefly yield no cart, which would set null again.
   useEffect(() => {
-    const cartName = data?.cart?.name || null
-    if (cartName !== prevCartNameRef.current) {
+    const cartName = data?.cart?.name ?? null
+    if (cartName && cartName !== prevCartNameRef.current) {
       prevCartNameRef.current = cartName
       setQuotationId(cartName)
+    } else {
+      prevCartNameRef.current = cartName
     }
   }, [data?.cart?.name])
 
@@ -106,9 +125,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       try {
         if (!currentQuotationId) {
           const response = await createCart({ items: [validatedItem] }, user)
+          const wrapped = response as typeof response & {
+            message?: { quotation_id?: { name?: string } }
+          }
           const quotationIdValue =
-            response.quotation_id?.name ||
-            response.message?.quotation_id?.name
+            response.quotation_id?.name ??
+            wrapped.message?.quotation_id?.name
 
           if (quotationIdValue) {
             setQuotationId(quotationIdValue)
@@ -271,6 +293,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       isLoading,
       isValidating,
       error: error as Error | null,
+      setUseFullCart,
       addItem,
       updateItem,
       removeItem,

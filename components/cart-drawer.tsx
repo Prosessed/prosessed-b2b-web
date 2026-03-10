@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -17,12 +17,17 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 
 export function CartDrawer() {
   const { isOpen, closeDrawer } = useCartDrawer()
-  const { cart, isLoading, updateItem, removeItem, clearCart } = useCartContext()
+  const { cart, isLoading, setUseFullCart, updateItem, removeItem, clearCart } =
+    useCartContext()
   const { user } = useAuth()
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [isClearing, setIsClearing] = useState(false)
   const currency = user?.defaultCurrency ?? "AUD"
+
+  useEffect(() => {
+    setUseFullCart(isOpen)
+  }, [isOpen, setUseFullCart])
 
   const cartItems = cart?.items || []
   const grandTotal = cart?.grand_total || 0
@@ -93,7 +98,7 @@ export function CartDrawer() {
                 {cartItems.length} {cartItems.length === 1 ? "item" : "items"}
               </SheetDescription>
             </div>
-            {cartItems.length > 0 && (
+            {/* {cartItems.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -110,7 +115,7 @@ export function CartDrawer() {
                   </>
                 )}
               </Button>
-            )}
+            )} */}
           </div>
         </SheetHeader>
 

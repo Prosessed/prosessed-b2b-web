@@ -68,7 +68,7 @@ export interface CartItemResponse {
 }
 
 /* =========================
-   GET CART RESPONSE
+   GET CART RESPONSE (get_cart_v2 – product pages, header, etc.)
 ========================= */
 export interface GetCartResponse {
   cart: {
@@ -85,6 +85,71 @@ export interface GetCartResponse {
     payment_terms_template?: string
     pricing_rules?: any[]
     items: CartItemResponse[]
+  } | null
+}
+
+/* =========================
+   FULL CART ITEM (get_full_cart response – cart page & sidebar)
+========================= */
+export interface FullCartItemResponse extends CartItemResponse {
+  description?: string
+  net_rate?: number
+  net_amount?: number
+  base_rate?: number
+  base_amount?: number
+  stock_uom?: string
+  conversion_factor?: number
+  stock_qty?: number
+  brand?: string | null
+  item_tax_rate?: string
+  item_tax_template?: string
+  pricing_rules?: unknown
+}
+
+/* =========================
+   FULL CART (get_full_cart – cart page & sidebar only)
+========================= */
+export interface FullCartTax {
+  name: string
+  charge_type: string
+  account_head: string
+  description: string
+  rate: number
+  tax_amount: number
+  total: number
+  base_tax_amount: number
+  base_total: number
+}
+
+export interface GetFullCartResponse {
+  cart: {
+    name: string
+    party_name: string
+    company: string
+    currency?: string
+    conversion_rate?: number
+    customer_address?: string
+    shipping_address_name?: string
+    apply_discount_on?: string
+    additional_discount_percentage?: number
+    discount_amount?: number
+    total?: number
+    net_total?: number
+    base_net_total?: number
+    grand_total: number
+    base_grand_total?: number
+    rounded_total?: number
+    total_taxes_and_charges?: number
+    total_qty?: number
+    total_net_weight?: number
+    in_words?: string
+    custom_quotation_detail_notes?: string
+    pricing_rules?: unknown[]
+    payment_terms_template?: string
+    workflow_state: string
+    taxes_and_charges?: string
+    taxes?: FullCartTax[]
+    items: FullCartItemResponse[]
   } | null
 }
 
@@ -157,7 +222,32 @@ export async function getCart(
   if (!user) throw new Error("User not authenticated")
 
   return apiClient.request<GetCartResponse>(
-    "/api/method/prosessed_orderit.orderit.get_cart",
+    "/api/method/prosessed_orderit.orderit.get_cart_v2",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        quotation: quotationId,
+        customer_id: customerId || user.customerId,
+      }),
+      auth: {
+        apiKey: user.apiKey,
+        apiSecret: user.apiSecret,
+        sid: user.sid,
+      },
+    }
+  )
+}
+
+/** Use on cart page and cart sidebar when showing cart details (after add/remove/modify). */
+export async function getFullCart(
+  quotationId: string | undefined,
+  customerId: string | undefined,
+  user: AuthUser
+): Promise<GetFullCartResponse> {
+  if (!user) throw new Error("User not authenticated")
+
+  return apiClient.request<GetFullCartResponse>(
+    "/api/method/prosessed_orderit.orderit.get_full_cart",
     {
       method: "POST",
       body: JSON.stringify({
@@ -195,7 +285,7 @@ export async function modifyCart(
     body.add_items = JSON.stringify(params.add_items)
 
   return apiClient.request<ModifyCartResponse>(
-    "/api/method/prosessed_orderit.orderit.modify_cart",
+    "/api/method/prosessed_orderit.orderit.modify_cart_v3",
     {
       method: "POST",
       body: JSON.stringify(body),
