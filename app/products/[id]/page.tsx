@@ -196,9 +196,18 @@ export default function ProductDetailPage() {
           <div>
             <div className="flex items-center gap-2 mb-2">
               {product.item_group && (
-                <Badge variant="outline" className="text-xs">
-                  {product.item_group}
-                </Badge>
+                <Link
+                  href={`/products?category=${encodeURIComponent(product.item_group)}`}
+                  className="inline-flex"
+                  aria-label={`View more products in ${product.item_group}`}
+                >
+                  <Badge
+                    variant="outline"
+                    className="text-xs cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
+                    {product.item_group}
+                  </Badge>
+                </Link>
               )}
               {product.brand && (
                 <Badge variant="outline" className="text-xs">
@@ -283,8 +292,9 @@ export default function ProductDetailPage() {
                   onClick={decrement}
                   variant="ghost"
                   size="icon"
-                  className="h-12 w-12 rounded-none"
+                  className="h-12 w-12 rounded-none cursor-pointer"
                   disabled={quantity <= 1 || isAdding}
+                  aria-label="Decrease quantity"
                 >
                   <Minus className="h-5 w-5" />
                 </Button>
@@ -313,8 +323,9 @@ export default function ProductDetailPage() {
                   onClick={increment}
                   variant="ghost"
                   size="icon"
-                  className="h-12 w-12 rounded-none"
+                  className="h-12 w-12 rounded-none cursor-pointer"
                   disabled={isAdding}
+                  aria-label="Increase quantity"
                 >
                   <Plus className="h-5 w-5" />
                 </Button>
@@ -372,6 +383,12 @@ export default function ProductDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Brand:</span>
                   <span className="font-bold">{product.brand}</span>
+                </div>
+              )}
+              {product.item_tax_template && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tax template:</span>
+                  <span className="font-bold">{product.item_tax_template}</span>
                 </div>
               )}
             </div>

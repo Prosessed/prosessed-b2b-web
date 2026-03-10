@@ -14,6 +14,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import {
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   Loader2,
   Minus,
   Plus,
@@ -24,7 +25,7 @@ import {
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 export default function CartPage() {
   const router = useRouter()
@@ -50,14 +51,55 @@ export default function CartPage() {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({})
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
-  // ✅ EXPLICITLY TYPE cartItems
   const cartItems: CartItemResponse[] = cart?.items || []
 
-  const subtotal = cartItems.reduce(
-    (sum, item) => sum + item.amount,
-    0
+  const subtotal = cartItems.reduce((sum, item) => sum + item.amount, 0)
+  const totalTaxesAndCharges = cart?.total_taxes_and_charges || 0
+
+  const groupedCartItems = useMemo(() => {
+    if (!cartItems.length) {
+      return []
+    }
+
+    const groups = cartItems.reduce<Record<string, CartItemResponse[]>>((acc, item) => {
+      const groupKey = item.item_group || "Other"
+      if (!acc[groupKey]) {
+        acc[groupKey] = []
+      }
+      acc[groupKey].push(item)
+      return acc
+    }, {})
+
+    return Object.entries(groups).map(([groupName, items]) => ({
+      groupName,
+      items,
+    }))
+  }, [cartItems])
+
+  useEffect(() => {
+    if (!groupedCartItems.length) return
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      groupedCartItems.forEach((g) => next.add(g.groupName))
+      return next
+    })
+  }, [groupedCartItems])
+
+  const isGroupExpanded = useCallback(
+    (groupName: string) => expandedGroups.has(groupName),
+    [expandedGroups]
   )
+
+  const handleToggleGroup = useCallback((groupName: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupName)) next.delete(groupName)
+      else next.add(groupName)
+      return next
+    })
+  }, [])
 
   const updateQuantity = useCallback(
     async (itemId: string, newQuantity: number) => {
@@ -171,108 +213,163 @@ export default function CartPage() {
         {/* ITEMS */}
         <div className="lg:col-span-2 space-y-4">
           <AnimatePresence>
-            {cartItems.map((item) => (
+            {groupedCartItems.map((group) => {
+              const isExpanded = isGroupExpanded(group.groupName)
+              return (
               <motion.div
-                key={item.name}
+                key={group.groupName}
                 layout
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="space-y-3"
               >
-                <Card className="p-6">
-                  <div className="flex gap-6">
-                    <div className="relative w-28 h-28 bg-muted rounded-xl overflow-hidden">
-                      <Image
-                        src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
-                        alt={item.item_name}
-                        fill
-                        className="object-contain p-2"
-                      />
-                    </div>
-
-                    <div className="flex-1 space-y-3">
-                      <div className="flex justify-between">
-                        <div>
-                          <Link
-                            href={`/products/${item.item_code}`}
-                            className="font-bold text-lg hover:text-primary"
-                          >
-                            {item.item_name}
-                          </Link>
-                          <p className="text-xs text-muted-foreground">
-                            {item.uom} • {formatPrice(item.rate ?? 0, currency)}
-                          </p>
-                        </div>
-                        <p className="font-bold text-primary text-lg">
-                          {formatPrice(item.amount ?? 0, currency)}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center border rounded-lg">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            disabled={isUpdating === item.name || item.qty <= 1}
-                            onClick={() =>
-                              updateQuantity(item.name, item.qty - 1)
-                            }
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="w-10 text-center font-bold">
-                            {item.qty}
-                          </span>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            disabled={isUpdating === item.name}
-                            onClick={() =>
-                              updateQuantity(item.name, item.qty + 1)
-                            }
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-
-                        <Button
-                          variant="ghost"
-                          className="text-destructive"
-                          disabled={isUpdating === item.name}
-                          onClick={() => handleRemoveItem(item.name)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Remove
-                        </Button>
-                      </div>
-
-                      <Textarea
-                        placeholder="Add special instructions..."
-                        value={
-                          itemNotes[item.name] ??
-                          (item.custom_quotation_item_details ?? "")
-                        }
-                        onChange={(e) =>
-                          setItemNotes((p) => ({
-                            ...p,
-                            [item.name]: e.target.value,
-                          }))
-                        }
-                        onBlur={async () => {
-                          const note = itemNotes[item.name]
-                          if (note !== item.custom_quotation_item_details) {
-                            await updateItem(item.name, {
-                              custom_quotation_item_details: note,
-                            })
-                          }
-                        }}
-                        className="min-h-[50px]"
-                      />
-                    </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleGroup(group.groupName)}
+                  className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 -my-1 text-left hover:bg-muted/50 active:bg-muted/70 transition-colors cursor-pointer border-0 bg-transparent"
+                  aria-expanded={isExpanded}
+                  aria-label={`${isExpanded ? "Collapse" : "Expand"} ${group.groupName}`}
+                >
+                  <div className="inline-flex items-center gap-2 rounded-full bg-muted/40 px-3 py-1.5 border border-border/60">
+                    <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
+                    <span className="text-base font-bold tracking-tight">
+                      {group.groupName}
+                    </span>
                   </div>
-                </Card>
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <span className="text-sm font-medium">
+                      {group.items.length} {group.items.length === 1 ? "item" : "items"}
+                    </span>
+                    <motion.span
+                      animate={{ rotate: isExpanded ? 0 : -90 }}
+                      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                      className="shrink-0"
+                    >
+                      <ChevronDown className="h-5 w-5" />
+                    </motion.span>
+                  </span>
+                </button>
+
+                <motion.div
+                  initial={false}
+                  animate={{
+                    height: isExpanded ? "auto" : 0,
+                    opacity: isExpanded ? 1 : 0,
+                  }}
+                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                  className="overflow-hidden"
+                >
+                {group.items.map((item) => (
+                  <motion.div
+                    key={item.name}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <Card className="p-6">
+                      <div className="flex gap-6">
+                        <div className="relative w-28 h-28 bg-muted rounded-xl overflow-hidden">
+                          <Image
+                            src={
+                              getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) ||
+                              "/placeholder.svg"
+                            }
+                            alt={item.item_name}
+                            fill
+                            className="object-contain p-2"
+                          />
+                        </div>
+
+                        <div className="flex-1 space-y-3">
+                          <div className="flex justify-between">
+                            <div>
+                              <Link
+                                href={`/products/${item.item_code}`}
+                                className="font-bold text-lg hover:text-primary"
+                              >
+                                {item.item_name}
+                              </Link>
+                              <p className="text-xs text-muted-foreground">
+                                {item.uom} • {formatPrice(item.rate ?? 0, currency)}
+                              </p>
+                            </div>
+                            <p className="font-bold text-primary text-lg">
+                              {formatPrice(item.amount ?? 0, currency)}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center border rounded-lg">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                disabled={isUpdating === item.name || item.qty <= 1}
+                                onClick={() => updateQuantity(item.name, item.qty - 1)}
+                                className="cursor-pointer"
+                                aria-label="Decrease quantity"
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              <span className="w-10 text-center font-bold">
+                                {item.qty}
+                              </span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                disabled={isUpdating === item.name}
+                                onClick={() => updateQuantity(item.name, item.qty + 1)}
+                                className="cursor-pointer"
+                                aria-label="Increase quantity"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            <Button
+                              variant="ghost"
+                              className="text-destructive cursor-pointer"
+                              disabled={isUpdating === item.name}
+                              onClick={() => handleRemoveItem(item.name)}
+                              aria-label={`Remove ${item.item_name} from cart`}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
+
+                          <Textarea
+                            placeholder="Add special instructions..."
+                            value={
+                              itemNotes[item.name] ??
+                              (item.custom_quotation_item_details ?? "")
+                            }
+                            onChange={(e) =>
+                              setItemNotes((p) => ({
+                                ...p,
+                                [item.name]: e.target.value,
+                              }))
+                            }
+                            onBlur={async () => {
+                              const note = itemNotes[item.name]
+                              if (note !== item.custom_quotation_item_details) {
+                                await updateItem(item.name, {
+                                  custom_quotation_item_details: note,
+                                })
+                              }
+                            }}
+                            className="min-h-[50px]"
+                          />
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+                </motion.div>
               </motion.div>
-            ))}
+            )
+            })}
           </AnimatePresence>
         </div>
 
@@ -286,6 +383,13 @@ export default function CartPage() {
                 <span>Subtotal</span>
                 <span>{formatPrice(subtotal, currency)}</span>
               </div>
+
+              {totalTaxesAndCharges > 0 && (
+                <div className="flex justify-between">
+                  <span>Taxes &amp; charges</span>
+                  <span>{formatPrice(totalTaxesAndCharges, currency)}</span>
+                </div>
+              )}
 
               
               <Separator />

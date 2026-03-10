@@ -68,6 +68,10 @@ export default function QuoteDetailPage() {
   const addressText = q.customer_address ?? ""
   const address = addressText || addressHtml.replace(/<br\s*\/?>/gi, "\n").trim() || "—"
   const items = Array.isArray(q.quotation_items) ? q.quotation_items : (Array.isArray(q.items) ? q.items : (q.order_items ?? []))
+  const totalTaxesAndCharges =
+    q.total_taxes_and_charges ??
+    q.total_taxes ??
+    0
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,6 +154,13 @@ export default function QuoteDetailPage() {
                 <FileText className="h-5 w-5" /> Summary
               </h3>
               <div className="space-y-2">
+                {totalTaxesAndCharges > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Taxes &amp; charges</span>
+                    <span>{formatPrice(totalTaxesAndCharges, currency)}</span>
+                  </div>
+                )}
+
                 <div className="flex justify-between font-bold text-lg">
                   <span>Grand Total</span>
                   <span className="text-primary">{formatPrice(grandTotal, currency)}</span>

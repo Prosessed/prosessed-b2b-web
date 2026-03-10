@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { Minus, Plus, Trash2, ShoppingCart, Loader2, X } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingCart, Loader2, X, ChevronDown } from "lucide-react"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
@@ -24,6 +24,7 @@ export function CartDrawer() {
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [isClearing, setIsClearing] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const currency = user?.defaultCurrency ?? "AUD"
 
   useEffect(() => {
@@ -36,6 +37,51 @@ export function CartDrawer() {
 
   const cartItems = cart?.items || []
   const grandTotal = cart?.grand_total || 0
+  const totalTaxesAndCharges = cart?.total_taxes_and_charges || 0
+
+  const groupedCartItems = useMemo(() => {
+    if (!cartItems.length) {
+      return []
+    }
+
+    const groups = cartItems.reduce<Record<string, typeof cartItems>>((acc, item) => {
+      const groupKey = item.item_group || "Other"
+      if (!acc[groupKey]) {
+        acc[groupKey] = []
+      }
+      acc[groupKey].push(item)
+      return acc
+    }, {})
+
+    return Object.entries(groups).map(([groupName, items]) => ({
+      groupName,
+      items,
+    }))
+  }, [cartItems])
+
+  // Default all categories expanded; when new groups appear (e.g. after add), open them
+  useEffect(() => {
+    if (!groupedCartItems.length) return
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      groupedCartItems.forEach((g) => next.add(g.groupName))
+      return next
+    })
+  }, [groupedCartItems])
+
+  const isGroupExpanded = useCallback(
+    (groupName: string) => expandedGroups.has(groupName),
+    [expandedGroups]
+  )
+
+  const handleToggleGroup = useCallback((groupName: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupName)) next.delete(groupName)
+      else next.add(groupName)
+      return next
+    })
+  }, [])
 
   const updateQuantity = useCallback(
     async (itemId: string, newQuantity: number) => {
@@ -145,84 +191,143 @@ export function CartDrawer() {
             </div>
           ) : (
             <AnimatePresence mode="popLayout">
-              <div className="space-y-4">
-                {cartItems.map((item, index) => (
+              <div className="space-y-5">
+                {groupedCartItems.map((group, groupIndex) => {
+                  const isExpanded = isGroupExpanded(group.groupName)
+                  return (
                   <motion.div
-                    key={item.name}
+                    key={group.groupName}
                     layout
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 24 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -100 }}
-                    transition={{ duration: 0.2, delay: index * 0.05 }}
-                    className="flex gap-4 p-4 border rounded-xl hover:border-primary/20 transition-all"
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={{ duration: 0.2, delay: groupIndex * 0.05 }}
+                    className="rounded-2xl border border-border/60 bg-muted/20 p-3 space-y-3"
                   >
-                    {/* Product Image */}
-                    <div className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-muted/40">
-                      <Image
-                        src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
-                        alt={item.item_name || "Product"}
-                        fill
-                        className="object-contain p-2"
-                      />
-                      {isUpdating === item.name && (
-                        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Product Details */}
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div>
-                        <h3 className="font-bold text-sm leading-tight line-clamp-2">{item.item_name}</h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {item.uom} • {formatPrice(item.rate ?? 0, currency)} each
-                        </p>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleGroup(group.groupName)}
+                      className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-2 -my-1 text-left hover:bg-muted/40 active:bg-muted/60 transition-colors cursor-pointer border-0 bg-transparent"
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? "Collapse" : "Expand"} ${group.groupName}`}
+                    >
+                      <div className="inline-flex items-center gap-2 rounded-full bg-background px-3 py-1.5 border border-border/60 shadow-sm">
+                        <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
+                        <span className="text-base font-bold tracking-tight">
+                          {group.groupName}
+                        </span>
                       </div>
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <span className="text-sm font-medium">
+                          {group.items.length} {group.items.length === 1 ? "item" : "items"}
+                        </span>
+                        <motion.span
+                          animate={{ rotate: isExpanded ? 0 : -90 }}
+                          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                          className="shrink-0"
+                        >
+                          <ChevronDown className="h-5 w-5" />
+                        </motion.span>
+                      </span>
+                    </button>
 
-                      {/* Quantity Controls */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1 bg-primary/5 rounded-lg border border-primary/20 p-1">
-                          <Button
-                            onClick={() => updateQuantity(item.name, item.qty - 1)}
-                            variant="ghost"
-                            size="icon"
-                            disabled={isUpdating === item.name || item.qty <= 1}
-                            className="h-7 w-7 rounded-md text-primary hover:bg-primary/10"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <div className="w-8 text-center font-bold text-xs tabular-nums">{item.qty}</div>
-                          <Button
-                            onClick={() => updateQuantity(item.name, item.qty + 1)}
-                            variant="ghost"
-                            size="icon"
-                            disabled={isUpdating === item.name}
-                            className="h-7 w-7 rounded-md text-primary hover:bg-primary/10"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
+                    <motion.div
+                      initial={false}
+                      animate={{
+                        height: isExpanded ? "auto" : 0,
+                        opacity: isExpanded ? 1 : 0,
+                      }}
+                      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                      className="overflow-hidden"
+                    >
+                    <div className="space-y-3 pt-1">
+                      {group.items.map((item, index) => (
+                        <motion.div
+                          key={item.name}
+                          layout
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -80 }}
+                          transition={{ duration: 0.18, delay: (groupIndex * 0.04) + (index * 0.02) }}
+                          className="flex gap-4 p-3 rounded-xl bg-background/60 border border-border/40 hover:border-primary/30 hover:bg-background transition-all"
+                        >
+                          <div className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-muted/40">
+                            <Image
+                              src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
+                              alt={item.item_name || "Product"}
+                              fill
+                              className="object-contain p-2"
+                            />
+                            {isUpdating === item.name && (
+                              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                              </div>
+                            )}
+                          </div>
 
-                        <div className="text-right">
-                          <p className="font-black text-base text-primary">{formatPrice(item.amount ?? 0, currency)}</p>
-                        </div>
-                      </div>
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div>
+                              <h3 className="font-bold text-sm leading-tight line-clamp-2">
+                                {item.item_name}
+                              </h3>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {item.uom} • {formatPrice(item.rate ?? 0, currency)} each
+                              </p>
+                            </div>
 
-                      {/* Remove Button */}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveItem(item.name)}
-                        disabled={isUpdating === item.name}
-                        className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-0"
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Remove
-                      </Button>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1 bg-primary/5 rounded-lg border border-primary/20 p-1">
+                                <Button
+                                  onClick={() => updateQuantity(item.name, item.qty - 1)}
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={isUpdating === item.name || item.qty <= 1}
+                                  className="h-7 w-7 rounded-md text-primary hover:bg-primary/10 cursor-pointer"
+                                  aria-label="Decrease quantity"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <div className="w-8 text-center font-bold text-xs tabular-nums">
+                                  {item.qty}
+                                </div>
+                                <Button
+                                  onClick={() => updateQuantity(item.name, item.qty + 1)}
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={isUpdating === item.name}
+                                  className="h-7 w-7 rounded-md text-primary hover:bg-primary/10 cursor-pointer"
+                                  aria-label="Increase quantity"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+
+                              <div className="text-right">
+                                <p className="font-black text-base text-primary">
+                                  {formatPrice(item.amount ?? 0, currency)}
+                                </p>
+                              </div>
+                            </div>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveItem(item.name)}
+                              disabled={isUpdating === item.name}
+                              className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-0 cursor-pointer"
+                              aria-label={`Remove ${item.item_name} from cart`}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
+                    </motion.div>
                   </motion.div>
-                ))}
+                )
+                })}
               </div>
             </AnimatePresence>
           )}
@@ -235,7 +340,10 @@ export function CartDrawer() {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal ({cartItems.length} items)</span>
                 <span className="font-medium">
-                  {formatPrice(cartItems.reduce((sum, item) => sum + (item.amount ?? 0), 0), currency)}
+                  {formatPrice(
+                    cartItems.reduce((sum, item) => sum + (item.amount ?? 0), 0),
+                    currency
+                  )}
                 </span>
               </div>
 
@@ -247,6 +355,15 @@ export function CartDrawer() {
                   </span>
                 </div>
               )} */}
+
+              {totalTaxesAndCharges > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Taxes &amp; charges</span>
+                  <span className="font-medium">
+                    {formatPrice(totalTaxesAndCharges, currency)}
+                  </span>
+                </div>
+              )}
 
               <Separator />
 
