@@ -68,16 +68,19 @@ export default function ProductsPage() {
 
   const observerTarget = useRef<HTMLDivElement>(null)
 
-  // Initialize state from URL params
-  type SortByType = "featured" | "price-low" | "price-high" | "name-asc" | "name-desc"
-  const [sortBy, setSortBy] = useState<SortByType>(() => {
-    if (!sortFromUrl) return "featured"
-    if (sortFromUrl === "relevance" || sortFromUrl === "qty-desc") return "featured"
-    if (["featured", "price-low", "price-high", "name-asc", "name-desc"].includes(sortFromUrl)) {
-      return sortFromUrl as SortByType
+  // Initialize state from URL params (legacy: featured/price-low/price-high still accepted)
+  type SortByType = "recommended" | "stock-low" | "stock-high" | "name-asc" | "name-desc"
+  const normalizeSortFromUrl = (url: string | null): SortByType => {
+    if (!url) return "recommended"
+    if (url === "featured" || url === "relevance" || url === "qty-desc") return "recommended"
+    if (url === "price-low") return "stock-low"
+    if (url === "price-high") return "stock-high"
+    if (["recommended", "stock-low", "stock-high", "name-asc", "name-desc"].includes(url)) {
+      return url as SortByType
     }
-    return "featured"
-  })
+    return "recommended"
+  }
+  const [sortBy, setSortBy] = useState<SortByType>(() => normalizeSortFromUrl(sortFromUrl))
   const [pageSize, setPageSize] = useState<number>(() => {
     const n = Number(pageSizeFromUrl)
     if (!Number.isFinite(n)) return 20
@@ -115,10 +118,12 @@ export default function ProductsPage() {
   const { data: categoryTree } = useItemGroupTree(false)
   const allCategories = useMemo(() => getAllCategories(categoryTree || []), [categoryTree])
 
-  /** API sortByQty: asc = low→high, desc = high→low — used when sorting by price */
+  /**
+   * Stock sort only: sortByQty=asc (low→high), sortByQty=desc (high→low).
+   * Recommended omits sortByQty so sortByRecommended applies via settings merge.
+   */
   const sortByQtyForApi: "asc" | "desc" | undefined =
-    sortBy === "price-low" ? "asc" : sortBy === "price-high" ? "desc" : undefined
-  const sortByQtyForHooks: "asc" | "desc" = sortByQtyForApi ?? "asc"
+    sortBy === "stock-low" ? "asc" : sortBy === "stock-high" ? "desc" : undefined
 
   // Search results
   const { data: searchData, isLoading: searchLoading, isValidating: searchValidating, error: searchError } = useSearch(
@@ -134,7 +139,7 @@ export default function ProductsPage() {
     item_group: shouldFetchItems ? categoryFromUrl : undefined,
     page: shouldFetchItems ? currentPage : undefined,
     page_size: shouldFetchItems ? pageSize : undefined,
-    sortByQty: shouldFetchItems ? sortByQtyForHooks : undefined,
+    sortByQty: shouldFetchItems ? sortByQtyForApi : undefined,
     filterByBrand: shouldFetchItems && selectedBrands.length > 0 ? selectedBrands : undefined,
     inStockOnly: shouldFetchItems ? inStockOnlyFilter : undefined,
   })
@@ -142,7 +147,7 @@ export default function ProductsPage() {
   const { data: mostBoughtData, isLoading: mostBoughtLoading, isValidating: mostBoughtValidating, error: mostBoughtError } = useMostBoughtItems({
     page: effectivePreviouslyBought ? currentPage : undefined,
     page_size: effectivePreviouslyBought ? pageSize : undefined,
-    sortByQty: effectivePreviouslyBought ? sortByQtyForHooks : undefined,
+    sortByQty: effectivePreviouslyBought ? sortByQtyForApi : undefined,
     filterByBrand: effectivePreviouslyBought && selectedBrands.length > 0 ? selectedBrands : undefined,
     time_frame: effectivePreviouslyBought ? "6 months" : undefined,
     inStockOnly: effectivePreviouslyBought ? inStockOnlyFilter : undefined,
@@ -150,7 +155,7 @@ export default function ProductsPage() {
 
   const useTaggedView = tagFromUrl || taggedFromUrl
   const { data: taggedItemsData, isLoading: taggedLoading, error: taggedError } = useTaggedItems(undefined, {
-    sortByQty: useTaggedView ? sortByQtyForHooks : undefined,
+    sortByQty: useTaggedView ? sortByQtyForApi : undefined,
     inStockOnly: useTaggedView ? inStockOnlyFilter : undefined,
   })
   const productsWhenTag = useMemo(() => {
@@ -212,14 +217,7 @@ export default function ProductsPage() {
   // Sync state from URL params when they change (e.g., browser back/forward)
   useEffect(() => {
     const newBrands = brandsFromUrl ? brandsFromUrl.split(",").filter(Boolean) : []
-    const newSort: SortByType = (() => {
-      if (!sortFromUrl) return "featured"
-      if (sortFromUrl === "relevance" || sortFromUrl === "qty-desc") return "featured"
-      if (["featured", "price-low", "price-high", "name-asc", "name-desc"].includes(sortFromUrl)) {
-        return sortFromUrl as SortByType
-      }
-      return "featured"
-    })()
+    const newSort = normalizeSortFromUrl(sortFromUrl)
     const newPageSize = (() => {
       const n = Number(pageSizeFromUrl)
       if (!Number.isFinite(n)) return 20
@@ -386,7 +384,7 @@ export default function ProductsPage() {
     }
 
     if (updates.sort !== undefined) {
-      if (updates.sort && updates.sort !== "featured") {
+      if (updates.sort && updates.sort !== "recommended") {
         params.set("sort", updates.sort)
       } else {
         params.delete("sort")
@@ -471,7 +469,7 @@ export default function ProductsPage() {
     updateUrlParams({
       category: null,
       brands: [],
-      sort: "featured",
+      sort: "recommended",
       tag: null,
       tagged: null,
       inStockOnly: null,
@@ -489,7 +487,7 @@ export default function ProductsPage() {
   }, [inStockOnlyFilter, updateUrlParams])
 
   const handleSortByChange = useCallback((value: string) => {
-    if (!["featured", "price-low", "price-high", "name-asc", "name-desc"].includes(value)) return
+    if (!["recommended", "stock-low", "stock-high", "name-asc", "name-desc"].includes(value)) return
     const next = value as SortByType
     setSortBy(next)
     updateUrlParams({ sort: next })
@@ -515,7 +513,7 @@ export default function ProductsPage() {
   const hasActiveFilters = selectedBrands.length > 0 || categoryFromUrl || !!tagFromUrl || taggedFromUrl
 
 
-  // Filter by tag (client-side); name sort client-side; price sort via API (sortByQty) — no local price reorder
+  // Filter by tag (client-side); name sort client-side; stock sort via API (sortByQty) — no local reorder
   const sortedProducts = useMemo(() => {
     let list = allProducts
     if (tagFromUrl) {
@@ -524,7 +522,7 @@ export default function ProductsPage() {
         return tags.includes(tagFromUrl)
       })
     }
-    if (sortBy === "price-low" || sortBy === "price-high") {
+    if (sortBy === "stock-low" || sortBy === "stock-high") {
       return list
     }
     if (sortBy === "name-asc") {
@@ -774,13 +772,13 @@ export default function ProductsPage() {
                   Sort by
                 </span>
                 <Select value={sortBy} onValueChange={handleSortByChange}>
-                  <SelectTrigger size="sm" className="w-[170px] rounded-lg">
-                    <SelectValue placeholder="Featured" />
+                  <SelectTrigger size="sm" className="w-[190px] rounded-lg">
+                    <SelectValue placeholder="Recommended" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="featured">Featured</SelectItem>
-                    <SelectItem value="price-low">Price: Low → High</SelectItem>
-                    <SelectItem value="price-high">Price: High → Low</SelectItem>
+                    <SelectItem value="recommended">Recommended</SelectItem>
+                    <SelectItem value="stock-low">Stock: Low → High</SelectItem>
+                    <SelectItem value="stock-high">Stock: High → Low</SelectItem>
                     <SelectItem value="name-asc">A → Z</SelectItem>
                     <SelectItem value="name-desc">Z → A</SelectItem>
                   </SelectContent>

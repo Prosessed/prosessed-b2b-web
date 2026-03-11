@@ -67,8 +67,8 @@ export type ProductRequestExtras = {
 /**
  * Merge settings into a POST JSON body used by listing/search/most-bought APIs.
  * - show_in_stock_only = 1 → inStockOnly 1 unless override false
- * - recommended_priority_sort = 1 → sortByRecommended 1
- * - sortByQty passed through when provided (asc = low→high qty/price per API)
+ * - Default sort = recommended: sortByRecommended 1 when settings say so — only when NOT using price sort
+ * - sortByQty only when explicitly asc (low→high) or desc (high→low); mutually exclusive with sortByRecommended
  */
 export const mergeOrderitIntoBody = (
   body: Record<string, unknown>,
@@ -76,13 +76,20 @@ export const mergeOrderitIntoBody = (
   opts?: {
     /** Explicit user toggle: true = force in stock only, false = force off, undefined = follow settings only */
     inStockOnlyOverride?: boolean | null
+    /** Only pass for product-page price sort: asc = low→high, desc = high→low (exact API param) */
     sortByQty?: "asc" | "desc"
   }
 ): Record<string, unknown> => {
   const out = { ...body }
+  const priceSort =
+    opts?.sortByQty === "asc" || opts?.sortByQty === "desc" ? opts.sortByQty : null
 
-  if (opts?.sortByQty === "asc" || opts?.sortByQty === "desc") {
-    out.sortByQty = opts.sortByQty
+  if (priceSort) {
+    out.sortByQty = priceSort
+    // Price sort replaces recommended for this request
+    delete (out as { sortByRecommended?: unknown }).sortByRecommended
+  } else if (settings && isTruthyOne(settings.recommended_priority_sort)) {
+    out.sortByRecommended = 1
   }
 
   if (settings && isTruthyOne(settings.show_in_stock_only)) {
@@ -95,10 +102,6 @@ export const mergeOrderitIntoBody = (
     out.inStockOnly = 1
   } else if (opts?.inStockOnlyOverride === false) {
     out.inStockOnly = 0
-  }
-
-  if (settings && isTruthyOne(settings.recommended_priority_sort)) {
-    out.sortByRecommended = 1
   }
 
   return out
@@ -115,8 +118,12 @@ export const appendOrderitToSearchParams = (
     sortByQty?: "asc" | "desc"
   }
 ): URLSearchParams => {
-  if (opts?.sortByQty === "asc" || opts?.sortByQty === "desc") {
-    params.set("sortByQty", opts.sortByQty)
+  const priceSort =
+    opts?.sortByQty === "asc" || opts?.sortByQty === "desc" ? opts.sortByQty : null
+  if (priceSort) {
+    params.set("sortByQty", priceSort)
+  } else if (settings && isTruthyOne(settings.recommended_priority_sort)) {
+    params.set("sortByRecommended", "1")
   }
 
   if (settings && isTruthyOne(settings.show_in_stock_only)) {
@@ -125,10 +132,6 @@ export const appendOrderitToSearchParams = (
     }
   } else if (opts?.inStockOnlyOverride === true) {
     params.set("inStockOnly", "1")
-  }
-
-  if (settings && isTruthyOne(settings.recommended_priority_sort)) {
-    params.set("sortByRecommended", "1")
   }
 
   return params

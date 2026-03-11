@@ -58,10 +58,9 @@ export function useItems(params: UseItemsParams) {
         filterByBrand: filterByBrand,
         qty: params.qty || 1.0,
       }
+      // sortByQty only when product page selects price low/high (asc/desc); otherwise recommended via merge
       if (params.sortByQty === "asc" || params.sortByQty === "desc") {
         baseBody.sortByQty = params.sortByQty
-      } else {
-        baseBody.sortByQty = "asc"
       }
       if (params.inStockOnly === true) {
         baseBody.inStockOnly = 1
@@ -72,7 +71,8 @@ export function useItems(params: UseItemsParams) {
       const body = mergeOrderitIntoBody(baseBody, settings, {
         inStockOnlyOverride:
           params.inStockOnly === true ? true : params.inStockOnly === false ? false : null,
-        sortByQty: params.sortByQty === "asc" || params.sortByQty === "desc" ? params.sortByQty : undefined,
+        sortByQty:
+          params.sortByQty === "asc" || params.sortByQty === "desc" ? params.sortByQty : undefined,
       })
 
       const response = await apiClient.request<any>(endpoint, {
@@ -300,7 +300,8 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
       if (params.inStockOnly === false) baseBody.inStockOnly = 0
 
       const body = mergeOrderitIntoBody(baseBody, settings, {
-        sortByQty: params.sortByQty,
+        sortByQty:
+          params.sortByQty === "asc" || params.sortByQty === "desc" ? params.sortByQty : undefined,
         inStockOnlyOverride:
           params.inStockOnly === true ? true : params.inStockOnly === false ? false : null,
       })
@@ -580,7 +581,10 @@ export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptio
         warehouse: warehouse || user.defaultWarehouse,
       })
       appendOrderitToSearchParams(params, settings, {
-        sortByQty: options?.sortByQty === "desc" ? "desc" : "asc",
+        sortByQty:
+          options?.sortByQty === "asc" || options?.sortByQty === "desc"
+            ? options.sortByQty
+            : undefined,
         inStockOnlyOverride:
           options?.inStockOnly === true ? true : options?.inStockOnly === false ? false : null,
       })
