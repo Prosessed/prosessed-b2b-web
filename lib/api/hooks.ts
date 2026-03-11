@@ -3,6 +3,11 @@
 import { useAuth } from "@/lib/auth/context"
 import useSWR from "swr"
 import { apiClient } from "./client"
+import {
+  appendOrderitToSearchParams,
+  fetchOrderitSettings,
+  mergeOrderitIntoBody,
+} from "./orderit-settings"
 
 export interface UseItemsParams {
   item_group?: string
@@ -10,9 +15,11 @@ export interface UseItemsParams {
   page_size?: number
   search_term?: string
   is_search?: boolean
+  /** API sort: asc = low→high, desc = high→low (qty/price per backend) */
   sortByQty?: "asc" | "desc"
   filterByBrand?: string | string[]
-  inStockOnly?: boolean
+  /** true = in stock only; false = include out of stock; undefined = follow OrderIT settings only */
+  inStockOnly?: boolean | null
   qty?: number
 }
 
@@ -36,28 +43,46 @@ export function useItems(params: UseItemsParams) {
         ? "/api/method/prosessed_orderit.orderit.get_items_from_item_group_vtwo"
         : "/api/method/prosessed_orderit.orderit_app.apis.quickaccess.all_items.all_items.get_all_items_card_v2"
 
+      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret }
+      const settings = await fetchOrderitSettings(auth)
+
+      const baseBody: Record<string, unknown> = {
+        item_group: params.item_group,
+        customer: user.customerId,
+        warehouse: user.defaultWarehouse,
+        company: user.companyName,
+        page: params.page || 1,
+        page_size: params.page_size || 20,
+        search_term: params.search_term,
+        is_search: params.is_search || false,
+        filterByBrand: filterByBrand,
+        qty: params.qty || 1.0,
+      }
+      if (params.sortByQty === "asc" || params.sortByQty === "desc") {
+        baseBody.sortByQty = params.sortByQty
+      } else {
+        baseBody.sortByQty = "asc"
+      }
+      if (params.inStockOnly === true) {
+        baseBody.inStockOnly = 1
+      } else if (params.inStockOnly === false) {
+        baseBody.inStockOnly = 0
+      }
+
+      const body = mergeOrderitIntoBody(baseBody, settings, {
+        inStockOnlyOverride:
+          params.inStockOnly === true ? true : params.inStockOnly === false ? false : null,
+        sortByQty: params.sortByQty === "asc" || params.sortByQty === "desc" ? params.sortByQty : undefined,
+      })
+
       const response = await apiClient.request<any>(endpoint, {
         method: "POST",
-        body: JSON.stringify({
-          item_group: params.item_group,
-          customer: user.customerId,
-          warehouse: user.defaultWarehouse,
-          company: user.companyName,
-          page: params.page || 1,
-          page_size: params.page_size || 20,
-          search_term: params.search_term,
-          is_search: params.is_search || false,
-          sortByQty: params.sortByQty || "asc",
-          filterByBrand: filterByBrand,
-          inStockOnly: params.inStockOnly ? 1 : 0,
-          qty: params.qty || 1.0,
-        }),
+        body: JSON.stringify(body),
         auth: {
           apiKey: user.apiKey,
           apiSecret: user.apiSecret,
         },
-        }
-      )
+      })
 
       // Normalize response so UI can rely on message.items + message.pagination
       const raw = response?.message || response
@@ -105,19 +130,40 @@ export interface UseSearchParams {
   search_key: string
   page?: number
   page_size?: number
+  sortByQty?: "asc" | "desc"
+  inStockOnly?: boolean | null
 }
 
-export function useSearch(term: string, page: number = 1, pageSize: number = 10) {
+export function useSearch(
+  term: string,
+  page: number = 1,
+  pageSize: number = 10,
+  options?: { sortByQty?: "asc" | "desc"; inStockOnly?: boolean | null }
+) {
   const { user } = useAuth()
 
-  const key = user && term && term.length >= 2 ? ["search", term, page, pageSize, user.customerId] : null
+  const key =
+    user && term && term.length >= 2
+      ? [
+          "search",
+          term,
+          page,
+          pageSize,
+          user.customerId,
+          options?.sortByQty,
+          options?.inStockOnly,
+        ]
+      : null
 
   return useSWR(
     key,
     async () => {
       if (!user || !term || term.length < 2) return null
 
-      const requestBody = {
+      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret }
+      const settings = await fetchOrderitSettings(auth)
+
+      const baseBody: Record<string, unknown> = {
         search_key: term,
         customer: user.customerId,
         warehouse: user.defaultWarehouse,
@@ -126,6 +172,11 @@ export function useSearch(term: string, page: number = 1, pageSize: number = 10)
         page: page,
         page_size: pageSize,
       }
+      const requestBody = mergeOrderitIntoBody(baseBody, settings, {
+        sortByQty: options?.sortByQty,
+        inStockOnlyOverride:
+          options?.inStockOnly === true ? true : options?.inStockOnly === false ? false : null,
+      })
 
       console.log(`[Search API] Request:`, requestBody)
 
@@ -166,7 +217,7 @@ export interface UseMostBoughtItemsParams {
   page_size?: number
   sortByQty?: "asc" | "desc"
   filterByBrand?: string | string[]
-  inStockOnly?: boolean
+  inStockOnly?: boolean | null
   warehouse?: string
 }
 
@@ -230,19 +281,33 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
       }
 
       const url = "/api/method/prosessed_orderit.orderit.get_most_bought_items_vtwo"
+      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret }
+      const settings = await fetchOrderitSettings(auth)
+
+      const baseBody: Record<string, unknown> = {
+        customer_id: user.customerId,
+        time_frame: params.time_frame || "6 months",
+        min_purchase_count: params.min_purchase_count || 1,
+        page: params.page || 1,
+        page_size: params.page_size || 20,
+        filterByBrand: filterByBrand,
+        warehouse: params.warehouse || user.defaultWarehouse,
+      }
+      if (params.sortByQty === "asc" || params.sortByQty === "desc") {
+        baseBody.sortByQty = params.sortByQty
+      }
+      if (params.inStockOnly === true) baseBody.inStockOnly = 1
+      if (params.inStockOnly === false) baseBody.inStockOnly = 0
+
+      const body = mergeOrderitIntoBody(baseBody, settings, {
+        sortByQty: params.sortByQty,
+        inStockOnlyOverride:
+          params.inStockOnly === true ? true : params.inStockOnly === false ? false : null,
+      })
+
       const response = await apiClient.request<any>(url, {
         method: "POST",
-        body: JSON.stringify({
-          customer_id: user.customerId,
-          time_frame: params.time_frame || "6 months",
-          min_purchase_count: params.min_purchase_count || 1,
-          page: params.page || 1,
-          page_size: params.page_size || 20,
-          sortByQty: params.sortByQty,
-          filterByBrand: filterByBrand,
-          inStockOnly: params.inStockOnly ? 1 : 0,
-          warehouse: params.warehouse || user.defaultWarehouse,
-        }),
+        body: JSON.stringify(body),
         auth: {
           apiKey: user.apiKey,
           apiSecret: user.apiSecret,
@@ -481,25 +546,47 @@ export function useCustomerName(customerId: string | null) {
   )
 }
 
-export function useTaggedItems(warehouse?: string) {
+export interface UseTaggedItemsOptions {
+  sortByQty?: "asc" | "desc"
+  inStockOnly?: boolean | null
+}
+
+export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptions) {
   const { user } = useAuth()
 
-  const key = user ? ["taggedItems", user.customerId, user.companyName, warehouse ?? user.defaultWarehouse] : null
+  const key = user
+    ? [
+        "taggedItems",
+        user.customerId,
+        user.companyName,
+        warehouse ?? user.defaultWarehouse,
+        options?.sortByQty,
+        options?.inStockOnly,
+      ]
+    : null
 
   return useSWR(
     key,
     async () => {
       if (!user) return null
+      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret }
+      const settings = await fetchOrderitSettings(auth)
+
       const params = new URLSearchParams({
         customer: user.customerId,
         qty: "1.0",
         company: user.companyName || "",
-        sortByQty: "asc",
         sortQtyField: "actual",
         warehouse: warehouse || user.defaultWarehouse,
       })
+      appendOrderitToSearchParams(params, settings, {
+        sortByQty: options?.sortByQty === "desc" ? "desc" : "asc",
+        inStockOnlyOverride:
+          options?.inStockOnly === true ? true : options?.inStockOnly === false ? false : null,
+      })
+
       const response = await apiClient.request<any>(
-        `/api/method/prosessed_orderit.orderit_app.apis.quickaccess.tagged_items.tagged_items.get_items_with_tags?${params}`,
+        `/api/method/prosessed_orderit.orderit_app.apis.quickaccess.tagged_items.tagged_items.get_items_with_tags_v2?${params}`,
         {
           method: "GET",
           auth: {
@@ -508,6 +595,8 @@ export function useTaggedItems(warehouse?: string) {
           },
         }
       )
+
+      console.log(`[Tagged Items API] Response:`, response)
       const raw = response?.message
       const data = Array.isArray(raw) ? raw : (raw?.items ?? [])
       return Array.isArray(data) ? data : []

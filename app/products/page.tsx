@@ -19,7 +19,7 @@ import { useItems, useMostBoughtItems, useSearch, useTaggedItems } from "@/lib/a
 import { getFirstImageUrl } from "@/lib/utils/image-url"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
 import { motion, AnimatePresence } from "framer-motion"
-import { Filter, LayoutGrid, List, Loader2, X } from "lucide-react"
+import { Filter, LayoutGrid, List, Loader2, Package, X } from "lucide-react"
 
 // Helper to flatten all categories from tree
 const getAllCategories = (tree: any[]): string[] => {
@@ -61,7 +61,11 @@ export default function ProductsPage() {
   const pageSizeFromUrl = searchParams.get("page_size")
   const viewFromUrl = searchParams.get("view")
   const gridColsFromUrl = searchParams.get("cols")
-  
+  const inStockOnlyParam = searchParams.get("in_stock_only")
+  /** null = follow OrderIT settings only; true/false = force API filter */
+  const inStockOnlyFilter: boolean | null =
+    inStockOnlyParam === "true" ? true : inStockOnlyParam === "false" ? false : null
+
   const observerTarget = useRef<HTMLDivElement>(null)
 
   // Initialize state from URL params
@@ -111,13 +115,17 @@ export default function ProductsPage() {
   const { data: categoryTree } = useItemGroupTree(false)
   const allCategories = useMemo(() => getAllCategories(categoryTree || []), [categoryTree])
 
-  const sortByQty: "asc" | "desc" = "asc"
+  /** API sortByQty: asc = low→high, desc = high→low — used when sorting by price */
+  const sortByQtyForApi: "asc" | "desc" | undefined =
+    sortBy === "price-low" ? "asc" : sortBy === "price-high" ? "desc" : undefined
+  const sortByQtyForHooks: "asc" | "desc" = sortByQtyForApi ?? "asc"
 
   // Search results
   const { data: searchData, isLoading: searchLoading, isValidating: searchValidating, error: searchError } = useSearch(
     searchQuery || "",
     currentPage,
-    pageSize
+    pageSize,
+    { sortByQty: sortByQtyForApi, inStockOnly: inStockOnlyFilter }
   )
 
   // Fetch products: use items vtwo when any filter (category/brand) or search; use most-bought only when solely previously_bought
@@ -126,21 +134,25 @@ export default function ProductsPage() {
     item_group: shouldFetchItems ? categoryFromUrl : undefined,
     page: shouldFetchItems ? currentPage : undefined,
     page_size: shouldFetchItems ? pageSize : undefined,
-    sortByQty: shouldFetchItems ? sortByQty : undefined,
+    sortByQty: shouldFetchItems ? sortByQtyForHooks : undefined,
     filterByBrand: shouldFetchItems && selectedBrands.length > 0 ? selectedBrands : undefined,
+    inStockOnly: shouldFetchItems ? inStockOnlyFilter : undefined,
   })
 
   const { data: mostBoughtData, isLoading: mostBoughtLoading, isValidating: mostBoughtValidating, error: mostBoughtError } = useMostBoughtItems({
     page: effectivePreviouslyBought ? currentPage : undefined,
     page_size: effectivePreviouslyBought ? pageSize : undefined,
-    sortByQty: effectivePreviouslyBought ? sortByQty : undefined,
+    sortByQty: effectivePreviouslyBought ? sortByQtyForHooks : undefined,
     filterByBrand: effectivePreviouslyBought && selectedBrands.length > 0 ? selectedBrands : undefined,
     time_frame: effectivePreviouslyBought ? "6 months" : undefined,
+    inStockOnly: effectivePreviouslyBought ? inStockOnlyFilter : undefined,
   })
 
-  const { data: taggedItemsData, isLoading: taggedLoading, error: taggedError } = useTaggedItems()
-
   const useTaggedView = tagFromUrl || taggedFromUrl
+  const { data: taggedItemsData, isLoading: taggedLoading, error: taggedError } = useTaggedItems(undefined, {
+    sortByQty: useTaggedView ? sortByQtyForHooks : undefined,
+    inStockOnly: useTaggedView ? inStockOnlyFilter : undefined,
+  })
   const productsWhenTag = useMemo(() => {
     if (!useTaggedView || !taggedItemsData || !Array.isArray(taggedItemsData)) return []
     if (tagFromUrl) return taggedItemsData.filter((p: any) => parseTags(p.tags).includes(tagFromUrl))
@@ -194,8 +206,8 @@ export default function ProductsPage() {
   
   // Create filter key for comparison
   const currentFiltersKey = useMemo(() => {
-    return `${categoryFromUrl || ""}|${selectedBrandsKey}|${searchQuery || ""}|${tagFromUrl || ""}|${taggedFromUrl}|${pageSize}`
-  }, [categoryFromUrl, selectedBrandsKey, searchQuery, tagFromUrl, taggedFromUrl, pageSize])
+    return `${categoryFromUrl || ""}|${selectedBrandsKey}|${searchQuery || ""}|${tagFromUrl || ""}|${taggedFromUrl}|${pageSize}|${inStockOnlyParam || ""}|${sortBy}`
+  }, [categoryFromUrl, selectedBrandsKey, searchQuery, tagFromUrl, taggedFromUrl, pageSize, inStockOnlyParam, sortBy])
 
   // Sync state from URL params when they change (e.g., browser back/forward)
   useEffect(() => {
@@ -346,6 +358,8 @@ export default function ProductsPage() {
     cols?: 2 | 3 | 4
     tag?: string | null
     tagged?: string | null
+    /** true = in stock only, false = include all, null = remove param (follow settings) */
+    inStockOnly?: boolean | null
   }) => {
     const params = new URLSearchParams(searchParams.toString())
 
@@ -421,6 +435,16 @@ export default function ProductsPage() {
       }
     }
 
+    if (updates.inStockOnly !== undefined) {
+      if (updates.inStockOnly === true) {
+        params.set("in_stock_only", "true")
+      } else if (updates.inStockOnly === false) {
+        params.set("in_stock_only", "false")
+      } else {
+        params.delete("in_stock_only")
+      }
+    }
+
     router.push(`/products?${params.toString()}`, { scroll: false })
   }, [searchParams, router])
 
@@ -450,8 +474,19 @@ export default function ProductsPage() {
       sort: "featured",
       tag: null,
       tagged: null,
+      inStockOnly: null,
     })
   }, [updateUrlParams])
+
+  const handleInStockToggle = useCallback(() => {
+    if (inStockOnlyFilter === true) {
+      updateUrlParams({ inStockOnly: false })
+    } else if (inStockOnlyFilter === false) {
+      updateUrlParams({ inStockOnly: null })
+    } else {
+      updateUrlParams({ inStockOnly: true })
+    }
+  }, [inStockOnlyFilter, updateUrlParams])
 
   const handleSortByChange = useCallback((value: string) => {
     if (!["featured", "price-low", "price-high", "name-asc", "name-desc"].includes(value)) return
@@ -480,7 +515,7 @@ export default function ProductsPage() {
   const hasActiveFilters = selectedBrands.length > 0 || categoryFromUrl || !!tagFromUrl || taggedFromUrl
 
 
-  // Filter by tag (client-side); then client-side sorting
+  // Filter by tag (client-side); name sort client-side; price sort via API (sortByQty) — no local price reorder
   const sortedProducts = useMemo(() => {
     let list = allProducts
     if (tagFromUrl) {
@@ -489,19 +524,8 @@ export default function ProductsPage() {
         return tags.includes(tagFromUrl)
       })
     }
-    if (sortBy === "price-low") {
-      return [...list].sort((a: any, b: any) => {
-        const priceA = a.price_list_rate ?? a.rate ?? a.price ?? 0
-        const priceB = b.price_list_rate ?? b.rate ?? b.price ?? 0
-        return priceA - priceB
-      })
-    }
-    if (sortBy === "price-high") {
-      return [...list].sort((a: any, b: any) => {
-        const priceA = a.price_list_rate ?? a.rate ?? a.price ?? 0
-        const priceB = b.price_list_rate ?? b.rate ?? b.price ?? 0
-        return priceB - priceA
-      })
+    if (sortBy === "price-low" || sortBy === "price-high") {
+      return list
     }
     if (sortBy === "name-asc") {
       return [...list].sort((a: any, b: any) => {
@@ -710,6 +734,39 @@ export default function ProductsPage() {
                     <SelectItem value="100">100</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* In stock only — cycles default → on → off; drives API inStockOnly */}
+              <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-1.5">
+                <Package
+                  className={`h-4 w-4 shrink-0 ${inStockOnlyFilter === true ? "text-primary" : "text-muted-foreground"}`}
+                  aria-hidden
+                />
+                <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+                  In stock
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={inStockOnlyFilter === true}
+                  aria-label="Toggle in-stock only filter"
+                  onClick={handleInStockToggle}
+                  className={`
+                    relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
+                    ${inStockOnlyFilter === true ? "bg-primary" : inStockOnlyFilter === false ? "bg-muted-foreground/40" : "bg-muted"}
+                  `}
+                >
+                  <span
+                    className={`
+                      absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-background shadow-md transition-transform duration-200
+                      ${inStockOnlyFilter === true ? "translate-x-5" : "translate-x-0"}
+                    `}
+                  />
+                </button>
+                <span className="text-[10px] font-bold text-muted-foreground hidden sm:inline max-w-18 truncate">
+                  {inStockOnlyFilter === true ? "Only" : inStockOnlyFilter === false ? "All" : "Auto"}
+                </span>
               </div>
 
               <div className="flex items-center gap-2">
