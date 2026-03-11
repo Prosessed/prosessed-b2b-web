@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { AnimatedBanner } from "@/components/animated-banner"
 import { CategoryGrid } from "@/components/category-grid"
 import { HeroCarousel } from "@/components/hero-carousel"
@@ -64,6 +65,19 @@ const defaultHeroBanners = [
 export default function HomePage() {
   const { data, isLoading } = useBannersAndDeals()
 
+  // Scroll to #categories when opening home with hash (e.g. from nav on another page)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (window.location.hash !== "#categories") return
+    const scrollToCategories = () => {
+      const el = document.getElementById("categories")
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+    scrollToCategories()
+    const t = window.setTimeout(scrollToCategories, 300)
+    return () => window.clearTimeout(t)
+  }, [])
+
   const heroBanners = (data?.banners || []).map((banner, index) => ({
     id: String(index),
     image_url: banner.image_url,
@@ -101,7 +115,10 @@ export default function HomePage() {
           pageSize={10}
           showTagFilter={false}
         />
-        <CategoryGrid />
+        {/* Anchor for nav "Categories" — scroll lands below Hot Deals & Trending */}
+        <div id="categories" className="scroll-mt-24" aria-label="Product categories">
+          <CategoryGrid />
+        </div>
 
         {/* <ProductRow title="Dairy, Bread & Eggs" itemGroup="Dairy & Bakery" categoryHref="/products?category=dairy" />
 

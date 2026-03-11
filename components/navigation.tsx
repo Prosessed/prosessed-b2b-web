@@ -23,10 +23,10 @@ import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { formatPrice } from "@/lib/utils/currency"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { AnimatePresence, motion } from "framer-motion"
-import { ArrowRight, Moon, Package, Search, ShoppingCart, Sun, Tag, User, X } from "lucide-react"
+import { ArrowRight, LayoutGrid, Moon, Package, Search, ShoppingCart, Sun, Tag, User, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
 export function Navigation() {
@@ -34,6 +34,7 @@ export function Navigation() {
   const { cart } = useCartContext()
   const { openDrawer } = useCartDrawer()
   const router = useRouter()
+  const pathname = usePathname()
   const [isDark, setIsDark] = useState(false)
   const cartCount = cart?.items?.length || 0
   const [searchTerm, setSearchTerm] = useState("")
@@ -51,6 +52,17 @@ export function Navigation() {
       console.log("[Search Navigation] Brands:", searchResults.brands)
     }
   }, [searchTerm, debouncedSearch, searchResults, isSearching])
+
+  const handleCategoriesNavClick = (e: React.MouseEvent) => {
+    if (pathname !== "/") return
+    e.preventDefault()
+    const el = document.getElementById("categories")
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" })
+    } else {
+      router.push("/#categories")
+    }
+  }
 
   const handleSearchSubmit = () => {
     if (searchTerm.trim().length >= 2) {
@@ -284,12 +296,22 @@ export function Navigation() {
         </div>
 
         {/* Navigation links */}
-        <nav className="hidden items-center gap-6 md:flex">
-          <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
-            Home
-          </Link>
-          <Link href="/products" className="text-sm font-medium hover:text-primary transition-colors">
-            Products
+        <nav className="hidden items-center gap-4 md:flex" aria-label="Main navigation">
+          <Button
+            asChild
+            className="rounded-full font-bold shadow-md shadow-primary/15 hover:shadow-lg hover:shadow-primary/20 transition-shadow"
+          >
+            <Link href="/products" className="gap-2">
+              <LayoutGrid className="h-4 w-4" aria-hidden />
+              Shop Now
+            </Link>
+          </Button>
+          <Link
+            href="/#categories"
+            onClick={handleCategoriesNavClick}
+            className="text-sm font-medium hover:text-primary transition-colors"
+          >
+            Categories
           </Link>
           <Link href="/orders" className="text-sm font-medium hover:text-primary transition-colors">
             Orders
