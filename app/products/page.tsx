@@ -618,7 +618,7 @@ export default function ProductsPage() {
           ${isMobileFiltersOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
         `}
         >
-          <Card className="h-full lg:h-[calc(100vh-6rem)] p-6 lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border shadow-none lg:shadow-xl shadow-primary/5 overflow-y-auto overscroll-contain scroll-smooth">
+          <Card className="h-full lg:h-[calc(100vh-6rem)] p-5 sm:p-6 lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border shadow-none lg:shadow-xl shadow-primary/5 overflow-y-auto overscroll-contain scroll-smooth">
             <div className="flex items-center justify-between mb-6 lg:hidden">
               <h2 className="text-xl font-bold">Filters</h2>
               <Button variant="ghost" size="icon" onClick={() => setIsMobileFiltersOpen(false)}>
@@ -626,26 +626,43 @@ export default function ProductsPage() {
               </Button>
             </div>
 
-            <h2 className="hidden lg:block text-xl font-black mb-6 tracking-tight">Refine Results</h2>
+            <h2 className="hidden lg:block text-xl font-black mb-5 tracking-tight">Refine Results</h2>
 
             {/* Category Filter */}
             {allCategories.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Categories</h3>
-                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
+              <section className="mb-6">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                    Categories
+                  </h3>
+                  {selectedCategory && (
+                    <button
+                      type="button"
+                      onClick={() => updateUrlParams({ category: null })}
+                      className="text-[11px] font-bold text-primary hover:underline underline-offset-4"
+                      aria-label="Clear category filter"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-background/60 p-2.5 max-h-[320px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
                   {allCategories.map((category) => (
-                    <label key={category} className="flex items-center gap-3 group cursor-pointer">
+                    <label
+                      key={category}
+                      className="flex items-start gap-3 rounded-xl px-2.5 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
+                    >
                       <Checkbox
                         id={`category-${category}`}
                         checked={selectedCategory === category}
                         onCheckedChange={() => handleCategoryChange(category)}
-                        className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
+                        className="mt-0.5 h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
                       />
                       <span
                         className={`text-sm font-bold transition-colors ${
                           selectedCategory === category
                             ? "text-primary"
-                            : "text-muted-foreground group-hover:text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {category}
@@ -653,38 +670,57 @@ export default function ProductsPage() {
                     </label>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
             {/* Brand Filter */}
             {brands.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Brands</h3>
-                <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
+              <section className="mb-6">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                    Brands
+                  </h3>
+                  {selectedBrands.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => updateUrlParams({ brands: [] })}
+                      className="text-[11px] font-bold text-primary hover:underline underline-offset-4"
+                      aria-label="Clear brand filters"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-background/60 p-2.5 max-h-[240px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
                   {brands.map((brand) => (
-                    <label key={brand.name} className="flex items-center justify-between group cursor-pointer">
-                      <div className="flex items-center gap-3 flex-1">
+                    <label
+                      key={brand.name}
+                      className="flex items-start justify-between gap-3 rounded-xl px-2.5 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
                         <Checkbox
                           id={`brand-${brand.name}`}
                           checked={selectedBrands.includes(brand.name)}
                           onCheckedChange={() => handleBrandToggle(brand.name)}
-                          className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
+                          className="mt-0.5 h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
                         />
                         <span
-                          className={`text-sm font-bold transition-colors ${
+                          className={`text-sm font-bold transition-colors truncate ${
                             selectedBrands.includes(brand.name)
                               ? "text-primary"
-                              : "text-muted-foreground group-hover:text-foreground"
+                              : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           {brand.name}
                         </span>
                       </div>
-                      <span className="text-xs text-muted-foreground font-medium">{brand.count}</span>
+                      <span className="text-xs text-muted-foreground font-semibold tabular-nums">
+                        {brand.count}
+                      </span>
                     </label>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
             {hasActiveFilters && (
@@ -702,7 +738,7 @@ export default function ProductsPage() {
 
         {/* Products Grid */}
         <div className="flex-1">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-8">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-3xl font-black tracking-tighter">
@@ -736,136 +772,151 @@ export default function ProductsPage() {
                     : "Loading..."}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
-                  Items per page
-                </span>
-                <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
-                  <SelectTrigger size="sm" className="w-[88px] rounded-lg">
-                    <SelectValue placeholder="20" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* In stock only — cycles default → on → off; drives API inStockOnly */}
-              <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-1.5">
-                <Package
-                  className={`h-4 w-4 shrink-0 ${inStockOnlyFilter === true ? "text-primary" : "text-muted-foreground"}`}
-                  aria-hidden
-                />
-                <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap">
-                  In stock
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={inStockOnlyFilter === true}
-                  aria-label="Toggle in-stock only filter"
-                  onClick={handleInStockToggle}
-                  className={`
-                    relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
-                    ${inStockOnlyFilter === true ? "bg-primary" : inStockOnlyFilter === false ? "bg-muted-foreground/40" : "bg-muted"}
-                  `}
-                >
-                  <span
-                    className={`
-                      absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-background shadow-md transition-transform duration-200
-                      ${inStockOnlyFilter === true ? "translate-x-5" : "translate-x-0"}
-                    `}
-                  />
-                </button>
-                <span className="text-[10px] font-bold text-muted-foreground hidden sm:inline max-w-18 truncate">
-                  {inStockOnlyFilter === true ? "Only" : inStockOnlyFilter === false ? "All" : "Auto"}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
-                  Sort by
-                </span>
-                <Select value={sortBy} onValueChange={handleSortByChange}>
-                  <SelectTrigger size="sm" className="w-[190px] rounded-lg">
-                    <SelectValue placeholder="Recommended" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="recommended">Recommended</SelectItem>
-                    <SelectItem value="name-asc">A → Z</SelectItem>
-                    <SelectItem value="name-desc">Z → A</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-muted/20 p-1">
-                <Button
-                  type="button"
-                  variant={viewMode === "grid" ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => handleViewModeChange("grid")}
-                  className="h-8 rounded-lg px-3 font-bold cursor-pointer"
-                  aria-label="Grid view"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  Grid
-                </Button>
-                <Button
-                  type="button"
-                  variant={viewMode === "list" ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => handleViewModeChange("list")}
-                  className="h-8 rounded-lg px-3 font-bold cursor-pointer"
-                  aria-label="List view"
-                >
-                  <List className="h-4 w-4" />
-                  List
-                </Button>
-              </div>
-
-              {viewMode === "grid" && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
-                    View as
+            <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 sm:p-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {/* Items per page */}
+                <div className="flex items-center justify-between gap-3 sm:justify-start">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Items
                   </span>
-                  <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-muted/20 p-1">
+                  <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                    <SelectTrigger size="sm" className="w-[104px] rounded-lg">
+                      <SelectValue placeholder="20" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Sort */}
+                <div className="flex items-center justify-between gap-3 sm:justify-start">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Sort
+                  </span>
+                  <Select value={sortBy} onValueChange={handleSortByChange}>
+                    <SelectTrigger size="sm" className="w-[170px] rounded-lg">
+                      <SelectValue placeholder="Recommended" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="recommended">Recommended</SelectItem>
+                      <SelectItem value="name-asc">A → Z</SelectItem>
+                      <SelectItem value="name-desc">Z → A</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* In stock */}
+                <div className="flex items-center justify-between gap-3 sm:justify-start">
+                  <div className="flex items-center gap-2">
+                    <Package
+                      className={`h-4 w-4 shrink-0 ${inStockOnlyFilter === true ? "text-primary" : "text-muted-foreground"}`}
+                      aria-hidden
+                    />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+                      In stock
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={inStockOnlyFilter === true}
+                      aria-label="Toggle in-stock only filter"
+                      onClick={handleInStockToggle}
+                      className={`
+                        relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200
+                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
+                        ${inStockOnlyFilter === true ? "bg-primary" : inStockOnlyFilter === false ? "bg-muted-foreground/40" : "bg-muted"}
+                      `}
+                    >
+                      <span
+                        className={`
+                          absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-background shadow-md transition-transform duration-200
+                          ${inStockOnlyFilter === true ? "translate-x-5" : "translate-x-0"}
+                        `}
+                      />
+                    </button>
+                    <span className="text-[10px] font-bold text-muted-foreground hidden sm:inline w-10 text-right">
+                      {inStockOnlyFilter === true ? "Only" : inStockOnlyFilter === false ? "All" : "Auto"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* View mode */}
+                <div className="flex items-center justify-between gap-3 sm:justify-start">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    View
+                  </span>
+                  <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-background/60 p-1">
                     <Button
                       type="button"
-                      variant={gridCols === 2 ? "secondary" : "ghost"}
+                      variant={viewMode === "grid" ? "secondary" : "ghost"}
                       size="sm"
-                      onClick={() => handleGridColsChange(2)}
-                      className="h-8 rounded-lg px-3 font-black cursor-pointer"
-                      aria-label="2 columns"
+                      onClick={() => handleViewModeChange("grid")}
+                      className="h-8 rounded-lg px-3 font-bold cursor-pointer"
+                      aria-label="Grid view"
                     >
-                      2
+                      <LayoutGrid className="h-4 w-4" />
+                      <span className="hidden sm:inline">Grid</span>
                     </Button>
                     <Button
                       type="button"
-                      variant={gridCols === 3 ? "secondary" : "ghost"}
+                      variant={viewMode === "list" ? "secondary" : "ghost"}
                       size="sm"
-                      onClick={() => handleGridColsChange(3)}
-                      className="h-8 rounded-lg px-3 font-black cursor-pointer"
-                      aria-label="3 columns"
+                      onClick={() => handleViewModeChange("list")}
+                      className="h-8 rounded-lg px-3 font-bold cursor-pointer"
+                      aria-label="List view"
                     >
-                      3
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={gridCols === 4 ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => handleGridColsChange(4)}
-                      className="h-8 rounded-lg px-3 font-black cursor-pointer"
-                      aria-label="4 columns"
-                    >
-                      4
+                      <List className="h-4 w-4" />
+                      <span className="hidden sm:inline">List</span>
                     </Button>
                   </div>
                 </div>
-              )}
+
+                {/* Grid columns */}
+                {viewMode === "grid" && (
+                  <div className="flex items-center justify-between gap-3 sm:justify-start">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                      Columns
+                    </span>
+                    <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-background/60 p-1">
+                      <Button
+                        type="button"
+                        variant={gridCols === 2 ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => handleGridColsChange(2)}
+                        className="h-8 rounded-lg px-3 font-black cursor-pointer"
+                        aria-label="2 columns"
+                      >
+                        2
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={gridCols === 3 ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => handleGridColsChange(3)}
+                        className="h-8 rounded-lg px-3 font-black cursor-pointer"
+                        aria-label="3 columns"
+                      >
+                        3
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={gridCols === 4 ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => handleGridColsChange(4)}
+                        className="h-8 rounded-lg px-3 font-black cursor-pointer"
+                        aria-label="4 columns"
+                      >
+                        4
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
