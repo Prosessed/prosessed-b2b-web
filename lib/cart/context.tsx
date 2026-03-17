@@ -154,7 +154,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const validatedItem: CartItem = {
         ...item,
         qty: item.qty || 1,
-        uom: item.uom || "Unit",
+        uom: item.uom || "Units",
         warehouse: item.warehouse || user.defaultWarehouse,
       }
 

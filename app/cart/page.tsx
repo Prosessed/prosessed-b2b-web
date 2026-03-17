@@ -39,6 +39,7 @@ export default function CartPage() {
     removeItem,
     submitQuotation,
     clearCart,
+    updateCart,
   } = useCartContext()
 
   useEffect(() => {
@@ -52,6 +53,8 @@ export default function CartPage() {
   const [isClearing, setIsClearing] = useState(false)
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({})
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [orderNote, setOrderNote] = useState("")
+  const [isSavingOrderNote, setIsSavingOrderNote] = useState(false)
 
   const cartItems: CartItemResponse[] = cart?.items || []
 
@@ -86,6 +89,11 @@ export default function CartPage() {
       return next
     })
   }, [groupedCartItems])
+
+  useEffect(() => {
+    if (!cart) return
+    setOrderNote(cart.custom_quotation_detail_notes ?? "")
+  }, [cart])
 
   const isGroupExpanded = useCallback(
     (groupName: string) => expandedGroups.has(groupName),
@@ -377,6 +385,36 @@ export default function CartPage() {
         <div>
           <Card className="p-8 sticky top-24">
             <h2 className="text-xl font-bold mb-6">Order Summary</h2>
+
+            <div className="mb-6 space-y-2">
+              <label
+                htmlFor="order-note"
+                className="text-xs font-semibold text-muted-foreground uppercase tracking-widest"
+              >
+                Order note
+              </label>
+              <Textarea
+                id="order-note"
+                placeholder="Add a note for this order (optional)"
+                value={orderNote}
+                onChange={(event) => setOrderNote(event.target.value)}
+                onBlur={async () => {
+                  try {
+                    setIsSavingOrderNote(true)
+                    await updateCart({ custom_quotation_detail_notes: orderNote || "" })
+                  } finally {
+                    setIsSavingOrderNote(false)
+                  }
+                }}
+                className="min-h-[72px] text-sm"
+              />
+              {isSavingOrderNote && (
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Saving note…
+                </p>
+              )}
+            </div>
 
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">

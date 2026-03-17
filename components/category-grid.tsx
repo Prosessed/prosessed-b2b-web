@@ -118,7 +118,7 @@ export function CategoryGrid() {
         <div className="space-y-4">
           <div className="flex-1 h-px bg-border" />
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-bold text-foreground">Individual</h3>
+            <h3 className="text-lg font-bold text-foreground">Categories</h3>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-4">
             {individualCategories.map((category) => (

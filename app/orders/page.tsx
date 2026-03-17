@@ -41,14 +41,11 @@ export default function OrdersPage() {
   const { user, isAuthenticated } = useAuth()
   const [startDate, setStartDate] = useState(defaultStart)
   const [endDate, setEndDate] = useState(defaultEnd)
-  const [salesPersonInput, setSalesPersonInput] = useState("")
   const [activePresetIndex, setActivePresetIndex] = useState<number>(1) // default: Last 30 days
-  const salesPerson = (user?.salesPerson ?? salesPersonInput.trim()) || ""
 
   const { data, isLoading, error } = useSalesPersonOrders({
     page: 1,
     pageSize: 50,
-    salesPerson: salesPerson || undefined,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
   })
@@ -111,7 +108,7 @@ export default function OrdersPage() {
                   Date range
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
                 <div className="space-y-2">
                   <label htmlFor="orders-start" className="text-xs font-semibold text-muted-foreground block">
                     From
@@ -144,29 +141,6 @@ export default function OrdersPage() {
                     aria-label="End date"
                   />
                 </div>
-                {!user?.salesPerson && (
-                  <div className="space-y-2 sm:col-span-2">
-                    <label htmlFor="orders-sales-person" className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <User className="h-3.5 w-3.5" />
-                      Sales person
-                    </label>
-                    <Input
-                      id="orders-sales-person"
-                      type="text"
-                      placeholder="e.g. Akshay"
-                      value={salesPersonInput}
-                      onChange={(e) => setSalesPersonInput(e.target.value)}
-                      className="w-full rounded-xl border-2 border-border/60 bg-background focus:border-primary"
-                      aria-label="Sales person"
-                    />
-                  </div>
-                )}
-                {user?.salesPerson && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <User className="h-4 w-4 shrink-0" />
-                    <span className="font-medium">{user.salesPerson}</span>
-                  </div>
-                )}
               </div>
               <div className="flex flex-wrap gap-2">
                 {PRESETS.map((preset, i) => (
@@ -187,19 +161,13 @@ export default function OrdersPage() {
           </Card>
         </motion.div>
 
-        {!salesPerson && (
-          <Card className="mb-6 p-6 bg-muted/50 border-muted">
-            <p className="text-muted-foreground text-sm">Enter a sales person name above to load orders, or sign in with an account that has a sales person assigned.</p>
-          </Card>
-        )}
-
         {error && (
           <Card className="mb-6 p-6 bg-destructive/10 border-destructive/20">
             <p className="text-destructive">Failed to load orders. Please try again.</p>
           </Card>
         )}
 
-        {salesPerson && isLoading ? (
+        {isLoading ? (
           <div className="grid gap-4">
             {[1, 2, 3].map((i) => (
               <Card key={i} className="p-6">
@@ -211,16 +179,16 @@ export default function OrdersPage() {
               </Card>
             ))}
           </div>
-        ) : salesPerson && orders.length === 0 ? (
+        ) : orders.length === 0 ? (
           <Card className="p-12 text-center">
             <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-50" />
             <h3 className="text-lg font-semibold mb-2">No orders in this range</h3>
-            <p className="text-muted-foreground mb-6">Try a different date range or sales person</p>
+            <p className="text-muted-foreground mb-6">Try a different date range</p>
             <Button variant="outline" onClick={() => { setStartDate(defaultStart); setEndDate(defaultEnd) }} className="cursor-pointer">
               Reset to last 30 days
             </Button>
           </Card>
-        ) : salesPerson && orders.length > 0 ? (
+        ) : orders.length > 0 ? (
           <div className="grid gap-4">
             {orders.map((order: any) => (
               <Link key={order.name} href={`/orders/${order.name}`} className="block group">

@@ -425,20 +425,24 @@ export function useSalesPersonOrders(params?: UseSalesPersonOrdersParams) {
   const startDate = params?.startDate ?? ""
   const endDate = params?.endDate ?? ""
 
-  const key =
-    user && salesPerson
-      ? ["salesPersonOrders", salesPerson, page, pageSize, startDate, endDate]
-      : null
+  const key = user
+    ? ["salesPersonOrders", salesPerson, page, pageSize, startDate, endDate]
+    : null
 
   return useSWR(
     key,
     async () => {
-      if (!user || !salesPerson) return { total_sales_order_count: 0, sales_orders: [] }
+      if (!user) {
+        return { total_sales_order_count: 0, sales_orders: [] }
+      }
+
       const search = new URLSearchParams({
         page: String(page),
         page_size: String(pageSize),
-        sales_person: salesPerson,
       })
+      if (salesPerson) {
+        search.set("sales_person", salesPerson)
+      }
       if (startDate) search.set("startDate", toApiDate(startDate))
       if (endDate) search.set("endDate", toApiDate(endDate))
       const response = await apiClient.request<any>(

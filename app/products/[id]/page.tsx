@@ -243,7 +243,7 @@ export default function ProductDetailPage() {
             ) : (
               <div className="flex items-baseline gap-3">
                 <span className="text-4xl font-black text-primary">{formatPrice(currentRate, user?.defaultCurrency)}</span>
-                <span className="text-muted-foreground">per {selectedUom || product.uom || product.stock_uom}</span>
+                <span className="text-muted-foreground">per {selectedUom +'s' || product.uom +'s' || product.stock_uom +'s'}</span>
               </div>
             )}
           </Card>

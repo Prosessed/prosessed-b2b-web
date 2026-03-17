@@ -69,13 +69,12 @@ export default function ProductsPage() {
   const observerTarget = useRef<HTMLDivElement>(null)
 
   // Initialize state from URL params (legacy: featured/price-low/price-high still accepted)
-  type SortByType = "recommended" | "stock-low" | "stock-high" | "name-asc" | "name-desc"
+  type SortByType = "recommended" | "name-asc" | "name-desc"
   const normalizeSortFromUrl = (url: string | null): SortByType => {
     if (!url) return "recommended"
     if (url === "featured" || url === "relevance" || url === "qty-desc") return "recommended"
-    if (url === "price-low") return "stock-low"
-    if (url === "price-high") return "stock-high"
-    if (["recommended", "stock-low", "stock-high", "name-asc", "name-desc"].includes(url)) {
+    if (url === "price-low" || url === "price-high") return "recommended"
+    if (["recommended", "name-asc", "name-desc"].includes(url)) {
       return url as SortByType
     }
     return "recommended"
@@ -118,12 +117,31 @@ export default function ProductsPage() {
   const { data: categoryTree } = useItemGroupTree(false)
   const allCategories = useMemo(() => getAllCategories(categoryTree || []), [categoryTree])
 
+  const slugifyCategory = useCallback((value: string) => {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+  }, [])
+
+  const resolvedCategoryFromUrl = useMemo(() => {
+    if (!categoryFromUrl) return undefined
+    if (allCategories.includes(categoryFromUrl)) return categoryFromUrl
+    const normalized = slugifyCategory(categoryFromUrl)
+    if (!normalized) return categoryFromUrl
+    const match = allCategories.find((c) => slugifyCategory(c) === normalized)
+    return match || categoryFromUrl
+  }, [allCategories, categoryFromUrl, slugifyCategory])
+
+  const selectedCategory = resolvedCategoryFromUrl
+
   /**
    * Stock sort only: sortByQty=asc (low→high), sortByQty=desc (high→low).
    * Recommended omits sortByQty so sortByRecommended applies via settings merge.
    */
-  const sortByQtyForApi: "asc" | "desc" | undefined =
-    sortBy === "stock-low" ? "asc" : sortBy === "stock-high" ? "desc" : undefined
+  const sortByQtyForApi: "asc" | "desc" | undefined = undefined
 
   // Search results
   const { data: searchData, isLoading: searchLoading, isValidating: searchValidating, error: searchError } = useSearch(
@@ -136,7 +154,7 @@ export default function ProductsPage() {
   // Fetch products: use items vtwo when any filter (category/brand) or search; use most-bought only when solely previously_bought
   const shouldFetchItems = !effectivePreviouslyBought && !searchQuery
   const { data: itemsData, isLoading: itemsLoading, isValidating: itemsValidating, error: itemsError } = useItems({
-    item_group: shouldFetchItems ? categoryFromUrl : undefined,
+    item_group: shouldFetchItems ? selectedCategory : undefined,
     page: shouldFetchItems ? currentPage : undefined,
     page_size: shouldFetchItems ? pageSize : undefined,
     sortByQty: shouldFetchItems ? sortByQtyForApi : undefined,
@@ -211,8 +229,8 @@ export default function ProductsPage() {
   
   // Create filter key for comparison
   const currentFiltersKey = useMemo(() => {
-    return `${categoryFromUrl || ""}|${selectedBrandsKey}|${searchQuery || ""}|${tagFromUrl || ""}|${taggedFromUrl}|${pageSize}|${inStockOnlyParam || ""}|${sortBy}`
-  }, [categoryFromUrl, selectedBrandsKey, searchQuery, tagFromUrl, taggedFromUrl, pageSize, inStockOnlyParam, sortBy])
+    return `${selectedCategory || ""}|${selectedBrandsKey}|${searchQuery || ""}|${tagFromUrl || ""}|${taggedFromUrl}|${pageSize}|${inStockOnlyParam || ""}|${sortBy}`
+  }, [selectedCategory, selectedBrandsKey, searchQuery, tagFromUrl, taggedFromUrl, pageSize, inStockOnlyParam, sortBy])
 
   // Sync state from URL params when they change (e.g., browser back/forward)
   useEffect(() => {
@@ -487,7 +505,7 @@ export default function ProductsPage() {
   }, [inStockOnlyFilter, updateUrlParams])
 
   const handleSortByChange = useCallback((value: string) => {
-    if (!["recommended", "stock-low", "stock-high", "name-asc", "name-desc"].includes(value)) return
+    if (!["recommended", "name-asc", "name-desc"].includes(value)) return
     const next = value as SortByType
     setSortBy(next)
     updateUrlParams({ sort: next })
@@ -510,10 +528,10 @@ export default function ProductsPage() {
     updateUrlParams({ cols: next })
   }, [updateUrlParams])
 
-  const hasActiveFilters = selectedBrands.length > 0 || categoryFromUrl || !!tagFromUrl || taggedFromUrl
+  const hasActiveFilters = selectedBrands.length > 0 || !!selectedCategory || !!tagFromUrl || taggedFromUrl
 
 
-  // Filter by tag (client-side); name sort client-side; stock sort via API (sortByQty) — no local reorder
+  // Filter by tag (client-side); name sort client-side
   const sortedProducts = useMemo(() => {
     let list = allProducts
     if (tagFromUrl) {
@@ -521,9 +539,6 @@ export default function ProductsPage() {
         const tags = parseTags(p.tags)
         return tags.includes(tagFromUrl)
       })
-    }
-    if (sortBy === "stock-low" || sortBy === "stock-high") {
-      return list
     }
     if (sortBy === "name-asc") {
       return [...list].sort((a: any, b: any) => {
@@ -573,6 +588,7 @@ export default function ProductsPage() {
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Mobile Filter Toggle */}
+        {!effectivePreviouslyBought && !useTaggedView && (
         <div className="lg:hidden flex items-center justify-between mb-4">
           <Button
             variant="outline"
@@ -591,11 +607,13 @@ export default function ProductsPage() {
             {pagination ? `${pagination.total_records || 0} items` : isLoading ? "Loading..." : "0 items"}
           </div>
         </div>
+        )}
 
         {/* Filters Sidebar */}
+        {!effectivePreviouslyBought && !useTaggedView && (
         <aside
           className={`
-          fixed inset-0 z-100 lg:relative lg:inset-auto lg:block w-full lg:w-72 shrink-0
+          fixed inset-0 z-40 lg:relative lg:inset-auto lg:block w-full lg:w-72 shrink-0
           bg-background lg:bg-transparent transition-transform duration-300
           ${isMobileFiltersOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
         `}
@@ -619,13 +637,13 @@ export default function ProductsPage() {
                     <label key={category} className="flex items-center gap-3 group cursor-pointer">
                       <Checkbox
                         id={`category-${category}`}
-                        checked={categoryFromUrl === category}
+                        checked={selectedCategory === category}
                         onCheckedChange={() => handleCategoryChange(category)}
                         className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
                       />
                       <span
                         className={`text-sm font-bold transition-colors ${
-                          categoryFromUrl === category
+                          selectedCategory === category
                             ? "text-primary"
                             : "text-muted-foreground group-hover:text-foreground"
                         }`}
@@ -680,6 +698,7 @@ export default function ProductsPage() {
             )}
           </Card>
         </aside>
+        )}
 
         {/* Products Grid */}
         <div className="flex-1">
@@ -693,7 +712,7 @@ export default function ProductsPage() {
                     ? "Hot Deals & Trending Products"
                     : effectivePreviouslyBought
                     ? "Previously Bought Items"
-                    : (categoryFromUrl || "All Products")}
+                    : (selectedCategory || "All Products")}
                 </h1>
                 {tagFromUrl && (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
@@ -777,8 +796,6 @@ export default function ProductsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="recommended">Recommended</SelectItem>
-                    <SelectItem value="stock-low">Stock: Low → High</SelectItem>
-                    <SelectItem value="stock-high">Stock: High → Low</SelectItem>
                     <SelectItem value="name-asc">A → Z</SelectItem>
                     <SelectItem value="name-desc">Z → A</SelectItem>
                   </SelectContent>
