@@ -69,8 +69,8 @@ export function useItems(params: UseItemsParams) {
       }
 
       const body = mergeOrderitIntoBody(baseBody, settings, {
-        inStockOnlyOverride:
-          params.inStockOnly === true ? true : params.inStockOnly === false ? false : null,
+        // Do not apply in-stock filter from portal settings on initial load; only when user explicitly sets it
+        inStockOnlyOverride: params.inStockOnly === true ? true : false,
         sortByQty:
           params.sortByQty === "asc" || params.sortByQty === "desc" ? params.sortByQty : undefined,
       })
@@ -174,8 +174,8 @@ export function useSearch(
       }
       const requestBody = mergeOrderitIntoBody(baseBody, settings, {
         sortByQty: options?.sortByQty,
-        inStockOnlyOverride:
-          options?.inStockOnly === true ? true : options?.inStockOnly === false ? false : null,
+        // Same behavior as items/most-bought: only respect in-stock when user explicitly turns it on
+        inStockOnlyOverride: options?.inStockOnly === true ? true : false,
       })
 
       console.log(`[Search API] Request:`, requestBody)
