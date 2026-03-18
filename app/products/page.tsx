@@ -18,6 +18,8 @@ import { parseTags } from "@/lib/utils/tags"
 import { useItems, useMostBoughtItems, useSearch, useTaggedItems } from "@/lib/api/hooks"
 import { getFirstImageUrl } from "@/lib/utils/image-url"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
+import { useAuth } from "@/lib/auth/context"
+import { fetchOrderitSettings } from "@/lib/api/orderit-settings"
 import { motion, AnimatePresence } from "framer-motion"
 import { Filter, LayoutGrid, List, Loader2, Package, X } from "lucide-react"
 
@@ -46,6 +48,7 @@ const getAllCategories = (tree: any[]): string[] => {
 export default function ProductsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { user } = useAuth()
   const categoryFromUrl = searchParams.get("category") || undefined
   const searchQuery = searchParams.get("search") || undefined
   const tagFromUrl = searchParams.get("tag") || undefined
@@ -62,11 +65,12 @@ export default function ProductsPage() {
   const viewFromUrl = searchParams.get("view")
   const gridColsFromUrl = searchParams.get("cols")
   const inStockOnlyParam = searchParams.get("in_stock_only")
-  /** null = follow OrderIT settings only; true/false = force API filter */
-  const inStockOnlyFilter: boolean | null =
-    inStockOnlyParam === "true" ? true : inStockOnlyParam === "false" ? false : null
+  /** Product page uses explicit on/off (no auto): true => inStockOnly=1, false => inStockOnly=0 */
+  const inStockOnlyFilter: boolean =
+    inStockOnlyParam === "true" ? true : inStockOnlyParam === "false" ? false : false
 
   const observerTarget = useRef<HTMLDivElement>(null)
+  const hasInitializedStockFromSettings = useRef(false)
 
   // Initialize state from URL params (legacy: featured/price-low/price-high still accepted)
   type SortByType = "recommended" | "name-asc" | "name-desc"
@@ -116,6 +120,33 @@ export default function ProductsPage() {
   // Get categories from API
   const { data: categoryTree } = useItemGroupTree(false)
   const allCategories = useMemo(() => getAllCategories(categoryTree || []), [categoryTree])
+
+  // Initialize stock toggle based on OrderIT setting `show_in_stock_only`
+  useEffect(() => {
+    if (!user) return
+    if (hasInitializedStockFromSettings.current) return
+    if (inStockOnlyParam === "true" || inStockOnlyParam === "false") {
+      hasInitializedStockFromSettings.current = true
+      return
+    }
+
+    hasInitializedStockFromSettings.current = true
+    const run = async () => {
+      const settings = await fetchOrderitSettings({
+        apiKey: user.apiKey,
+        apiSecret: user.apiSecret,
+      })
+      const showInStockOnly =
+        settings?.show_in_stock_only === 1 ||
+        settings?.show_in_stock_only === "1" ||
+        settings?.show_in_stock_only === true
+
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("in_stock_only", showInStockOnly ? "true" : "false")
+      router.push(`/products?${params.toString()}`, { scroll: false })
+    }
+    run()
+  }, [user, inStockOnlyParam, router, searchParams])
 
   const slugifyCategory = useCallback((value: string) => {
     return value
@@ -495,13 +526,7 @@ export default function ProductsPage() {
   }, [updateUrlParams])
 
   const handleInStockToggle = useCallback(() => {
-    if (inStockOnlyFilter === true) {
-      updateUrlParams({ inStockOnly: false })
-    } else if (inStockOnlyFilter === false) {
-      updateUrlParams({ inStockOnly: null })
-    } else {
-      updateUrlParams({ inStockOnly: true })
-    }
+    updateUrlParams({ inStockOnly: !inStockOnlyFilter })
   }, [inStockOnlyFilter, updateUrlParams])
 
   const handleSortByChange = useCallback((value: string) => {
@@ -840,9 +865,6 @@ export default function ProductsPage() {
                         `}
                       />
                     </button>
-                    <span className="text-[10px] font-bold text-muted-foreground hidden sm:inline whitespace-nowrap min-w-10">
-                      {inStockOnlyFilter === true ? "Only" : inStockOnlyFilter === false ? "All" : "Auto"}
-                    </span>
                   </div>
                 </div>
 

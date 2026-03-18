@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Minus, Plus, Trash2, ShoppingCart, Loader2, X, ChevronDown } from "lucide-react"
 import { useCartContext } from "@/lib/cart/context"
@@ -25,6 +26,7 @@ export function CartDrawer() {
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [isClearing, setIsClearing] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [quantityEdits, setQuantityEdits] = useState<Record<string, string>>({})
   const currency = user?.defaultCurrency ?? "AUD"
 
   useEffect(() => {
@@ -97,6 +99,45 @@ export function CartDrawer() {
     },
     [updateItem]
   )
+
+  const handleQuantityChange = useCallback((itemId: string, next: string) => {
+    setQuantityEdits((prev) => ({ ...prev, [itemId]: next }))
+  }, [])
+
+  const commitQuantity = useCallback(async (itemId: string, fallbackQty: number) => {
+    const raw = (quantityEdits[itemId] ?? "").trim()
+    if (!raw) {
+      setQuantityEdits((prev) => {
+        const next = { ...prev }
+        delete next[itemId]
+        return next
+      })
+      return
+    }
+
+    const parsed = Number(raw)
+    const nextQty = Number.isFinite(parsed) ? Math.floor(parsed) : NaN
+    if (!Number.isFinite(nextQty) || nextQty < 1) {
+      setQuantityEdits((prev) => ({ ...prev, [itemId]: String(fallbackQty) }))
+      return
+    }
+
+    if (nextQty === fallbackQty) {
+      setQuantityEdits((prev) => {
+        const next = { ...prev }
+        delete next[itemId]
+        return next
+      })
+      return
+    }
+
+    await updateQuantity(itemId, nextQty)
+    setQuantityEdits((prev) => {
+      const next = { ...prev }
+      delete next[itemId]
+      return next
+    })
+  }, [quantityEdits, updateQuantity])
 
   const handleRemoveItem = useCallback(
     async (itemId: string) => {
@@ -287,9 +328,20 @@ export function CartDrawer() {
                                 >
                                   <Minus className="h-3 w-3" />
                                 </Button>
-                                <div className="w-8 text-center font-bold text-xs tabular-nums">
-                                  {item.qty}
-                                </div>
+                                <Input
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  type="text"
+                                  value={quantityEdits[item.name] ?? String(item.qty)}
+                                  onChange={(event) => handleQuantityChange(item.name, event.target.value)}
+                                  onBlur={() => commitQuantity(item.name, item.qty)}
+                                  onKeyDown={(event) => {
+                                    if (event.key !== "Enter") return
+                                    event.currentTarget.blur()
+                                  }}
+                                  className="h-7 w-14 rounded-md border border-primary/20 bg-background/70 px-2 text-center font-bold text-xs tabular-nums focus-visible:ring-2 focus-visible:ring-primary"
+                                  aria-label={`Quantity for ${item.item_name}`}
+                                />
                                 <Button
                                   onClick={() => updateQuantity(item.name, item.qty + 1)}
                                   variant="ghost"

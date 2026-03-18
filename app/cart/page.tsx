@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import type { CartItemResponse } from "@/lib/api/cart"
@@ -55,6 +56,7 @@ export default function CartPage() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [orderNote, setOrderNote] = useState("")
   const [isSavingOrderNote, setIsSavingOrderNote] = useState(false)
+  const [quantityEdits, setQuantityEdits] = useState<Record<string, string>>({})
 
   const cartItems: CartItemResponse[] = cart?.items || []
 
@@ -121,6 +123,45 @@ export default function CartPage() {
     },
     [updateItem]
   )
+
+  const handleQuantityChange = useCallback((itemId: string, next: string) => {
+    setQuantityEdits((prev) => ({ ...prev, [itemId]: next }))
+  }, [])
+
+  const commitQuantity = useCallback(async (itemId: string, fallbackQty: number) => {
+    const raw = (quantityEdits[itemId] ?? "").trim()
+    if (!raw) {
+      setQuantityEdits((prev) => {
+        const next = { ...prev }
+        delete next[itemId]
+        return next
+      })
+      return
+    }
+
+    const parsed = Number(raw)
+    const nextQty = Number.isFinite(parsed) ? Math.floor(parsed) : NaN
+    if (!Number.isFinite(nextQty) || nextQty < 1) {
+      setQuantityEdits((prev) => ({ ...prev, [itemId]: String(fallbackQty) }))
+      return
+    }
+
+    if (nextQty === fallbackQty) {
+      setQuantityEdits((prev) => {
+        const next = { ...prev }
+        delete next[itemId]
+        return next
+      })
+      return
+    }
+
+    await updateQuantity(itemId, nextQty)
+    setQuantityEdits((prev) => {
+      const next = { ...prev }
+      delete next[itemId]
+      return next
+    })
+  }, [quantityEdits, updateQuantity])
 
   const handleRemoveItem = useCallback(
     async (itemId: string) => {
@@ -320,9 +361,20 @@ export default function CartPage() {
                               >
                                 <Minus className="h-4 w-4" />
                               </Button>
-                              <span className="w-10 text-center font-bold">
-                                {item.qty}
-                              </span>
+                              <Input
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                type="text"
+                                value={quantityEdits[item.name] ?? String(item.qty)}
+                                onChange={(event) => handleQuantityChange(item.name, event.target.value)}
+                                onBlur={() => commitQuantity(item.name, item.qty)}
+                                onKeyDown={(event) => {
+                                  if (event.key !== "Enter") return
+                                  event.currentTarget.blur()
+                                }}
+                                className="h-9 w-16 rounded-none border-0 border-x px-2 text-center font-bold tabular-nums focus-visible:ring-0"
+                                aria-label={`Quantity for ${item.item_name}`}
+                              />
                               <Button
                                 size="icon"
                                 variant="ghost"
