@@ -772,15 +772,15 @@ export default function ProductsPage() {
                     : "Loading..."}
               </p>
             </div>
-            <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 sm:p-3.5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                {/* Items per page */}
-                <div className="flex items-center justify-between gap-3 sm:justify-start">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 sm:p-5 overflow-visible space-y-5">
+              {/* Row 1: Items, Sort */}
+              <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                <div className="flex items-center gap-4 min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground shrink-0">
                     Items
                   </span>
                   <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
-                    <SelectTrigger size="sm" className="w-[104px] rounded-lg">
+                    <SelectTrigger size="sm" className="w-[104px] rounded-lg shrink-0">
                       <SelectValue placeholder="20" />
                     </SelectTrigger>
                     <SelectContent>
@@ -790,14 +790,12 @@ export default function ProductsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Sort */}
-                <div className="flex items-center justify-between gap-3 sm:justify-start">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <div className="flex items-center gap-4 min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground shrink-0">
                     Sort
                   </span>
                   <Select value={sortBy} onValueChange={handleSortByChange}>
-                    <SelectTrigger size="sm" className="w-[170px] rounded-lg">
+                    <SelectTrigger size="sm" className="w-[170px] rounded-lg shrink-0">
                       <SelectValue placeholder="Recommended" />
                     </SelectTrigger>
                     <SelectContent>
@@ -807,19 +805,22 @@ export default function ProductsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
 
+              {/* Row 2: In stock, View (Grid/List), Column selector */}
+              <div className="flex flex-wrap items-center gap-6 sm:gap-8 pt-4 border-t border-border/40">
                 {/* In stock */}
-                <div className="flex items-center justify-between gap-3 sm:justify-start">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Package
-                      className={`h-4 w-4 shrink-0 ${inStockOnlyFilter === true ? "text-primary" : "text-muted-foreground"}`}
+                      className={`h-4 w-4 ${inStockOnlyFilter === true ? "text-primary" : "text-muted-foreground"}`}
                       aria-hidden
                     />
                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap">
                       In stock
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3 shrink-0">
                     <button
                       type="button"
                       role="switch"
@@ -839,18 +840,18 @@ export default function ProductsPage() {
                         `}
                       />
                     </button>
-                    <span className="text-[10px] font-bold text-muted-foreground hidden sm:inline w-10 text-right">
+                    <span className="text-[10px] font-bold text-muted-foreground hidden sm:inline whitespace-nowrap min-w-10">
                       {inStockOnlyFilter === true ? "Only" : inStockOnlyFilter === false ? "All" : "Auto"}
                     </span>
                   </div>
                 </div>
 
                 {/* View mode */}
-                <div className="flex items-center justify-between gap-3 sm:justify-start">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <div className="flex items-center gap-4 min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground shrink-0">
                     View
                   </span>
-                  <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-background/60 p-1">
+                  <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-background/60 p-1 shrink-0">
                     <Button
                       type="button"
                       variant={viewMode === "grid" ? "secondary" : "ghost"}
@@ -878,42 +879,37 @@ export default function ProductsPage() {
 
                 {/* Grid columns */}
                 {viewMode === "grid" && (
-                  <div className="flex items-center justify-between gap-3 sm:justify-start">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      Columns
-                    </span>
-                    <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-background/60 p-1">
-                      <Button
-                        type="button"
-                        variant={gridCols === 2 ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={() => handleGridColsChange(2)}
-                        className="h-8 rounded-lg px-3 font-black cursor-pointer"
-                        aria-label="2 columns"
-                      >
-                        2
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={gridCols === 3 ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={() => handleGridColsChange(3)}
-                        className="h-8 rounded-lg px-3 font-black cursor-pointer"
-                        aria-label="3 columns"
-                      >
-                        3
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={gridCols === 4 ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={() => handleGridColsChange(4)}
-                        className="h-8 rounded-lg px-3 font-black cursor-pointer"
-                        aria-label="4 columns"
-                      >
-                        4
-                      </Button>
-                    </div>
+                  <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-background/60 p-1 shrink-0">
+                    <Button
+                      type="button"
+                      variant={gridCols === 2 ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => handleGridColsChange(2)}
+                      className="h-8 rounded-lg px-3 font-black cursor-pointer"
+                      aria-label="2 columns"
+                    >
+                      2
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={gridCols === 3 ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => handleGridColsChange(3)}
+                      className="h-8 rounded-lg px-3 font-black cursor-pointer"
+                      aria-label="3 columns"
+                    >
+                      3
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={gridCols === 4 ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => handleGridColsChange(4)}
+                      className="h-8 rounded-lg px-3 font-black cursor-pointer"
+                      aria-label="4 columns"
+                    >
+                      4
+                    </Button>
                   </div>
                 )}
               </div>
