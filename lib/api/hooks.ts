@@ -589,8 +589,8 @@ export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptio
           options?.sortByQty === "asc" || options?.sortByQty === "desc"
             ? options.sortByQty
             : undefined,
-        inStockOnlyOverride:
-          options?.inStockOnly === true ? true : options?.inStockOnly === false ? false : null,
+        // Do not apply in-stock filter from portal settings on initial load; only when user explicitly sets it
+        inStockOnlyOverride: options?.inStockOnly === true ? true : false,
       })
 
       const response = await apiClient.request<any>(
