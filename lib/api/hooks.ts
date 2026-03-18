@@ -302,8 +302,8 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
       const body = mergeOrderitIntoBody(baseBody, settings, {
         sortByQty:
           params.sortByQty === "asc" || params.sortByQty === "desc" ? params.sortByQty : undefined,
-        inStockOnlyOverride:
-          params.inStockOnly === true ? true : params.inStockOnly === false ? false : null,
+        // Do not apply in-stock filter from portal settings on initial load; only when user explicitly sets it
+        inStockOnlyOverride: params.inStockOnly === true ? true : false,
       })
 
       const response = await apiClient.request<any>(url, {
