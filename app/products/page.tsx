@@ -19,20 +19,22 @@ import { useItems, useMostBoughtItems, useSearch, useTaggedItems } from "@/lib/a
 import { getFirstImageUrl } from "@/lib/utils/image-url"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
 import { useAuth } from "@/lib/auth/context"
-import { fetchOrderitSettings } from "@/lib/api/orderit-settings"
 import { motion, AnimatePresence } from "framer-motion"
 import { Filter, LayoutGrid, List, Loader2, Package, X } from "lucide-react"
 
-// Helper to flatten all categories from tree
 const getAllCategories = (tree: any[]): string[] => {
   const categories: string[] = []
   
   const traverse = (nodes: any[]) => {
     for (const node of nodes) {
-      if (node.value && node.value !== "All Item Groups") {
+      const hasChildren = node.children && node.children.length > 0
+
+      // ✅ Only push leaf nodes
+      if (!hasChildren && node.value && node.value !== "All Item Groups") {
         categories.push(node.value)
       }
-      if (node.children && Array.isArray(node.children)) {
+
+      if (hasChildren) {
         traverse(node.children)
       }
     }
@@ -44,6 +46,27 @@ const getAllCategories = (tree: any[]): string[] => {
   
   return categories
 }
+// Helper to flatten all categories from tree
+// const getAllCategories = (tree: any[]): string[] => {
+//   const categories: string[] = []
+  
+//   const traverse = (nodes: any[]) => {
+//     for (const node of nodes) {
+//       if (node.value && node.value !== "All Item Groups") {
+//         categories.push(node.value)
+//       }
+//       if (node.children && Array.isArray(node.children)) {
+//         traverse(node.children)
+//       }
+//     }
+//   }
+  
+//   if (tree.length > 0 && tree[0].children) {
+//     traverse(tree[0].children)
+//   }
+  
+//   return categories
+// }
 
 export default function ProductsPage() {
   const searchParams = useSearchParams()
@@ -131,21 +154,25 @@ export default function ProductsPage() {
     }
 
     hasInitializedStockFromSettings.current = true
-    const run = async () => {
-      const settings = await fetchOrderitSettings({
-        apiKey: user.apiKey,
-        apiSecret: user.apiSecret,
-      })
-      const showInStockOnly =
-        settings?.show_in_stock_only === 1 ||
-        settings?.show_in_stock_only === "1" ||
-        settings?.show_in_stock_only === true
-
-      const params = new URLSearchParams(searchParams.toString())
-      params.set("in_stock_only", showInStockOnly ? "true" : "false")
-      router.push(`/products?${params.toString()}`, { scroll: false })
-    }
-    run()
+    // NOTE: Temporarily disabled.
+    // This was auto-applying OrderIT setting `show_in_stock_only` to the URL,
+    // which made the "In stock" filter auto-enable on page load.
+    //
+    // const run = async () => {
+    //   const settings = await fetchOrderitSettings({
+    //     apiKey: user.apiKey,
+    //     apiSecret: user.apiSecret,
+    //   })
+    //   const showInStockOnly =
+    //     settings?.show_in_stock_only === 1 ||
+    //     settings?.show_in_stock_only === "1" ||
+    //     settings?.show_in_stock_only === true
+    //
+    //   const params = new URLSearchParams(searchParams.toString())
+    //   params.set("in_stock_only", showInStockOnly ? "true" : "false")
+    //   router.push(`/products?${params.toString()}`, { scroll: false })
+    // }
+    // run()
   }, [user, inStockOnlyParam, router, searchParams])
 
   const slugifyCategory = useCallback((value: string) => {
