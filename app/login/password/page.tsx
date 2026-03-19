@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, ArrowLeft, Lock, Building2 } from "lucide-react"
+import { Loader2, ArrowLeft, Lock, Building2, Eye, EyeOff } from "lucide-react"
 import { apiClient, ApiError } from "@/lib/api/client"
 import { setAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
@@ -22,6 +22,7 @@ export default function PasswordPage() {
   const [email, setEmail] = useState("")
   const [company, setCompany] = useState<Company | null>(null)
   const [password, setPassword] = useState("")
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isOtpLoading, setIsOtpLoading] = useState(false)
   const [error, setError] = useState("")
@@ -109,15 +110,30 @@ export default function PasswordPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
+                  type={isPasswordVisible ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 h-12 text-base"
+                  className="pl-10 pr-12 h-12 text-base"
                   required
                   disabled={isLoading}
                   autoFocus
                 />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                  aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+                  aria-pressed={isPasswordVisible}
+                  onClick={() => setIsPasswordVisible((prev) => !prev)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" && e.key !== " ") return
+                    e.preventDefault()
+                    setIsPasswordVisible((prev) => !prev)
+                  }}
+                  disabled={isLoading}
+                >
+                  {isPasswordVisible ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 

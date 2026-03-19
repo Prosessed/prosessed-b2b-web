@@ -17,6 +17,7 @@ import {
 import { parseTags } from "@/lib/utils/tags"
 import { useItems, useMostBoughtItems, useSearch, useTaggedItems } from "@/lib/api/hooks"
 import { getFirstImageUrl } from "@/lib/utils/image-url"
+import { fetchOrderitSettings } from "@/lib/api/orderit-settings"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
 import { useAuth } from "@/lib/auth/context"
 import { motion, AnimatePresence } from "framer-motion"
@@ -90,7 +91,11 @@ export default function ProductsPage() {
   const inStockOnlyParam = searchParams.get("in_stock_only")
   /** Product page uses explicit on/off (no auto): true => inStockOnly=1, false => inStockOnly=0 */
   const inStockOnlyFilter: boolean =
-    inStockOnlyParam === "true" ? true : inStockOnlyParam === "false" ? false : false
+    inStockOnlyParam === "true" || inStockOnlyParam === "1"
+      ? true
+      : inStockOnlyParam === "false" || inStockOnlyParam === "0"
+        ? false
+        : false
 
   const observerTarget = useRef<HTMLDivElement>(null)
   const hasInitializedStockFromSettings = useRef(false)
@@ -148,31 +153,35 @@ export default function ProductsPage() {
   useEffect(() => {
     if (!user) return
     if (hasInitializedStockFromSettings.current) return
-    if (inStockOnlyParam === "true" || inStockOnlyParam === "false") {
+    if (
+      inStockOnlyParam === "true" ||
+      inStockOnlyParam === "false" ||
+      inStockOnlyParam === "1" ||
+      inStockOnlyParam === "0"
+    ) {
       hasInitializedStockFromSettings.current = true
       return
     }
 
     hasInitializedStockFromSettings.current = true
-    // NOTE: Temporarily disabled.
-    // This was auto-applying OrderIT setting `show_in_stock_only` to the URL,
-    // which made the "In stock" filter auto-enable on page load.
-    //
-    // const run = async () => {
-    //   const settings = await fetchOrderitSettings({
-    //     apiKey: user.apiKey,
-    //     apiSecret: user.apiSecret,
-    //   })
-    //   const showInStockOnly =
-    //     settings?.show_in_stock_only === 1 ||
-    //     settings?.show_in_stock_only === "1" ||
-    //     settings?.show_in_stock_only === true
-    //
-    //   const params = new URLSearchParams(searchParams.toString())
-    //   params.set("in_stock_only", showInStockOnly ? "true" : "false")
-    //   router.push(`/products?${params.toString()}`, { scroll: false })
-    // }
-    // run()
+    const run = async () => {
+      const settings = await fetchOrderitSettings({
+        apiKey: user.apiKey,
+        apiSecret: user.apiSecret,
+      })
+      const showInStockOnly =
+        settings?.show_in_stock_only === 1 ||
+        settings?.show_in_stock_only === "1" ||
+        settings?.show_in_stock_only === true
+
+      // Only auto-enable when OrderIT explicitly forces it on.
+      if (!showInStockOnly) return
+
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("in_stock_only", "1")
+      router.push(`/products?${params.toString()}`, { scroll: false })
+    }
+    run()
   }, [user, inStockOnlyParam, router, searchParams])
 
   const slugifyCategory = useCallback((value: string) => {
@@ -511,9 +520,9 @@ export default function ProductsPage() {
 
     if (updates.inStockOnly !== undefined) {
       if (updates.inStockOnly === true) {
-        params.set("in_stock_only", "true")
+        params.set("in_stock_only", "1")
       } else if (updates.inStockOnly === false) {
-        params.set("in_stock_only", "false")
+        params.set("in_stock_only", "0")
       } else {
         params.delete("in_stock_only")
       }

@@ -9,6 +9,55 @@ import {
   mergeOrderitIntoBody,
 } from "./orderit-settings"
 
+type WarehousesByCustomerBranchResponse = {
+  filtered?: boolean
+  customer_branch?: string
+  default_warehouse?: string
+  warehouses?: unknown[]
+}
+
+const getWarehousesByCustomerBranch = async (
+  auth: { apiKey: string; apiSecret: string },
+  customerId: string,
+  company?: string | null
+) => {
+  const search = new URLSearchParams({
+    customer_id: customerId,
+  })
+  if (company) search.set("company", company)
+  const response = await apiClient.request<any>(
+    `/api/method/prosessed_orderit.orderit.get_warehouses_based_on_customer_branch?${search.toString()}`,
+    {
+      method: "GET",
+      auth,
+    }
+  )
+  const raw = response?.message ?? response
+  return (raw && typeof raw === "object" ? (raw as WarehousesByCustomerBranchResponse) : null) as
+    | WarehousesByCustomerBranchResponse
+    | null
+}
+
+export const useWarehousesByCustomerBranch = (customerIdOverride?: string | null) => {
+  const { user } = useAuth()
+  const customerId = customerIdOverride ?? user?.customerId ?? null
+
+  const key = user && customerId ? ["warehousesByCustomerBranch", customerId, user.companyName, user.apiKey] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user || !customerId) return null
+      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret }
+      return await getWarehousesByCustomerBranch(auth, customerId, user.companyName)
+    },
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60_000,
+    }
+  )
+}
+
 export interface UseItemsParams {
   item_group?: string
   page?: number
@@ -26,7 +75,10 @@ export interface UseItemsParams {
 export function useItems(params: UseItemsParams) {
   const { user } = useAuth()
 
-  const key = user ? ["items", params, user.customerId, user.defaultWarehouse] : null
+  const { data: warehousesData } = useWarehousesByCustomerBranch()
+  const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
+
+  const key = user ? ["items", params, user.customerId, resolvedWarehouse] : null
 
   return useSWR(
     key,
@@ -49,7 +101,7 @@ export function useItems(params: UseItemsParams) {
       const baseBody: Record<string, unknown> = {
         item_group: params.item_group,
         customer: user.customerId,
-        warehouse: user.defaultWarehouse,
+        warehouse: resolvedWarehouse,
         company: user.companyName,
         page: params.page || 1,
         page_size: params.page_size || 20,
@@ -75,7 +127,17 @@ export function useItems(params: UseItemsParams) {
           params.sortByQty === "asc" || params.sortByQty === "desc" ? params.sortByQty : undefined,
       })
 
-      const response = await apiClient.request<any>(endpoint, {
+      const extraParams = new URLSearchParams()
+      if (params.inStockOnly === true) {
+        extraParams.set("inStockOnly", "1")
+        extraParams.set("warehouse", String(resolvedWarehouse || ""))
+        if (!(params.sortByQty === "asc" || params.sortByQty === "desc")) {
+          extraParams.set("sortByRecommended", "1")
+        }
+      }
+      const endpointWithParams = extraParams.toString() ? `${endpoint}?${extraParams}` : endpoint
+
+      const response = await apiClient.request<any>(endpointWithParams, {
         method: "POST",
         body: JSON.stringify(body),
         auth: {
@@ -141,6 +203,8 @@ export function useSearch(
   options?: { sortByQty?: "asc" | "desc"; inStockOnly?: boolean | null }
 ) {
   const { user } = useAuth()
+  const { data: warehousesData } = useWarehousesByCustomerBranch()
+  const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
 
   const key =
     user && term && term.length >= 2
@@ -152,6 +216,7 @@ export function useSearch(
           user.customerId,
           options?.sortByQty,
           options?.inStockOnly,
+          resolvedWarehouse,
         ]
       : null
 
@@ -166,7 +231,7 @@ export function useSearch(
       const baseBody: Record<string, unknown> = {
         search_key: term,
         customer: user.customerId,
-        warehouse: user.defaultWarehouse,
+        warehouse: resolvedWarehouse,
         company: user.companyName,
         include_item_details: true,
         page: page,
@@ -180,7 +245,20 @@ export function useSearch(
 
       console.log(`[Search API] Request:`, requestBody)
 
-      const response = await apiClient.request<any>("/api/method/prosessed_orderit.orderit.search_items", {
+      const extraParams = new URLSearchParams()
+      if (options?.inStockOnly === true) {
+        extraParams.set("inStockOnly", "1")
+        extraParams.set("warehouse", String(resolvedWarehouse || ""))
+        if (!(options?.sortByQty === "asc" || options?.sortByQty === "desc")) {
+          extraParams.set("sortByRecommended", "1")
+        }
+      }
+      const endpoint =
+        extraParams.toString().length > 0
+          ? `/api/method/prosessed_orderit.orderit.search_items?${extraParams}`
+          : "/api/method/prosessed_orderit.orderit.search_items"
+
+      const response = await apiClient.request<any>(endpoint, {
         method: "POST",
         body: JSON.stringify(requestBody),
         auth: {
@@ -267,8 +345,10 @@ export function useItemDetails(itemCode: string | null, qty: number = 1) {
 
 export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
   const { user } = useAuth()
+  const { data: warehousesData } = useWarehousesByCustomerBranch()
+  const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
 
-  const key = user && params ? ["mostBought", params, user.customerId] : null
+  const key = user && params ? ["mostBought", params, user.customerId, resolvedWarehouse] : null
 
   return useSWR(
     key,
@@ -291,7 +371,7 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
         page: params.page || 1,
         page_size: params.page_size || 20,
         filterByBrand: filterByBrand,
-        warehouse: params.warehouse || user.defaultWarehouse,
+        warehouse: params.warehouse || resolvedWarehouse,
       }
       if (params.sortByQty === "asc" || params.sortByQty === "desc") {
         baseBody.sortByQty = params.sortByQty
@@ -306,7 +386,17 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
         inStockOnlyOverride: params.inStockOnly === true ? true : false,
       })
 
-      const response = await apiClient.request<any>(url, {
+      const extraParams = new URLSearchParams()
+      if (params.inStockOnly === true) {
+        extraParams.set("inStockOnly", "1")
+        extraParams.set("warehouse", String(params.warehouse || resolvedWarehouse || ""))
+        if (!(params.sortByQty === "asc" || params.sortByQty === "desc")) {
+          extraParams.set("sortByRecommended", "1")
+        }
+      }
+      const endpointWithParams = extraParams.toString() ? `${url}?${extraParams}` : url
+
+      const response = await apiClient.request<any>(endpointWithParams, {
         method: "POST",
         body: JSON.stringify(body),
         auth: {
@@ -558,13 +648,15 @@ export interface UseTaggedItemsOptions {
 
 export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptions) {
   const { user } = useAuth()
+  const { data: warehousesData } = useWarehousesByCustomerBranch()
+  const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
 
   const key = user
     ? [
         "taggedItems",
         user.customerId,
         user.companyName,
-        warehouse ?? user.defaultWarehouse,
+        warehouse ?? resolvedWarehouse,
         options?.sortByQty,
         options?.inStockOnly,
       ]
@@ -582,7 +674,7 @@ export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptio
         qty: "1.0",
         company: user.companyName || "",
         sortQtyField: "actual",
-        warehouse: warehouse || user.defaultWarehouse,
+        warehouse: warehouse || resolvedWarehouse,
       })
       appendOrderitToSearchParams(params, settings, {
         sortByQty:
