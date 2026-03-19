@@ -432,7 +432,7 @@ export function useQuotations(params?: UseQuotationsParams) {
   const startDate = params?.startDate ?? ""
   const endDate = params?.endDate ?? ""
 
-  const key = user ? ["quotations", user.email, startDate, endDate] : null
+  const key = user ? ["quotations", user.email, user.customerId, startDate, endDate] : null
 
   return useSWR(
     key,
@@ -442,6 +442,9 @@ export function useQuotations(params?: UseQuotationsParams) {
       const search = new URLSearchParams({
         owner: user.email,
       })
+      if (user.customerId) {
+        search.set("customer_name", user.customerId)
+      }
       if (startDate) search.set("startDate", toApiDate(startDate))
       if (endDate) search.set("endDate", toApiDate(endDate))
 
@@ -516,7 +519,7 @@ export function useSalesPersonOrders(params?: UseSalesPersonOrdersParams) {
   const endDate = params?.endDate ?? ""
 
   const key = user
-    ? ["salesPersonOrders", salesPerson, page, pageSize, startDate, endDate]
+    ? ["salesPersonOrders", user.customerId, salesPerson, page, pageSize, startDate, endDate]
     : null
 
   return useSWR(
@@ -530,6 +533,9 @@ export function useSalesPersonOrders(params?: UseSalesPersonOrdersParams) {
         page: String(page),
         page_size: String(pageSize),
       })
+      if (user.customerId) {
+        search.set("customer_name", user.customerId)
+      }
       if (salesPerson) {
         search.set("sales_person", salesPerson)
       }

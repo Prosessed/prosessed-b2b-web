@@ -10,16 +10,68 @@ import { useAuth } from "@/lib/auth/context"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice, formatDate } from "@/lib/utils/currency"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
-import { ArrowLeft, Package, FileText, User, MapPin, Phone, Mail } from "lucide-react"
+import { ArrowLeft, Package, FileText, User, MapPin, Phone, Mail, Loader2 } from "lucide-react"
 import { useParams } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
+import { fetchSalesOrderPdfBlob, useDefaultSalesOrderPrintFormat } from "@/lib/api/print"
+import { useCallback, useState } from "react"
 
 export default function OrderDetailPage() {
   const params = useParams()
   const id = typeof params?.id === "string" ? params.id : null
   const { user } = useAuth()
+  const defaultPrintFormat = useDefaultSalesOrderPrintFormat()
+  const [pdfLoading, setPdfLoading] = useState<"view" | "download" | null>(null)
+  const [pdfError, setPdfError] = useState<string>("")
   const { data: order, isLoading, error } = useOrderDetails(id)
   const currency = user?.defaultCurrency ?? "AUD"
+
+  const handleViewPdf = useCallback(async () => {
+    if (!user || !id) return
+    setPdfError("")
+    setPdfLoading("view")
+    try {
+      const { blob } = await fetchSalesOrderPdfBlob({
+        apiKey: user.apiKey,
+        apiSecret: user.apiSecret,
+        docname: id,
+        printFormat: defaultPrintFormat,
+      })
+      const url = URL.createObjectURL(blob)
+      window.open(url, "_blank", "noopener,noreferrer")
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e: any) {
+      setPdfError(e?.message || "Failed to generate PDF. Please try again.")
+    } finally {
+      setPdfLoading(null)
+    }
+  }, [user, id, defaultPrintFormat])
+
+  const handleDownloadPdf = useCallback(async () => {
+    if (!user || !id) return
+    setPdfError("")
+    setPdfLoading("download")
+    try {
+      const { blob, filename } = await fetchSalesOrderPdfBlob({
+        apiKey: user.apiKey,
+        apiSecret: user.apiSecret,
+        docname: id,
+        printFormat: defaultPrintFormat,
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename || `${id}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e: any) {
+      setPdfError(e?.message || "Failed to download PDF. Please try again.")
+    } finally {
+      setPdfLoading(null)
+    }
+  }, [user, id, defaultPrintFormat])
 
   if (!id) {
     return (
@@ -88,6 +140,42 @@ export default function OrderDetailPage() {
                   <p className="text-muted-foreground">{formatDate(orderDate)}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleViewPdf}
+                      disabled={pdfLoading != null}
+                      aria-label="View Sales Order Confirmation PDF"
+                    >
+                      {pdfLoading === "view" ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Opening...
+                        </>
+                      ) : (
+                        "View PDF"
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleDownloadPdf}
+                      disabled={pdfLoading != null}
+                      aria-label="Download Sales Order Confirmation PDF"
+                    >
+                      {pdfLoading === "download" ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Downloading...
+                        </>
+                      ) : (
+                        "Download"
+                      )}
+                    </Button>
+                  </div>
                   {workflowStatus && (
                     <Badge className="bg-primary/10 text-primary">{workflowStatus}</Badge>
                   )}
@@ -98,6 +186,11 @@ export default function OrderDetailPage() {
                   )}
                 </div>
               </div>
+              {pdfError && (
+                <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                  {pdfError}
+                </div>
+              )}
 
               <div className="grid gap-4 mb-6">
                 {m.customer_name && (

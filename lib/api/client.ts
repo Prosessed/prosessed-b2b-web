@@ -332,6 +332,70 @@ export const apiClient = {
 
 
 
+  /* ------------------ Generic Blob Request (PDF) ------------------ */
+  async requestBlob(
+    endpoint: string,
+    options: RequestInit & { auth?: AuthCredentials } = {}
+  ): Promise<{ blob: Blob; contentType: string; filename?: string }> {
+    const baseUrl = getApiBaseUrl()
+    const auth = options.auth ?? getAuthFromStorage()
+    const url = `${baseUrl}${endpoint}`
+    const method = options.method || "GET"
+
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      Accept: "application/pdf, application/octet-stream, */*",
+    })
+
+    if (options.headers) {
+      new Headers(options.headers).forEach((v, k) => headers.set(k, v))
+    }
+
+    const useTokenAuth = auth.apiKey && auth.apiSecret
+    if (useTokenAuth) {
+      headers.set("Authorization", `token ${auth.apiKey}:${auth.apiSecret}`)
+    }
+
+    apiLogger.request(method, url, headers, options.body)
+    const start = performance.now()
+
+    try {
+      const resp = await fetch(url, {
+        method,
+        headers,
+        body: options.body,
+        signal: options.signal,
+        credentials: "omit",
+      })
+      const timeMs = Math.round(performance.now() - start)
+
+      if (!resp.ok) {
+        let errMsg = resp.statusText
+        try {
+          const errJson = await resp.clone().json()
+          errMsg = errJson?.message || JSON.stringify(errJson)
+        } catch {}
+        apiLogger.response(url, resp.status, errMsg, timeMs)
+        throw new ApiError(resp.status, errMsg)
+      }
+
+      const contentType = resp.headers.get("content-type") || ""
+      const contentDisposition = resp.headers.get("content-disposition") || ""
+      const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i)
+      const filename = filenameMatch?.[1]
+        ? decodeURIComponent(filenameMatch[1].replace(/\"/g, ""))
+        : undefined
+
+      const blob = await resp.blob()
+      apiLogger.response(url, resp.status, `[${contentType}] blob (${blob.size} bytes)`, timeMs)
+      return { blob, contentType, filename }
+    } catch (err) {
+      const timeMs = Math.round(performance.now() - start)
+      apiLogger.error(url, err, timeMs)
+      throw err
+    }
+  },
+
   /* ------------------ Statements ------------------ */
   async getCustomerStatementUrl(
     customer: string,

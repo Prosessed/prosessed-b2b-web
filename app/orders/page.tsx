@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useSalesPersonOrders } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
+import { fetchSalesOrderPdfBlob, useDefaultSalesOrderPrintFormat } from "@/lib/api/print"
 import { formatPrice, formatDate } from "@/lib/utils/currency"
 import { motion } from "framer-motion"
-import { ArrowRight, Calendar, Package, User } from "lucide-react"
+import { ArrowRight, Calendar, Download, Eye, Loader2, Package, User } from "lucide-react"
 import Link from "next/link"
 import { useCallback, useMemo, useState } from "react"
 
@@ -39,9 +40,12 @@ const defaultStart = getDaysAgoISO(30)
 
 export default function OrdersPage() {
   const { user, isAuthenticated } = useAuth()
+  const defaultPrintFormat = useDefaultSalesOrderPrintFormat()
   const [startDate, setStartDate] = useState(defaultStart)
   const [endDate, setEndDate] = useState(defaultEnd)
   const [activePresetIndex, setActivePresetIndex] = useState<number>(1) // default: Last 30 days
+  const [pdfLoadingState, setPdfLoadingState] = useState<{ orderId: string; action: "view" | "download" } | null>(null)
+  const [pdfError, setPdfError] = useState<string>("")
 
   const { data, isLoading, error } = useSalesPersonOrders({
     page: 1,
@@ -50,6 +54,53 @@ export default function OrdersPage() {
     endDate: endDate || undefined,
   })
   const orders = data?.sales_orders ?? []
+
+  const handleViewPdf = useCallback(async (orderId: string) => {
+    if (!user) return
+    setPdfError("")
+    setPdfLoadingState({ orderId, action: "view" })
+    try {
+      const { blob } = await fetchSalesOrderPdfBlob({
+        apiKey: user.apiKey,
+        apiSecret: user.apiSecret,
+        docname: orderId,
+        printFormat: defaultPrintFormat,
+      })
+      const url = URL.createObjectURL(blob)
+      window.open(url, "_blank", "noopener,noreferrer")
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e: any) {
+      setPdfError(e?.message || "Failed to generate PDF. Please try again.")
+    } finally {
+      setPdfLoadingState(null)
+    }
+  }, [user, defaultPrintFormat])
+
+  const handleDownloadPdf = useCallback(async (orderId: string) => {
+    if (!user) return
+    setPdfError("")
+    setPdfLoadingState({ orderId, action: "download" })
+    try {
+      const { blob, filename } = await fetchSalesOrderPdfBlob({
+        apiKey: user.apiKey,
+        apiSecret: user.apiSecret,
+        docname: orderId,
+        printFormat: defaultPrintFormat,
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename || `${orderId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e: any) {
+      setPdfError(e?.message || "Failed to download PDF. Please try again.")
+    } finally {
+      setPdfLoadingState(null)
+    }
+  }, [user, defaultPrintFormat])
 
   const applyPreset = useCallback((presetIndex: number, preset: (typeof PRESETS)[number]) => {
     if ("days" in preset && preset.days) {
@@ -166,6 +217,11 @@ export default function OrdersPage() {
             <p className="text-destructive">Failed to load orders. Please try again.</p>
           </Card>
         )}
+        {pdfError && (
+          <Card className="mb-6 p-4 bg-destructive/10 border-destructive/20">
+            <p className="text-sm text-destructive">{pdfError}</p>
+          </Card>
+        )}
 
         {isLoading ? (
           <div className="grid gap-4">
@@ -190,9 +246,13 @@ export default function OrdersPage() {
           </Card>
         ) : orders.length > 0 ? (
           <div className="grid gap-4">
-            {orders.map((order: any) => (
-              <Link key={order.name} href={`/orders/${order.name}`} className="block group">
-                <Card className="p-6 hover:shadow-lg transition-shadow hover:border-primary/50 cursor-pointer">
+            {orders.map((order: any) => {
+              const isLoadingThisOrder = pdfLoadingState?.orderId === order.name
+              const isViewLoading = isLoadingThisOrder && pdfLoadingState?.action === "view"
+              const isDownloadLoading = isLoadingThisOrder && pdfLoadingState?.action === "download"
+              return (
+                <Link key={order.name} href={`/orders/${order.name}`} className="block group">
+                  <Card className="p-6 hover:shadow-lg transition-shadow hover:border-primary/50 cursor-pointer">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold group-hover:text-primary transition-colors">
@@ -202,7 +262,61 @@ export default function OrdersPage() {
                         {order.customer_name || "—"} · {formatDate(order.transaction_date)}
                       </p>
                     </div>
-                    {getStatusBadge(order.workflow_state)}
+                    <div className="flex items-center gap-2">
+                      <div className="hidden sm:flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleViewPdf(order.name)
+                          }}
+                          disabled={isLoadingThisOrder}
+                          aria-label={`View ${order.name} PDF`}
+                        >
+                          {isViewLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Opening...
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View PDF
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDownloadPdf(order.name)
+                          }}
+                          disabled={isLoadingThisOrder}
+                          aria-label={`Download ${order.name} PDF`}
+                        >
+                          {isDownloadLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Downloading...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      {getStatusBadge(order.workflow_state)}
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
@@ -214,26 +328,69 @@ export default function OrdersPage() {
                       <p className="text-sm font-medium">{formatDate(order.delivery_date)}</p>
                     </div>
                   </div>
+                  <div className="mt-4 flex gap-2 sm:hidden">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleViewPdf(order.name)
+                      }}
+                      disabled={isLoadingThisOrder}
+                      aria-label={`View ${order.name} PDF`}
+                    >
+                      {isViewLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Opening...
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View PDF
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleDownloadPdf(order.name)
+                      }}
+                      disabled={isLoadingThisOrder}
+                      aria-label={`Download ${order.name} PDF`}
+                    >
+                      {isDownloadLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Downloading...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   <div className="flex justify-end pt-4 border-t">
                     <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
-                </Card>
-              </Link>
-            ))}
+                  </Card>
+                </Link>
+              )
+            })}
           </div>
         ) : null}
 
-        <Card className="mt-8 p-6 bg-primary/5 border-primary/10">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold mb-1">Need help?</h3>
-              <p className="text-sm text-muted-foreground">Contact support for order queries</p>
-            </div>
-            <Button variant="outline" asChild>
-              <Link href="/contact">Contact</Link>
-            </Button>
-          </div>
-        </Card>
+        
       </div>
     </div>
   )
