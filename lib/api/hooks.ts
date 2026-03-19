@@ -724,10 +724,28 @@ export interface Deal {
   image_url: string
   redirect_url?: string | null
 }
+
+export interface AnnouncementPopupConfig {
+  enabled?: boolean
+  image_url?: string | null
+  redirect_url?: string | null
+  start_date?: string | null
+  end_date?: string | null
+}
+
+export interface SocialHandlesConfig {
+  instagram_url?: string | null
+  facebook_url?: string | null
+  twitter_url?: string | null
+  linkedin_url?: string | null
+  youtube_url?: string | null
+}
 export interface BannersAndDealsResponse {
   company_logo?: string
   banners: Banner[]
   deals: Deal[]
+  announcement_popup?: AnnouncementPopupConfig | null
+  social_handles?: SocialHandlesConfig | null
 }
 
 export function useBannersAndDeals() {
@@ -753,6 +771,8 @@ export function useBannersAndDeals() {
           company_logo: undefined,
           banners: [],
           deals: [],
+          announcement_popup: null,
+          social_handles: null,
         } as BannersAndDealsResponse
       }
     },

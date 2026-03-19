@@ -28,6 +28,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { AnnouncementPopup } from "@/components/announcement-popup"
 
 export function Navigation() {
   const { user, logout, isAuthenticated } = useAuth()
@@ -87,10 +88,12 @@ export function Navigation() {
   const companyName = isAuthenticated && user
     ? (user.companyName || user.companyUrl.replace(/https?:\/\//, "").split(".")[0] || "B2B Portal")
     : "B2B Portal"
+  const isLoginRoute = pathname.startsWith("/login")
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center gap-4 px-4">
+    <>
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+        <div className="container mx-auto flex h-16 items-center gap-4 px-4">
         {/* Company Logo */}
         <Link href="/" className="flex items-center min-w-0 shrink-0">
           {companyLogo ? (
@@ -409,7 +412,12 @@ export function Navigation() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
-    </header>
+        </div>
+      </header>
+      <AnnouncementPopup
+        announcement={bannersData?.announcement_popup ?? null}
+        disabled={isLoginRoute}
+      />
+    </>
   )
 }

@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import type { ComponentType } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Mail, Phone, Globe, MapPin } from "lucide-react"
+import { Mail, Phone, Globe, MapPin, Instagram, Facebook, Twitter, Linkedin, Youtube } from "lucide-react"
 import { apiClient } from "@/lib/api/client"
 import { useAuth } from "@/lib/auth/context"
+import { useBannersAndDeals } from "@/lib/api/hooks"
 
 interface CompanyDetails {
   company_name: string
@@ -38,6 +40,7 @@ export function Footer() {
   const [branding, setBranding] = useState<CompanyDetails | null>(null)
   const { isAuthenticated } = useAuth()
   const pathname = usePathname()
+  const { data: bannersData } = useBannersAndDeals()
 
   const isLoginRoute = pathname.startsWith("/login")
 
@@ -66,6 +69,25 @@ export function Footer() {
     branding?.website?.startsWith("http") ? branding.website : `https://${branding?.website ?? ""}`
 
   const hasBranding = branding && (branding.company_name || branding.email || branding.address)
+
+  const social = bannersData?.social_handles
+  const socialLinks: Array<{
+    key: string
+    label: string
+    url: string
+    icon: ComponentType<{ className?: string }>
+  }> = [
+    social?.instagram_url ? { key: "instagram", label: "Instagram", url: social.instagram_url, icon: Instagram } : null,
+    social?.facebook_url ? { key: "facebook", label: "Facebook", url: social.facebook_url, icon: Facebook } : null,
+    social?.twitter_url ? { key: "twitter", label: "Twitter", url: social.twitter_url, icon: Twitter } : null,
+    social?.linkedin_url ? { key: "linkedin", label: "LinkedIn", url: social.linkedin_url, icon: Linkedin } : null,
+    social?.youtube_url ? { key: "youtube", label: "YouTube", url: social.youtube_url, icon: Youtube } : null,
+  ].filter(Boolean) as Array<{
+    key: string
+    label: string
+    url: string
+    icon: ComponentType<{ className?: string }>
+  }>
 
   return (
     <footer className="bg-muted/30 border-t mt-16">
@@ -154,6 +176,30 @@ export function Footer() {
               Statement
             </p>
           </FooterColumn>
+
+          {/* Social links */}
+          {socialLinks.length > 0 && (
+            <FooterColumn title="Social" className="text-center sm:text-left lg:col-span-4">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+                {socialLinks.map((s) => {
+                  const Icon = s.icon
+                  return (
+                    <a
+                      key={s.key}
+                      href={s.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full bg-background/60 hover:bg-background border border-border/60 px-3 py-2 text-sm font-semibold text-foreground/90 hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
+                      aria-label={s.label}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{s.label}</span>
+                    </a>
+                  )
+                })}
+              </div>
+            </FooterColumn>
+          )}
         </div>
 
         {/* Bottom bar */}
