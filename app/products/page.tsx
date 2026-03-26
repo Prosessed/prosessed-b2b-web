@@ -168,6 +168,7 @@ export default function ProductsPage() {
       const settings = await fetchOrderitSettings({
         apiKey: user.apiKey,
         apiSecret: user.apiSecret,
+        sid: user.sid,
       })
       const showInStockOnly =
         settings?.show_in_stock_only === 1 ||

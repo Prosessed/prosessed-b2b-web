@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedUser = authStorage.getUser()
     if (storedUser) {
-      if (authStorage.isSessionValid(storedUser.apiSecret)) {
+      if (authStorage.isSessionValid(storedUser.sid)) {
         setApiBaseUrl(storedUser.companyUrl)
         setUser(storedUser)
         // Sync auth cookie so server-rendered pages (e.g. /quotes) have session
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setApiBaseUrl(userData.companyUrl)
     setUser(userData)
     authStorage.setUser(userData)
-    authStorage.setSession(userData.apiSecret)
+    authStorage.setSession(userData.sid)
   }
 
   const logout = () => {

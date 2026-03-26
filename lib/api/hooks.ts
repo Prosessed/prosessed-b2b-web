@@ -17,7 +17,7 @@ type WarehousesByCustomerBranchResponse = {
 }
 
 const getWarehousesByCustomerBranch = async (
-  auth: { apiKey: string; apiSecret: string },
+  auth: { apiKey?: string | null; apiSecret?: string | null; sid?: string | null },
   customerId: string,
   company?: string | null
 ) => {
@@ -48,7 +48,7 @@ export const useWarehousesByCustomerBranch = (customerIdOverride?: string | null
     key,
     async () => {
       if (!user || !customerId) return null
-      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret }
+      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret, sid: user.sid }
       return await getWarehousesByCustomerBranch(auth, customerId, user.companyName)
     },
     {
@@ -95,7 +95,7 @@ export function useItems(params: UseItemsParams) {
         ? "/api/method/prosessed_orderit.orderit.get_items_from_item_group_vtwo"
         : "/api/method/prosessed_orderit.orderit_app.apis.quickaccess.all_items.all_items.get_all_items_card_v2"
 
-      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret }
+      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret, sid: user.sid }
       const settings = await fetchOrderitSettings(auth)
 
       const baseBody: Record<string, unknown> = {
@@ -143,6 +143,7 @@ export function useItems(params: UseItemsParams) {
         auth: {
           apiKey: user.apiKey,
           apiSecret: user.apiSecret,
+          sid: user.sid,
         },
       })
 
@@ -225,7 +226,7 @@ export function useSearch(
     async () => {
       if (!user || !term || term.length < 2) return null
 
-      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret }
+      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret, sid: user.sid }
       const settings = await fetchOrderitSettings(auth)
 
       const baseBody: Record<string, unknown> = {
@@ -264,6 +265,7 @@ export function useSearch(
         auth: {
           apiKey: user.apiKey,
           apiSecret: user.apiSecret,
+          sid: user.sid,
         },
       })
 
@@ -322,6 +324,7 @@ export function useItemDetails(itemCode: string | null, qty: number = 1) {
         auth: {
           apiKey: user.apiKey,
           apiSecret: user.apiSecret,
+          sid: user.sid,
         },
       })
       console.log(`[Item Details API] POST /api/method/prosessed_orderit.orderit.get_item_details - Item: ${itemCode} - Status: OK`)
@@ -361,7 +364,7 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
       }
 
       const url = "/api/method/prosessed_orderit.orderit.get_most_bought_items_vtwo"
-      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret }
+      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret, sid: user.sid }
       const settings = await fetchOrderitSettings(auth)
 
       const baseBody: Record<string, unknown> = {
@@ -402,6 +405,7 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
         auth: {
           apiKey: user.apiKey,
           apiSecret: user.apiSecret,
+          sid: user.sid,
         },
       })
       const items = response?.message?.items || response?.items || []
@@ -455,6 +459,7 @@ export function useQuotations(params?: UseQuotationsParams) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
+            sid: user.sid,
           },
         }
       )
@@ -490,6 +495,7 @@ export function useQuotationDetails(quotationId: string | null) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
+            sid: user.sid,
           },
         }
       )
@@ -548,6 +554,7 @@ export function useSalesPersonOrders(params?: UseSalesPersonOrdersParams) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
+            sid: user.sid,
           },
         }
       )
@@ -579,6 +586,7 @@ export function useOrderDetails(orderId: string | null) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
+            sid: user.sid,
           },
         }
       )
@@ -604,6 +612,7 @@ export function useCustomerDetails(customerId: string | null) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
+            sid: user.sid,
           },
         }
       )
@@ -632,6 +641,7 @@ export function useCustomerName(customerId: string | null) {
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
+            sid: user.sid,
           },
         }
       )
@@ -672,7 +682,7 @@ export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptio
     key,
     async () => {
       if (!user) return null
-      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret }
+      const auth = { apiKey: user.apiKey, apiSecret: user.apiSecret, sid: user.sid }
       const settings = await fetchOrderitSettings(auth)
 
       const params = new URLSearchParams({
@@ -698,6 +708,7 @@ export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptio
           auth: {
             apiKey: user.apiKey,
             apiSecret: user.apiSecret,
+            sid: user.sid,
           },
         }
       )
