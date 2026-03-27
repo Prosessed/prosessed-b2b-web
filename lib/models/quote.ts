@@ -37,7 +37,7 @@ export class QuoteModel {
         {
           method: "GET",
           headers: {
-            Authorization: `token ${session.user.apiKey}:${session.user.apiSecret}`,
+            Authorization: `Bearer ${session.user.sid}`,
             "Content-Type": "application/json",
           },
         }
@@ -89,7 +89,7 @@ export class QuoteModel {
         {
           method: "GET",
           headers: {
-            Authorization: `token ${session.user.apiKey}:${session.user.apiSecret}`,
+            Authorization: `Bearer ${session.user.sid}`,
             "Content-Type": "application/json",
           },
         }

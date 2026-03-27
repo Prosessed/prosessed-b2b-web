@@ -32,8 +32,7 @@ export default function OrderDetailPage() {
     setPdfLoading("view")
     try {
       const { blob } = await fetchSalesOrderPdfBlob({
-        apiKey: user.apiKey,
-        apiSecret: user.apiSecret,
+        sid: user.sid,
         docname: id,
         printFormat: defaultPrintFormat,
       })
@@ -53,8 +52,7 @@ export default function OrderDetailPage() {
     setPdfLoading("download")
     try {
       const { blob, filename } = await fetchSalesOrderPdfBlob({
-        apiKey: user.apiKey,
-        apiSecret: user.apiSecret,
+        sid: user.sid,
         docname: id,
         printFormat: defaultPrintFormat,
       })

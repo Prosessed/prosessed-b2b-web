@@ -21,6 +21,7 @@ let currentBaseUrl = ""
 interface AuthCredentials {
   apiKey?: string | null
   apiSecret?: string | null
+  sid?: string | null
 }
 
 /* ============================================================
@@ -31,15 +32,38 @@ const getAuthFromStorage = (): AuthCredentials => {
   if (typeof window === "undefined") return {}
 
   try {
-    const raw = localStorage.getItem("auth-storage")
-    if (!raw) return {}
+    // AuthProvider (current implementation)
+    const rawUser = localStorage.getItem("prosessed_auth")
+    if (rawUser) {
+      const parsedUser = JSON.parse(rawUser)
 
-    const parsed = JSON.parse(raw)
+      // Only use sid when the client-side session is still valid.
+      const rawSession = localStorage.getItem("prosessed_session")
+      if (rawSession) {
+        const session = JSON.parse(rawSession)
+        if (typeof session?.sid === "string" && typeof parsedUser?.sid === "string") {
+          if (session.sid !== parsedUser.sid) return {}
+        }
+      }
+
+      return {
+        apiKey: parsedUser?.apiKey ?? null,
+        apiSecret: parsedUser?.apiSecret ?? null,
+        sid: parsedUser?.sid ?? null,
+      }
+    }
+
+    // Legacy Zustand store (if still present)
+    const rawLegacy = localStorage.getItem("auth-storage")
+    if (!rawLegacy) return {}
+
+    const parsed = JSON.parse(rawLegacy)
     const state = parsed?.state
 
     return {
       apiKey: state?.apiKey || null,
       apiSecret: state?.apiSecret || null,
+      sid: state?.sid || null,
     }
   } catch {
     return {}
@@ -84,7 +108,12 @@ const sanitizeHeaders = (headers?: HeadersInit) => {
   if (!headers) return headers
   const h = new Headers(headers)
   if (h.has("Authorization")) {
-    h.set("Authorization", "token ***:***")
+    const value = h.get("Authorization") || ""
+    if (value.toLowerCase().startsWith("bearer")) {
+      h.set("Authorization", "Bearer ***")
+    } else {
+      h.set("Authorization", "token ***:***")
+    }
   }
   return Object.fromEntries(h.entries())
 }
@@ -285,9 +314,13 @@ export const apiClient = {
       new Headers(options.headers).forEach((v, k) => headers.set(k, v))
     }
 
+    const sid = typeof auth.sid === "string" ? auth.sid.trim() : ""
+    const useBearerAuth = sid.length > 0
     const useTokenAuth = auth.apiKey && auth.apiSecret
 
-    if (useTokenAuth) {
+    if (useBearerAuth) {
+      headers.set("Authorization", `Bearer ${sid}`)
+    } else if (useTokenAuth) {
       headers.set("Authorization", `token ${auth.apiKey}:${auth.apiSecret}`)
     }
 
@@ -351,8 +384,13 @@ export const apiClient = {
       new Headers(options.headers).forEach((v, k) => headers.set(k, v))
     }
 
+    const sid = typeof auth.sid === "string" ? auth.sid.trim() : ""
+    const useBearerAuth = sid.length > 0
     const useTokenAuth = auth.apiKey && auth.apiSecret
-    if (useTokenAuth) {
+
+    if (useBearerAuth) {
+      headers.set("Authorization", `Bearer ${sid}`)
+    } else if (useTokenAuth) {
       headers.set("Authorization", `token ${auth.apiKey}:${auth.apiSecret}`)
     }
 
@@ -410,7 +448,11 @@ export const apiClient = {
       "Content-Type": "application/json",
       Accept: "application/pdf, application/octet-stream, */*",
     })
-    if (auth.apiKey && auth.apiSecret) {
+    const sid = typeof auth.sid === "string" ? auth.sid.trim() : ""
+    const useBearerAuth = sid.length > 0
+    if (useBearerAuth) {
+      headers.set("Authorization", `Bearer ${sid}`)
+    } else if (auth.apiKey && auth.apiSecret) {
       headers.set("Authorization", `token ${auth.apiKey}:${auth.apiSecret}`)
     }
 

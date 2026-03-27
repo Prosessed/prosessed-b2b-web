@@ -17,13 +17,14 @@ export type OrderitSettings = {
 const isTruthyOne = (v: unknown): boolean =>
   v === 1 || v === "1" || v === true
 
-type Auth = { apiKey: string; apiSecret: string }
+type Auth = { apiKey?: string | null; apiSecret?: string | null; sid?: string | null }
 
 /** Short-lived cache per auth fingerprint to avoid N+1 before each product call. */
 const cache = new Map<string, { settings: OrderitSettings | null; expires: number }>()
 const TTL_MS = 60_000
 
-const cacheKey = (auth: Auth) => `${auth.apiKey}:${auth.apiSecret}`.slice(0, 80)
+const cacheKey = (auth: Auth) =>
+  (auth.sid ? `sid:${auth.sid}` : `${auth.apiKey}:${auth.apiSecret}`).slice(0, 80)
 
 /**
  * Fetch OrderIT settings once (per auth) before product APIs.

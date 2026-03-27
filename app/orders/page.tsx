@@ -61,8 +61,7 @@ export default function OrdersPage() {
     setPdfLoadingState({ orderId, action: "view" })
     try {
       const { blob } = await fetchSalesOrderPdfBlob({
-        apiKey: user.apiKey,
-        apiSecret: user.apiSecret,
+        sid: user.sid,
         docname: orderId,
         printFormat: defaultPrintFormat,
       })
@@ -82,8 +81,7 @@ export default function OrdersPage() {
     setPdfLoadingState({ orderId, action: "download" })
     try {
       const { blob, filename } = await fetchSalesOrderPdfBlob({
-        apiKey: user.apiKey,
-        apiSecret: user.apiSecret,
+        sid: user.sid,
         docname: orderId,
         printFormat: defaultPrintFormat,
       })

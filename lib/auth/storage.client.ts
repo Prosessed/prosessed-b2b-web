@@ -19,20 +19,20 @@ export const authStorage = {
     localStorage.removeItem(SESSION_STORAGE_KEY)
   },
 
-  getSession(): { apiSecret: string } | null {
+  getSession(): { sid: string } | null {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY)
     return stored ? JSON.parse(stored) : null
   },
 
-  setSession(apiSecret: string) {
+  setSession(sid: string) {
     localStorage.setItem(
       SESSION_STORAGE_KEY,
-      JSON.stringify({ apiSecret })
+      JSON.stringify({ sid })
     )
   },
 
-  isSessionValid(currentApiSecret: string): boolean {
+  isSessionValid(currentSid: string): boolean {
     const session = this.getSession()
-    return session ? session.apiSecret === currentApiSecret : false
+    return session ? session.sid === currentSid : false
   },
 }

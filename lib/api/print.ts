@@ -21,7 +21,7 @@ export const usePrintFormatsForDoctype = (doctype?: string | null) => {
         {
           method: "POST",
           body: JSON.stringify({ doctype: dt }),
-          auth: { apiKey: user.apiKey, apiSecret: user.apiSecret },
+          auth: { apiKey: user.apiKey, apiSecret: user.apiSecret, sid: user.sid },
         }
       )
       const raw = response?.message ?? response
@@ -39,8 +39,7 @@ export const useDefaultSalesOrderPrintFormat = () => {
 }
 
 export const fetchSalesOrderPdfBlob = async (args: {
-  apiKey: string
-  apiSecret: string
+  sid: string
   docname: string
   printFormat: string
 }) => {
@@ -53,7 +52,7 @@ export const fetchSalesOrderPdfBlob = async (args: {
         docname: args.docname,
         print_format: args.printFormat,
       }),
-      auth: { apiKey: args.apiKey, apiSecret: args.apiSecret },
+      auth: { sid: args.sid },
     }
   )
   return { blob, filename }
