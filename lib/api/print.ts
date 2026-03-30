@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth/context"
 type PrintFormat = { name?: string }
 
 export const DEFAULT_SALES_ORDER_PRINT_FORMAT = "Sales Order Confirmation"
+export const DEFAULT_SALES_INVOICE_PRINT_FORMAT = "Sales Invoice"
 
 export const usePrintFormatsForDoctype = (doctype?: string | null) => {
   const { user } = useAuth()
@@ -49,6 +50,34 @@ export const fetchSalesOrderPdfBlob = async (args: {
       method: "POST",
       body: JSON.stringify({
         doctype: "Sales Order",
+        docname: args.docname,
+        print_format: args.printFormat,
+      }),
+      auth: { sid: args.sid },
+    }
+  )
+  return { blob, filename }
+}
+
+export const useDefaultSalesInvoicePrintFormat = () => {
+  const { data: formats = [] } = usePrintFormatsForDoctype("Sales Invoice")
+  const hasDefault = formats.some((f) => f?.name === DEFAULT_SALES_INVOICE_PRINT_FORMAT)
+  return hasDefault
+    ? DEFAULT_SALES_INVOICE_PRINT_FORMAT
+    : (formats?.[0]?.name ?? DEFAULT_SALES_INVOICE_PRINT_FORMAT)
+}
+
+export const fetchSalesInvoicePdfBlob = async (args: {
+  sid: string
+  docname: string
+  printFormat: string
+}) => {
+  const { blob, filename } = await apiClient.requestBlob(
+    "/api/method/prosessed_orderit.orderit.get_print_pdf",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        doctype: "Sales Invoice",
         docname: args.docname,
         print_format: args.printFormat,
       }),
