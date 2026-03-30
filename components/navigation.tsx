@@ -389,6 +389,9 @@ export function Navigation() {
                   <Link href="/orders">My Orders</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
+                  <Link href="/my-invoices">My Invoices</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
                   <Link href="/quotes">My Quotes</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">

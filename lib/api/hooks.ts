@@ -829,3 +829,114 @@ export function useCustomerStatement(
     }
   )
 }
+
+export interface PaginationInfo {
+  total_records?: number
+  has_next_page?: boolean
+}
+
+export interface UseAllInvoicesParams {
+  page?: number
+  pageSize?: number
+}
+
+export function useAllInvoices(params?: UseAllInvoicesParams) {
+  const { user } = useAuth()
+  const page = params?.page ?? 1
+  const pageSize = params?.pageSize ?? 10
+
+  const limitStart = Math.max(0, (page - 1) * pageSize)
+  const limitPageLength = Math.max(1, pageSize)
+
+  const key = user ? ["allInvoices", user.customerId, page, pageSize, user.apiKey] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user) return { invoices: [], pagination: {} as PaginationInfo }
+
+      const search = new URLSearchParams({
+        limit_start: String(limitStart),
+        limit_page_length: String(limitPageLength),
+      })
+
+      const response = await apiClient.request<any>(
+        `/api/method/prosessed_orderit.orderit.get_all_invoices?${search.toString()}`,
+        {
+          method: "GET",
+          auth: {
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            sid: user.sid,
+          },
+        }
+      )
+
+      const raw = response?.message ?? response
+      const invoices =
+        (Array.isArray(raw?.invoices) && raw.invoices) ||
+        (Array.isArray(raw?.items) && raw.items) ||
+        (Array.isArray(raw) && raw) ||
+        []
+
+      const totalRecords =
+        typeof raw?.total_records === "number"
+          ? raw.total_records
+          : typeof raw?.totalRecords === "number"
+            ? raw.totalRecords
+            : typeof raw?.total === "number"
+              ? raw.total
+              : typeof response?.total_records === "number"
+                ? response.total_records
+                : undefined
+
+      const hasNextPage =
+        typeof totalRecords === "number"
+          ? limitStart + limitPageLength < totalRecords
+          : typeof raw?.has_next_page === "boolean"
+            ? raw.has_next_page
+            : typeof raw?.pagination?.has_next_page === "boolean"
+              ? raw.pagination.has_next_page
+              : undefined
+
+      const pagination: PaginationInfo = {
+        total_records: totalRecords,
+        has_next_page: hasNextPage,
+      }
+
+      return { invoices, pagination }
+    },
+    {
+      revalidateOnFocus: false,
+      keepPreviousData: true,
+    }
+  )
+}
+
+export function useInvoiceDetails(invoiceId: string | null) {
+  const { user } = useAuth()
+
+  const key = user && invoiceId ? ["invoiceDetails", invoiceId, user.apiKey] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user || !invoiceId) return null
+
+      const response = await apiClient.request<any>(
+        `/api/method/prosessed_orderit.orderit.get_invoice_details?invoice_id=${encodeURIComponent(invoiceId)}`,
+        {
+          method: "GET",
+          auth: {
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            sid: user.sid,
+          },
+        }
+      )
+
+      return response?.message ?? null
+    },
+    { revalidateOnFocus: false }
+  )
+}
