@@ -15,6 +15,7 @@ import { useItemDetails } from "@/lib/api/hooks"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
+import { useWarehousesByCustomerBranch } from "@/lib/api/hooks"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
@@ -34,6 +35,8 @@ export default function ProductDetailPage() {
   const { user } = useAuth()
   const { addItem, cart, updateItem } = useCartContext()
   const { openDrawer } = useCartDrawer()
+  const { data: warehousesData } = useWarehousesByCustomerBranch()
+  const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
   const { data, isLoading, error } = useItemDetails(itemCode, quantity)
 
   // Check if item is already in cart
@@ -117,7 +120,7 @@ export default function ProductDetailPage() {
           item_code: product.item_code,
           qty: quantity,
           rate: currentRate,
-          warehouse: user.defaultWarehouse,
+          warehouse: resolvedWarehouse,
           uom: selectedUom || product.uom || product.stock_uom,
           custom_quotation_item_details: note || undefined,
         })

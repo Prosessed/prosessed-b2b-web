@@ -394,8 +394,8 @@ export function Navigation() {
                 <DropdownMenuItem asChild>
                   <Link href="/quotes">My Quotes</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
-                  My Statements
+                <DropdownMenuItem asChild>
+                  <Link href="/statements">My Statements</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
