@@ -303,9 +303,11 @@ export interface UseMostBoughtItemsParams {
 
 export function useItemDetails(itemCode: string | null, qty: number = 1) {
   const { user } = useAuth()
+  const { data: warehousesData } = useWarehousesByCustomerBranch()
+  const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
 
   // Don't include qty in key to avoid refetching on quantity change - price calculation happens client-side
-  const key = user && itemCode ? ["itemDetails", itemCode, user.customerId, user.defaultWarehouse] : null
+  const key = user && itemCode ? ["itemDetails", itemCode, user.customerId, resolvedWarehouse] : null
 
   return useSWR(
     key,
@@ -318,7 +320,7 @@ export function useItemDetails(itemCode: string | null, qty: number = 1) {
           item_code: itemCode,
           customer: user.customerId,
           qty: qty,
-          warehouse: user.defaultWarehouse,
+          warehouse: resolvedWarehouse,
           company: user.companyName,
         }),
         auth: {
@@ -633,7 +635,7 @@ export function useCustomerName(customerId: string | null) {
       if (!user || !customerId) return null
 
       const response = await apiClient.request<any>(
-        `/api/method/prosessed_orderit.orderit.get_customer_name?customer_id=${encodeURIComponent(
+        `/api/method/prosessed_orderit.orderit.get_customer_names?customer_id=${encodeURIComponent(
           customerId
         )}`,
         {
@@ -757,6 +759,14 @@ export interface BannersAndDealsResponse {
   deals: Deal[]
   announcement_popup?: AnnouncementPopupConfig | null
   social_handles?: SocialHandlesConfig | null
+  /**
+   * Controls whether the backend should create a Sales Order vs a Quotation
+   * when submitting the cart.
+   */
+  order_quote_logic?: {
+    create_order?: number | null
+    create_quote?: number | null
+  } | null
 }
 
 export function useBannersAndDeals() {
@@ -784,6 +794,8 @@ export function useBannersAndDeals() {
           deals: [],
           announcement_popup: null,
           social_handles: null,
+          // Default to existing behavior: quotations.
+          order_quote_logic: { create_order: 0, create_quote: 1 },
         } as BannersAndDealsResponse
       }
     },

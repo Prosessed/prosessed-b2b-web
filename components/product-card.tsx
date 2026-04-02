@@ -17,6 +17,7 @@ import { Loader2, Minus, Plus } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
+import { useWarehousesByCustomerBranch } from "@/lib/api/hooks"
 
 interface ProductCardProps {
   view?: "grid" | "list"
@@ -55,7 +56,9 @@ export function ProductCard({
   const { cart, addItem, updateItem, removeItem, isLoading: cartLoading } = useCartContext()
   const { openDrawer } = useCartDrawer()
   const { user } = useAuth()
+  const { data: warehousesData } = useWarehousesByCustomerBranch()
   const [isMutating, setIsMutating] = useState(false)
+  const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
 
   const cartItem = cart?.items?.find((item) => item.item_code === id)
   const quantity = cartItem?.qty || 0
@@ -76,7 +79,7 @@ export function ProductCard({
         item_code: id,
         qty: 1,
         rate: itemRate,
-        warehouse: user.defaultWarehouse,
+        warehouse: resolvedWarehouse,
         uom: displayUnit,
       })
       await new Promise((r) => setTimeout(r, 100))
@@ -88,7 +91,7 @@ export function ProductCard({
     } finally {
       setIsMutating(false)
     }
-  }, [cart?.items?.length, id, price, rate, displayUnit, user, addItem, openDrawer])
+  }, [cart?.items?.length, id, price, rate, displayUnit, user, resolvedWarehouse, addItem, openDrawer])
 
   const increment = useCallback(async () => {
     if (!user || !cartItem) return
@@ -134,12 +137,12 @@ export function ProductCard({
           item_code: id,
           qty: n,
           rate: itemRate,
-          warehouse: user.defaultWarehouse,
+          warehouse: resolvedWarehouse,
           uom: displayUnit,
         })
       }
     },
-    [user, cartItem, id, rate, price, displayUnit, addItem, updateItem, removeItem]
+    [user, cartItem, id, rate, price, displayUnit, resolvedWarehouse, addItem, updateItem, removeItem]
   )
 
   const handleQtyInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

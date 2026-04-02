@@ -177,6 +177,14 @@ export interface ModifyCartResponse {
 export interface SubmitCartParams {
   quotation_id: string
   signature_base64?: string
+  /**
+   * Backend toggle: create Sales Order vs create Quotation.
+   * Expected shape (from backend): { create_order: 1|0, create_quote: 1|0 }
+   */
+  order_quote_logic?: {
+    create_order?: number | null
+    create_quote?: number | null
+  } | null
 }
 
 export interface SubmitCartResponse {
@@ -185,6 +193,25 @@ export interface SubmitCartResponse {
   quotation_id: string
   workflow_state: string
   signature_url?: string
+}
+
+/* =========================
+   CREATE SALES ORDER FROM CART
+========================= */
+export interface CreateSalesOrderFromCartParams {
+  quotation_id: string
+  latitude: string
+  longitude: string
+  /** Expected format: YYYY-MM-DD */
+  delivery_date: string
+}
+
+export interface CreateSalesOrderFromCartResponse {
+  status: "success" | "error" | "info"
+  message: string
+  order_id?: string
+  sales_order_id?: string
+  workflow_state?: string
 }
 
 /* =========================
@@ -306,6 +333,26 @@ export async function submitCart(
 
   return apiClient.request<SubmitCartResponse>(
     "/api/method/prosessed_orderit.orderit.submit_cart_quotation",
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+      auth: {
+        apiKey: user.apiKey,
+        apiSecret: user.apiSecret,
+        sid: user.sid,
+      },
+    }
+  )
+}
+
+export async function createSalesOrderFromCart(
+  params: CreateSalesOrderFromCartParams,
+  user: AuthUser
+): Promise<CreateSalesOrderFromCartResponse> {
+  if (!user) throw new Error("User not authenticated")
+
+  return apiClient.request<CreateSalesOrderFromCartResponse>(
+    "/api/method/prosessed_orderit.orderit.create_sales_order_from_cart",
     {
       method: "POST",
       body: JSON.stringify(params),

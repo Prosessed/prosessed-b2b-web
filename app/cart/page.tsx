@@ -27,10 +27,12 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useBannersAndDeals } from "@/lib/api/hooks"
 
 export default function CartPage() {
   const router = useRouter()
   const { user } = useAuth()
+  const { data: bannersData, isLoading: bannersLoading } = useBannersAndDeals()
   const currency = user?.defaultCurrency ?? "AUD"
   const {
     cart,
@@ -39,6 +41,7 @@ export default function CartPage() {
     updateItem,
     removeItem,
     submitQuotation,
+    placeOrder,
     clearCart,
     updateCart,
   } = useCartContext()
@@ -50,7 +53,8 @@ export default function CartPage() {
 
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [submitSuccess, setSubmitSuccess] = useState<null | "quote" | "order">(null)
+  const [submitError, setSubmitError] = useState<string>("")
   const [isClearing, setIsClearing] = useState(false)
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({})
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -175,19 +179,77 @@ export default function CartPage() {
     [removeItem]
   )
 
-  const handleSubmitQuotation = useCallback(async () => {
-    setIsSubmitting(true)
-    try {
-      await submitQuotation()
-      setSubmitSuccess(true)
-      // Brief success feedback then redirect to My Quotes
-      await new Promise((resolve) => setTimeout(resolve, 800))
-      router.push("/quotes")
-    } catch (error) {
-      console.error("Failed to submit quotation:", error)
-      setIsSubmitting(false)
+  const resolvedOrderQuoteLogic = useMemo(() => {
+    const createOrder = bannersData?.order_quote_logic?.create_order ?? 0
+    const createQuote = bannersData?.order_quote_logic?.create_quote ?? 0
+
+    // If backend explicitly disables both, keep existing user experience:
+    // show quote option by default.
+    if (createOrder === 0 && createQuote === 0) {
+      return { create_order: 0, create_quote: 1 }
     }
-  }, [submitQuotation, router])
+
+    return {
+      create_order: createOrder,
+      create_quote: createQuote,
+    }
+  }, [bannersData?.order_quote_logic])
+
+  const canCreateQuote = resolvedOrderQuoteLogic.create_quote === 1
+  const canCreateOrder = resolvedOrderQuoteLogic.create_order === 1
+  const primaryAction: "quote" | "order" = canCreateOrder ? "order" : "quote"
+
+  const getTomorrowDate = useCallback((): string => {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }, [])
+
+  // TEMPORARY:
+  // For now we are NOT requesting geolocation permissions.
+  // Hard-coded sample coordinates:
+  const hardcodedLatitude = "23.0225"
+  const hardcodedLongitude = "72.5714"
+
+  const handleSubmit = useCallback(
+    async (action: "quote" | "order") => {
+      if (!canCreateQuote && !canCreateOrder) return
+
+      setIsSubmitting(true)
+      setSubmitError("")
+      try {
+        if (action === "order") {
+          const delivery_date = getTomorrowDate()
+          await placeOrder({
+            latitude: hardcodedLatitude,
+            longitude: hardcodedLongitude,
+            delivery_date,
+          })
+          setSubmitSuccess("order")
+          await new Promise((resolve) => setTimeout(resolve, 800))
+          router.push("/orders")
+          return
+        }
+
+        await submitQuotation()
+        setSubmitSuccess("quote")
+        await new Promise((resolve) => setTimeout(resolve, 800))
+        router.push("/quotes")
+      } catch (error) {
+        const msg =
+          error && typeof (error as any).message === "string"
+            ? (error as any).message
+            : "Failed to submit. Please try again."
+        setSubmitError(msg)
+        console.error(`Failed to submit cart as ${action}:`, error)
+        setIsSubmitting(false)
+      }
+    },
+    [submitQuotation, router, canCreateQuote, canCreateOrder, placeOrder, getTomorrowDate]
+  )
 
   const handleClearCart = useCallback(async () => {
     if (isClearing || !cartItems.length) return
@@ -500,24 +562,63 @@ export default function CartPage() {
                   className="mt-6 flex items-center gap-2 p-4 bg-primary/10 rounded-xl text-primary"
                 >
                   <CheckCircle2 className="h-5 w-5" />
-                  Quotation Submitted
+                  {submitSuccess === "order" ? "Order Placed" : "Quotation Submitted"}
                 </motion.div>
               ) : (
-                <Button
-                  size="lg"
-                  className="w-full mt-6"
-                  disabled={isSubmitting}
-                  onClick={handleSubmitQuotation}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    "Submit Quotation"
+                <>
+                  {submitError && (
+                    <div className="mt-6 mb-3 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+                      {submitError}
+                    </div>
                   )}
-                </Button>
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {canCreateQuote && (
+                    <Button
+                      size="lg"
+                      className="w-full"
+                      disabled={isSubmitting || bannersLoading || !canCreateQuote}
+                      onClick={() => handleSubmit("quote")}
+                      variant={primaryAction === "quote" ? "default" : "outline"}
+                      aria-label="Submit quotation"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        "Submit Quotation"
+                      )}
+                    </Button>
+                  )}
+
+                  {canCreateOrder && (
+                    <Button
+                      size="lg"
+                      className="w-full"
+                      disabled={isSubmitting || bannersLoading || !canCreateOrder}
+                      onClick={() => handleSubmit("order")}
+                      variant={primaryAction === "order" ? "default" : "outline"}
+                      aria-label="Place order"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        "Place Order"
+                      )}
+                    </Button>
+                  )}
+
+                  {!canCreateQuote && !canCreateOrder && (
+                    <Button size="lg" className="w-full" disabled aria-label="Submission unavailable">
+                      Submissions unavailable
+                    </Button>
+                  )}
+                </div>
+                </>
               )}
             </AnimatePresence>
           </Card>

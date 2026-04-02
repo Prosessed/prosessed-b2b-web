@@ -2,6 +2,7 @@
 
 import {
   createCart,
+  createSalesOrderFromCart,
   getCart,
   getFullCart,
   modifyCart,
@@ -9,6 +10,8 @@ import {
   type CartItem,
   type GetCartResponse,
   type GetFullCartResponse,
+  type CreateSalesOrderFromCartParams,
+  type SubmitCartParams,
 } from "@/lib/api/cart"
 import { useAuth } from "@/lib/auth/context"
 import {
@@ -36,7 +39,8 @@ interface CartContextType {
   removeItem: (itemId: string) => Promise<void>
   updateCart: (updates: Record<string, any>) => Promise<void>
   refreshCart: () => Promise<void>
-  submitQuotation: (params?: { signature_base64?: string }) => Promise<void>
+  submitQuotation: (params?: { signature_base64?: string; order_quote_logic?: SubmitCartParams["order_quote_logic"] }) => Promise<void>
+  placeOrder: (params: Omit<CreateSalesOrderFromCartParams, "quotation_id">) => Promise<void>
   clearCart: () => void
 }
 
@@ -292,7 +296,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   )
 
   const submitQuotation = useCallback(
-    async (params?: { signature_base64?: string }) => {
+    async (params?: { signature_base64?: string; order_quote_logic?: SubmitCartParams["order_quote_logic"] }) => {
       if (!user) throw new Error("User not authenticated")
 
       const currentQuotationId = quotationId || data?.cart?.name
@@ -303,6 +307,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           {
             quotation_id: currentQuotationId,
             signature_base64: params?.signature_base64,
+            order_quote_logic: params?.order_quote_logic,
           },
           user
         )
@@ -312,6 +317,34 @@ export function CartProvider({ children }: { children: ReactNode }) {
         await mutate({ cart: null }, false)
       } catch (error) {
         console.error("[Cart Context] Failed to submit quotation:", error)
+        throw error
+      }
+    },
+    [quotationId, data?.cart?.name, mutate, user]
+  )
+
+  const placeOrder = useCallback(
+    async (params: Omit<CreateSalesOrderFromCartParams, "quotation_id">) => {
+      if (!user) throw new Error("User not authenticated")
+
+      const currentQuotationId = quotationId || data?.cart?.name
+      if (!currentQuotationId) throw new Error("Cart not found")
+
+      try {
+        await createSalesOrderFromCart(
+          {
+            quotation_id: currentQuotationId,
+            latitude: params.latitude,
+            longitude: params.longitude,
+            delivery_date: params.delivery_date,
+          },
+          user
+        )
+
+        setQuotationId(null)
+        await mutate({ cart: null }, false)
+      } catch (error) {
+        console.error("[Cart Context] Failed to place order:", error)
         throw error
       }
     },
@@ -336,6 +369,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       updateCart,
       refreshCart,
       submitQuotation,
+      placeOrder,
       clearCart,
     }),
     [
@@ -349,6 +383,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       updateCart,
       refreshCart,
       submitQuotation,
+      placeOrder,
       clearCart,
     ]
   )
