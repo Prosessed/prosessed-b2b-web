@@ -180,7 +180,19 @@ export default function CartPage() {
   )
 
   const resolvedOrderQuoteLogic = useMemo(() => {
-    return bannersData?.order_quote_logic ?? { create_order: 0, create_quote: 1 }
+    const createOrder = bannersData?.order_quote_logic?.create_order ?? 0
+    const createQuote = bannersData?.order_quote_logic?.create_quote ?? 0
+
+    // If backend explicitly disables both, keep existing user experience:
+    // show quote option by default.
+    if (createOrder === 0 && createQuote === 0) {
+      return { create_order: 0, create_quote: 1 }
+    }
+
+    return {
+      create_order: createOrder,
+      create_quote: createQuote,
+    }
   }, [bannersData?.order_quote_logic])
 
   const canCreateQuote = resolvedOrderQuoteLogic.create_quote === 1
