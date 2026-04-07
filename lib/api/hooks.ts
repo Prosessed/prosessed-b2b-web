@@ -624,6 +624,39 @@ export function useCustomerDetails(customerId: string | null) {
   )
 }
 
+type CustomerNameListRow = { name?: string; customer_name?: string }
+
+const resolveCustomerDisplayName = (
+  message: unknown,
+  customerId: string
+): string | null => {
+  if (message == null) return null
+  if (typeof message === "string") return message
+
+  if (typeof message !== "object") return null
+  const msg = message as Record<string, unknown>
+
+  // Single-object shape: { customer_name: '...' }
+  if (typeof msg.customer_name === "string" && msg.customer_name) {
+    return msg.customer_name
+  }
+
+  // List API shape: { data: [{ name, customer_name }, ...] } (matches get_customer_names)
+  const rawData = msg.data
+  if (Array.isArray(rawData)) {
+    const row = rawData.find(
+      (item): item is CustomerNameListRow =>
+        item != null &&
+        typeof item === "object" &&
+        "name" in item &&
+        (item as CustomerNameListRow).name === customerId
+    )
+    if (row?.customer_name) return row.customer_name
+  }
+
+  return null
+}
+
 export function useCustomerName(customerId: string | null) {
   const { user } = useAuth()
 
@@ -634,7 +667,7 @@ export function useCustomerName(customerId: string | null) {
     async () => {
       if (!user || !customerId) return null
 
-      const response = await apiClient.request<any>(
+      const response = await apiClient.request<{ message?: unknown }>(
         `/api/method/prosessed_orderit.orderit.get_customer_names?customer_id=${encodeURIComponent(
           customerId
         )}`,
@@ -648,12 +681,7 @@ export function useCustomerName(customerId: string | null) {
         }
       )
 
-      // API returns message with the customer name string or object { customer_name: '...' }
-      const msg = response?.message
-      if (!msg) return null
-      if (typeof msg === "string") return msg
-      if (msg.customer_name) return msg.customer_name
-      return null
+      return resolveCustomerDisplayName(response?.message, customerId)
     },
     { revalidateOnFocus: false }
   )
@@ -807,29 +835,24 @@ export function useBannersAndDeals() {
   )
 }
 
+/** `customerName` must be ERPNext `Customer.customer_name` (see `useCustomerName`), not document `name`. */
 export function useCustomerStatement(
-  customer: string | null,
+  customerName: string | null,
   startDate: string | null,
   endDate: string | null
 ) {
-  const { user } = useAuth()
-
-  const key = customer && startDate && endDate
-    ? ["statement", customer, startDate, endDate]
-    : null
+  const key =
+    customerName && startDate && endDate
+      ? ["statement", customerName, startDate, endDate]
+      : null
 
   return useSWR(
     key,
     async () => {
-      if (!customer || !startDate || !endDate) return null
+      if (!customerName || !startDate || !endDate) return null
 
       try {
-        const response = await apiClient.getCustomerStatementUrl(
-          customer,
-          startDate,
-          endDate
-        )
-        return response?.message || response
+        return await apiClient.getCustomerStatementUrl(customerName, startDate, endDate)
       } catch (error) {
         console.error("Error fetching statement URL:", error)
         throw error

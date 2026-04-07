@@ -17,7 +17,7 @@ export default function StatementsPage() {
   const [endDate, setEndDate] = useState("")
   const [submitted, setSubmitted] = useState(false)
 
-  // Fetch customer name (API: get_customer_name) and statement URL when dates are submitted
+  // ERPNext Customer.customer_name for display and for get_customer_statement_url (server matches on customer_name).
   const { data: customerName, isLoading: isNameLoading } = useCustomerName(user?.customerId ?? null)
 
   const { data: statementUrl, isLoading, error } = useCustomerStatement(
@@ -73,6 +73,15 @@ export default function StatementsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (isNameLoading) {
+      alert("Please wait — loading customer name.")
+      return
+    }
+    if (!customerName) {
+      alert("Could not load your customer name. Please refresh the page or try again later.")
+      return
+    }
 
     if (!startDate || !endDate) {
       alert("Please select both start and end dates")
@@ -160,7 +169,7 @@ export default function StatementsPage() {
                   <Button
                     type="submit"
                     className="flex-1"
-                    disabled={isLoading}
+                    disabled={isLoading || isNameLoading || !customerName}
                   >
                     {isLoading && (
                       <Loader className="h-4 w-4 mr-2 animate-spin" />
