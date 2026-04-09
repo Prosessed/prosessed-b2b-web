@@ -24,6 +24,20 @@ interface AuthCredentials {
   sid?: string | null
 }
 
+export interface B2bRegistrationPayload {
+  company_name: string
+  contact_person: string
+  email: string
+  phone: string
+  gst_number: string
+  address_line_1: string
+  address_line_2: string
+  city: string
+  state: string
+  country: string
+  pincode: string
+}
+
 /* ============================================================
    AUTH HELPERS (TOKEN ONLY)
 ============================================================ */
@@ -306,12 +320,21 @@ export const apiClient = {
     const url = `${baseUrl}${endpoint}`
     const method = options.method || "GET"
 
-    const headers = new Headers({
-      "Content-Type": "application/json",
-    })
+    const isFormDataBody = typeof FormData !== "undefined" && options.body instanceof FormData
+    const headers = new Headers(
+      isFormDataBody
+        ? undefined
+        : {
+            "Content-Type": "application/json",
+          }
+    )
 
     if (options.headers) {
       new Headers(options.headers).forEach((v, k) => headers.set(k, v))
+    }
+    // Never set Content-Type manually for FormData; browser must add the boundary.
+    if (isFormDataBody) {
+      headers.delete("Content-Type")
     }
 
     const sid = typeof auth.sid === "string" ? auth.sid.trim() : ""
@@ -435,71 +458,157 @@ export const apiClient = {
   },
 
   /* ------------------ Statements ------------------ */
+  /**
+   * POST `prosessed_orderit.orderit.get_customer_statement_url`.
+   * Server resolves the Customer by **customer_name** (`Customer.customer_name`), not by document name.
+   * Pass the display name from `useCustomerName` (same value as `customer` / `customerName` in form_dict / JSON).
+   */
   async getCustomerStatementUrl(
-    customer: string,
+    customerName: string,
     startDate: string,
     endDate: string
-  ): Promise<any> {
-    const baseUrl = getApiBaseUrl()
+  ): Promise<{ url: string; blob?: Blob; contentType: string }> {
+    const c = typeof customerName === "string" ? customerName.trim() : ""
+    const start = typeof startDate === "string" ? startDate.trim() : ""
+    const end = typeof endDate === "string" ? endDate.trim() : ""
 
-    // Build headers including auth if available
+    if (!c || !start || !end) {
+      throw new ApiError(400, "Customer name and date range are required.")
+    }
+
+    const baseUrl = getApiBaseUrl()
     const auth = getAuthFromStorage()
     const headers = new Headers({
       "Content-Type": "application/json",
-      Accept: "application/pdf, application/octet-stream, */*",
+      Accept: "application/pdf, application/json, application/octet-stream, */*",
     })
     const sid = typeof auth.sid === "string" ? auth.sid.trim() : ""
-    const useBearerAuth = sid.length > 0
-    if (useBearerAuth) {
+    if (sid.length > 0) {
       headers.set("Authorization", `Bearer ${sid}`)
     } else if (auth.apiKey && auth.apiSecret) {
       headers.set("Authorization", `token ${auth.apiKey}:${auth.apiSecret}`)
     }
 
-    const url = `${baseUrl}/api/method/prosessed_orderit.orderit.get_customer_statement_url`
+    const endpoint = `${baseUrl}/api/method/prosessed_orderit.orderit.get_customer_statement_url`
+    const body = JSON.stringify({
+      customer: c,
+      customerName: c,
+      start_date: start,
+      end_date: end,
+      startDate: start,
+      endDate: end,
+    })
 
-    apiLogger.request("POST", url, headers, { customer, start_date: startDate, end_date: endDate })
+    apiLogger.request("POST", endpoint, headers, { customer: c, start_date: start, end_date: end })
 
-    const start = performance.now()
-    const resp = await fetch(url, {
+    const t0 = performance.now()
+    const resp = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: JSON.stringify({ customer, start_date: startDate, end_date: endDate }),
+      body,
       credentials: "omit",
     })
-    const timeMs = Math.round(performance.now() - start)
+    const elapsed = Math.round(performance.now() - t0)
 
-    // If response is not OK, try to parse JSON error, otherwise throw
     if (!resp.ok) {
       let errMsg = resp.statusText
       try {
         const errJson = await resp.json()
-        errMsg = errJson?.message || JSON.stringify(errJson)
-      } catch {}
-      apiLogger.response(url, resp.status, errMsg, timeMs)
-      if (resp.status === 403) throw new ApiError(403, "Authentication failed. Please login again.")
+        errMsg =
+          (typeof errJson?.message === "string" && errJson.message) ||
+          (typeof errJson?.exc === "string" && errJson.exc) ||
+          JSON.stringify(errJson)
+      } catch {
+        /* keep statusText */
+      }
+      apiLogger.response(endpoint, resp.status, errMsg, elapsed)
+      if (resp.status === 403) {
+        throw new ApiError(403, "Authentication failed. Please login again.")
+      }
       throw new ApiError(resp.status, errMsg)
     }
 
-    // Check content type
-    const contentType = resp.headers.get("content-type") || ""
-    apiLogger.response(url, resp.status, `[${contentType}] binary response`, timeMs)
+    const ct = resp.headers.get("content-type") || ""
+    apiLogger.response(endpoint, resp.status, `[${ct}]`, elapsed)
 
-    if (contentType.includes("application/pdf") || contentType.includes("application/octet-stream") || contentType.includes("application/x-pdf")) {
+    if (
+      ct.includes("application/pdf") ||
+      ct.includes("application/octet-stream") ||
+      ct.includes("application/x-pdf")
+    ) {
       const blob = await resp.blob()
-      const objectUrl = URL.createObjectURL(blob)
-      return { url: objectUrl, blob, contentType }
+      return { url: URL.createObjectURL(blob), blob, contentType: ct }
     }
 
-    // Fallback: if server returns JSON with a URL inside
+    let parsed: { message?: unknown }
     try {
-      const json = await resp.json()
-      return json
+      parsed = await resp.json()
     } catch {
-      return { url: "", contentType }
+      throw new ApiError(502, "Invalid response from statement service.")
     }
+
+    const msg = parsed.message
+
+    if (typeof msg === "string") {
+      const s = msg.trim()
+      if (/^https?:\/\//i.test(s)) {
+        return { url: s, contentType: "application/pdf" }
+      }
+      throw new ApiError(400, s)
+    }
+
+    if (
+      msg &&
+      typeof msg === "object" &&
+      "url" in msg &&
+      typeof (msg as { url: unknown }).url === "string"
+    ) {
+      const m = msg as { url: string; contentType?: string }
+      return { url: m.url, contentType: m.contentType || ct || "application/json" }
+    }
+
+    throw new ApiError(502, "Unexpected statement response from server.")
   },
 
+  /* ------------------ B2B registration (public, no auth) ------------------ */
+  async createB2bRegistration(
+    payload: B2bRegistrationPayload,
+    companyUrl?: string | null
+  ): Promise<{ message?: unknown }> {
+    const trimmed = typeof companyUrl === "string" ? companyUrl.trim() : ""
+    if (trimmed) {
+      setApiBaseUrl(trimmed)
+    }
 
+    const debugB2b =
+      process.env.NODE_ENV === "development" ||
+      process.env.NEXT_PUBLIC_DEBUG_B2B_REGISTRATION === "1"
+    if (debugB2b && typeof window !== "undefined") {
+      const safePayload = {
+        ...payload,
+        email:
+          typeof payload.email === "string" && payload.email.includes("@")
+            ? payload.email.replace(/(^.).*(@.*$)/, "$1***$2")
+            : payload.email,
+        phone:
+          typeof payload.phone === "string" && payload.phone.length > 4
+            ? `${payload.phone.slice(0, 2)}***${payload.phone.slice(-2)}`
+            : payload.phone,
+      }
+      console.groupCollapsed("[B2B] createB2bRegistration")
+      console.log("companyUrl:", trimmed || "(default)")
+      console.log("baseUrl:", getApiBaseUrl())
+      console.log("payload:", safePayload)
+      console.groupEnd()
+    }
 
+    return this.request<{ message?: unknown }>(
+      "/api/method/prosessed_order.api.create_b2b_registration",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+        auth: {},
+      }
+    )
+  },
 }

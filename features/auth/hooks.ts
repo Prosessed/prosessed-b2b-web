@@ -5,6 +5,7 @@
 
 import { useAuth } from "@/lib/auth/context"
 import { useCallback, useState } from "react"
+import type { Company } from "@/lib/auth/types"
 import * as authApi from "./api"
 
 /**
@@ -104,7 +105,7 @@ export function useForgotPassword() {
  * Hook to fetch companies by email
  */
 export function useCompaniesByEmail(email: string) {
-  const [companies, setCompanies] = useState([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

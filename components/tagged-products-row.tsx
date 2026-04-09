@@ -78,6 +78,7 @@ export function TaggedProductsRow({
                 unit={product.default_sales_uom || product.stock_uom || product.uom}
                 stock={product.actual_qty}
                 tags={product.tags}
+                customerPriceMargin={product.customer_price_margin}
               />
             )
           })}
@@ -122,6 +123,7 @@ export function TaggedProductsRow({
                       unit={product.default_sales_uom || product.stock_uom || product.uom}
                       stock={product.actual_qty}
                       tags={product.tags}
+                      customerPriceMargin={product.customer_price_margin}
                     />
                   )
                 })}

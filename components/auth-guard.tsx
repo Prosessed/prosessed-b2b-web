@@ -5,7 +5,16 @@ import { useRouter, usePathname } from "next/navigation"
 import { useEffect, type ReactNode } from "react"
 import { Building } from "lucide-react"
 
-const PUBLIC_ROUTES = ["/login", "/login/password", "/login/otp", "/login/forgot-password", "/contact", "/privacy", "/terms"]
+const PUBLIC_ROUTES = [
+  "/login",
+  "/login/password",
+  "/login/otp",
+  "/login/forgot-password",
+  "/signup",
+  "/contact",
+  "/privacy",
+  "/terms",
+]
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()

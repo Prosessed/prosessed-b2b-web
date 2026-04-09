@@ -21,6 +21,7 @@ import { formatPrice } from "@/lib/utils/currency"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { parseTags } from "@/lib/utils/tags"
 import { TagBadge } from "@/components/tag-badge"
+import { getPriceDisplay } from "@/lib/utils/pricing"
 import { motion } from "framer-motion"
 
 export default function ProductDetailPage() {
@@ -234,21 +235,40 @@ export default function ProductDetailPage() {
 
           {/* Price */}
           <Card className="p-6 bg-primary/5 rounded-2xl border-primary/20">
-            {product.customer_price_margin?.is_custom_price === 1 ? (
-              <div>
-                <p className="text-lg font-bold text-primary mb-2">Custom Pricing</p>
-                <p className="text-sm text-muted-foreground">Price customized based on your volume and account. Contact sales for details.</p>
-              </div>
-            ) : product.customer_price_margin?.is_custom_price === 0 ? (
-              <div>
-                <p className="text-sm text-muted-foreground">Pricing available on request. Please contact us for a quote.</p>
-              </div>
-            ) : (
-              <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-black text-primary">{formatPrice(currentRate, user?.defaultCurrency)}</span>
-                <span className="text-muted-foreground">per {selectedUom +'s' || product.uom +'s' || product.stock_uom +'s'}</span>
-              </div>
-            )}
+            {(() => {
+              const display = getPriceDisplay({
+                basePrice: Number(currentRate ?? 0),
+                currency: user?.defaultCurrency,
+                marginInfo: product.customer_price_margin,
+              })
+              const perUnit = selectedUom || product.uom || product.stock_uom || ""
+
+              if (display.kind === "hidden") {
+                return (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Pricing available on request. Please contact us for a quote.</p>
+                  </div>
+                )
+              }
+
+              if (display.kind === "range") {
+                return (
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-3xl sm:text-4xl font-black text-primary">
+                      {display.minLabel} - {display.maxLabel}
+                    </span>
+                    {perUnit ? <span className="text-muted-foreground">per {perUnit}</span> : null}
+                  </div>
+                )
+              }
+
+              return (
+                <div className="flex items-baseline gap-3">
+                  <span className="text-4xl font-black text-primary">{display.label}</span>
+                  {perUnit ? <span className="text-muted-foreground">per {perUnit}</span> : null}
+                </div>
+              )
+            })()}
           </Card>
 
           {/* UOM Selector */}
@@ -277,7 +297,20 @@ export default function ProductDetailPage() {
                         )}
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-lg">{formatPrice(uom.price_list_rate ?? 0, user?.defaultCurrency)}</div>
+                        {(() => {
+                          const display = getPriceDisplay({
+                            basePrice: Number(uom.price_list_rate ?? 0),
+                            currency: user?.defaultCurrency,
+                            marginInfo: product.customer_price_margin,
+                          })
+                          const label =
+                            display.kind === "hidden"
+                              ? "Price on Request"
+                              : display.kind === "range"
+                                ? `${display.minLabel} - ${display.maxLabel}`
+                                : display.label
+                          return <div className="font-bold text-lg">{label}</div>
+                        })()}
                       </div>
                     </Label>
                   </motion.div>

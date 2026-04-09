@@ -128,6 +128,13 @@ export default function LoginPage() {
                   )}
                 </Button>
 
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                  New to the portal?{" "}
+                  <Link href="/signup" className="font-semibold text-primary hover:underline underline-offset-4">
+                    Create an account
+                  </Link>
+                </p>
+
               </CardContent>
             </form>
           ) : (
@@ -169,6 +176,13 @@ export default function LoginPage() {
               >
                 Use a different email
               </Button>
+
+              <p className="text-center text-sm text-muted-foreground pt-2">
+                New to the portal?{" "}
+                <Link href="/signup" className="font-semibold text-primary hover:underline underline-offset-4">
+                  Create an account
+                </Link>
+              </p>
             </div>
           )}
         </div>
