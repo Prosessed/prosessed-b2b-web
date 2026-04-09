@@ -320,12 +320,21 @@ export const apiClient = {
     const url = `${baseUrl}${endpoint}`
     const method = options.method || "GET"
 
-    const headers = new Headers({
-      "Content-Type": "application/json",
-    })
+    const isFormDataBody = typeof FormData !== "undefined" && options.body instanceof FormData
+    const headers = new Headers(
+      isFormDataBody
+        ? undefined
+        : {
+            "Content-Type": "application/json",
+          }
+    )
 
     if (options.headers) {
       new Headers(options.headers).forEach((v, k) => headers.set(k, v))
+    }
+    // Never set Content-Type manually for FormData; browser must add the boundary.
+    if (isFormDataBody) {
+      headers.delete("Content-Type")
     }
 
     const sid = typeof auth.sid === "string" ? auth.sid.trim() : ""
@@ -569,6 +578,28 @@ export const apiClient = {
     const trimmed = typeof companyUrl === "string" ? companyUrl.trim() : ""
     if (trimmed) {
       setApiBaseUrl(trimmed)
+    }
+
+    const debugB2b =
+      process.env.NODE_ENV === "development" ||
+      process.env.NEXT_PUBLIC_DEBUG_B2B_REGISTRATION === "1"
+    if (debugB2b && typeof window !== "undefined") {
+      const safePayload = {
+        ...payload,
+        email:
+          typeof payload.email === "string" && payload.email.includes("@")
+            ? payload.email.replace(/(^.).*(@.*$)/, "$1***$2")
+            : payload.email,
+        phone:
+          typeof payload.phone === "string" && payload.phone.length > 4
+            ? `${payload.phone.slice(0, 2)}***${payload.phone.slice(-2)}`
+            : payload.phone,
+      }
+      console.groupCollapsed("[B2B] createB2bRegistration")
+      console.log("companyUrl:", trimmed || "(default)")
+      console.log("baseUrl:", getApiBaseUrl())
+      console.log("payload:", safePayload)
+      console.groupEnd()
     }
 
     return this.request<{ message?: unknown }>(

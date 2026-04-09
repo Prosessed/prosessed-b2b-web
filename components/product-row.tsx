@@ -82,6 +82,7 @@ export function ProductRow({ title, itemGroup, categoryHref = "/products", pageS
               unit={unit}
               stock={product.actual_qty ?? product.uoms?.[0]?.reserved ?? product.reserved ?? 0}
               tags={product.tags}
+              customerPriceMargin={product.customer_price_margin}
             />
           )
         })}

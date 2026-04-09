@@ -20,8 +20,8 @@ import { clearAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
-import { formatPrice } from "@/lib/utils/currency"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
+import { getPriceDisplay } from "@/lib/utils/pricing"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowRight, LayoutGrid, Moon, Package, Search, ShoppingCart, Sun, Tag, User, X } from "lucide-react"
 import Image from "next/image"
@@ -181,6 +181,20 @@ export function Navigation() {
                         </div>
                         <div className="space-y-1">
                           {searchResults.items.slice(0, 8).map((item: any) => (
+                            (() => {
+                              const priceDisplay = getPriceDisplay({
+                                basePrice: Number(item.price_list_rate ?? item.rate ?? 0),
+                                currency: user?.defaultCurrency,
+                                marginInfo: item.customer_price_margin,
+                              })
+                              const priceLabel =
+                                priceDisplay.kind === "hidden"
+                                  ? "Price on Request"
+                                  : priceDisplay.kind === "range"
+                                    ? `${priceDisplay.minLabel} - ${priceDisplay.maxLabel}`
+                                    : priceDisplay.label
+
+                              return (
                             <Link
                               key={item.item_code}
                               href={`/products/${item.item_code}`}
@@ -200,9 +214,7 @@ export function Navigation() {
                                   {item.item_name}
                                 </p>
                                 <div className="flex items-center gap-2 mt-0.5">
-                                  <p className="text-xs font-black text-primary">
-                                    {formatPrice(item.price_list_rate || item.rate || 0, user?.defaultCurrency)}
-                                  </p>
+                                  <p className="text-xs font-black text-primary">{priceLabel}</p>
                                   {item.item_group && (
                                     <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">
                                       {item.item_group}
@@ -212,6 +224,8 @@ export function Navigation() {
                               </div>
                               <Package className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0 opacity-0 group-hover:opacity-100" />
                             </Link>
+                              )
+                            })()
                           ))}
                         </div>
                       </div>
@@ -319,6 +333,9 @@ export function Navigation() {
           <Link href="/orders" className="text-sm font-medium hover:text-primary transition-colors">
             Orders
           </Link>
+          <Link href="/return-requests" className="text-sm font-medium hover:text-primary transition-colors">
+            Returns
+          </Link>
           <Link href="/quotes" className="text-sm font-medium hover:text-primary transition-colors">
             Quotes
           </Link>
@@ -382,14 +399,17 @@ export function Navigation() {
                   </div>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
-                  My Account
+                <DropdownMenuItem asChild>
+                  <Link href="/my-accounts">My Account</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/orders">My Orders</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/my-invoices">My Invoices</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/return-requests">Return Requests</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/quotes">My Quotes</Link>

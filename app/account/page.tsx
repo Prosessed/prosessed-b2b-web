@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useQuotations, useCustomerDetails } from "@/lib/api/hooks"
 import { clearAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
-import { Building, Camera, CreditCard, Edit, LogOut, Mail, MapPin, Package, User, Phone, Users } from "lucide-react"
+import { Building, Camera, CreditCard, Edit, LogOut, Mail, MapPin, Package, RotateCcw, User, Phone, Users } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -129,7 +129,7 @@ export default function AccountPage() {
         </Card>
 
         {/* Account Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <Link href="/orders">
             <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
               <CardContent className="pt-6 text-center">
@@ -148,6 +148,15 @@ export default function AccountPage() {
               <div className="text-sm text-muted-foreground">Outstanding</div>
             </CardContent>
           </Card>
+          <Link href="/return-requests">
+            <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
+              <CardContent className="pt-6 text-center">
+                <RotateCcw className="h-8 w-8 mx-auto mb-2 text-primary" />
+                <div className="text-2xl font-bold">Returns</div>
+                <div className="text-sm text-muted-foreground">Manage requests</div>
+              </CardContent>
+            </Card>
+          </Link>
           <Card className="border-border/50 hover:border-primary/50 transition-colors">
             <CardContent className="pt-6 text-center">
               <Users className="h-8 w-8 mx-auto mb-2 text-primary" />

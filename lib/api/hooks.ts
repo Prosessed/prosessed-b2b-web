@@ -873,17 +873,93 @@ export interface PaginationInfo {
 export interface UseAllInvoicesParams {
   page?: number
   pageSize?: number
+  customerId?: string | null
+}
+
+export interface ReturnRequestItem {
+  item_code?: string
+  item_name?: string
+  item_group?: string
+  qty?: number
+  quantity?: number
+  rate?: number
+  amount?: number
+  uom?: string
+}
+
+export interface ReturnRequestCreditNote {
+  invoice_id?: string
+  posting_date?: string
+  due_date?: string
+  grand_total?: number
+  outstanding_amount?: number
+  currency?: string
+  status?: string
+}
+
+export interface ReturnRequest {
+  name?: string
+  return_request_id?: string
+  customer_id?: string
+  customer_name?: string
+  date_of_request?: string
+  reason_for_return?: string
+  return_for_invoice_no?: string
+  credit_note?: ReturnRequestCreditNote | null
+  items?: ReturnRequestItem[]
+  products?: ReturnRequestItem[]
+}
+
+export interface ReturnRequestsPagination {
+  total_records?: number
+  page_size?: number
+  current_page?: number
+  total_pages?: number
+  has_next_page?: boolean
+  has_previous_page?: boolean
+  start_index?: number
+  end_index?: number
+}
+
+export interface UseReturnRequestsParams {
+  customerId?: string | null
+  page?: number
+  pageSize?: number
+}
+
+export interface CreateSalesOrderReturnProductInput {
+  item_code: string
+  item_name: string
+  quantity: number
+  uom: string
+}
+
+export interface CreateSalesOrderReturnInput {
+  customerName: string
+  returnForInvoiceNo: string
+  reasonForReturn: string
+  dateOfRequest: string
+  products: CreateSalesOrderReturnProductInput[]
+  photos?: File[]
+  customerSignature?: File | null
+}
+
+export interface CreateSalesOrderReturnResponse {
+  status?: string
+  message?: string
+  return_request_name?: string
+  customer_name?: string
+  attachments?: string[]
+  customer_signature?: string
 }
 
 export function useAllInvoices(params?: UseAllInvoicesParams) {
   const { user } = useAuth()
   const page = params?.page ?? 1
   const pageSize = params?.pageSize ?? 10
+  const customerId = params?.customerId ?? user?.customerId ?? null
 
-  const limitStart = Math.max(0, (page - 1) * pageSize)
-  const limitPageLength = Math.max(1, pageSize)
-
-  const key = user ? ["allInvoices", user.customerId, page, pageSize, user.apiKey] : null
+  const key = user ? ["allInvoices", customerId, page, pageSize, user.apiKey] : null
 
   return useSWR(
     key,
@@ -891,9 +967,10 @@ export function useAllInvoices(params?: UseAllInvoicesParams) {
       if (!user) return { invoices: [], pagination: {} as PaginationInfo }
 
       const search = new URLSearchParams({
-        limit_start: String(limitStart),
-        limit_page_length: String(limitPageLength),
+        page: String(page),
+        page_size: String(pageSize),
       })
+      if (customerId) search.set("customer_id", customerId)
 
       const response = await apiClient.request<any>(
         `/api/method/prosessed_orderit.orderit.get_all_invoices?${search.toString()}`,
@@ -915,8 +992,10 @@ export function useAllInvoices(params?: UseAllInvoicesParams) {
         []
 
       const totalRecords =
-        typeof raw?.total_records === "number"
-          ? raw.total_records
+        typeof raw?.pagination?.total_records === "number"
+          ? raw.pagination.total_records
+          : typeof raw?.total_records === "number"
+            ? raw.total_records
           : typeof raw?.totalRecords === "number"
             ? raw.totalRecords
             : typeof raw?.total === "number"
@@ -926,13 +1005,13 @@ export function useAllInvoices(params?: UseAllInvoicesParams) {
                 : undefined
 
       const hasNextPage =
-        typeof totalRecords === "number"
-          ? limitStart + limitPageLength < totalRecords
+        typeof raw?.pagination?.has_next_page === "boolean"
+          ? raw.pagination.has_next_page
+          : typeof totalRecords === "number"
+            ? page * pageSize < totalRecords
           : typeof raw?.has_next_page === "boolean"
             ? raw.has_next_page
-            : typeof raw?.pagination?.has_next_page === "boolean"
-              ? raw.pagination.has_next_page
-              : undefined
+            : undefined
 
       const pagination: PaginationInfo = {
         total_records: totalRecords,
@@ -946,6 +1025,112 @@ export function useAllInvoices(params?: UseAllInvoicesParams) {
       keepPreviousData: true,
     }
   )
+}
+
+export function useReturnRequests(params?: UseReturnRequestsParams) {
+  const { user } = useAuth()
+  const page = params?.page ?? 1
+  const pageSize = params?.pageSize ?? 10
+  const customerId = params?.customerId ?? user?.customerId ?? null
+
+  const key = user && customerId ? ["returnRequests", customerId, page, pageSize, user.apiKey] : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user || !customerId) {
+        return {
+          return_requests: [] as ReturnRequest[],
+          pagination: {} as ReturnRequestsPagination,
+        }
+      }
+
+      const search = new URLSearchParams({
+        customer_id: customerId,
+        page: String(page),
+        page_size: String(pageSize),
+      })
+
+      const response = await apiClient.request<any>(
+        `/api/method/prosessed_orderit.orderit.get_return_requests_list?${search.toString()}`,
+        {
+          method: "GET",
+          auth: {
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            sid: user.sid,
+          },
+        }
+      )
+
+      const raw = response?.message ?? response
+
+      return {
+        return_requests: Array.isArray(raw?.return_requests) ? raw.return_requests : [],
+        pagination:
+          raw?.pagination && typeof raw.pagination === "object"
+            ? (raw.pagination as ReturnRequestsPagination)
+            : ({} as ReturnRequestsPagination),
+      }
+    },
+    {
+      revalidateOnFocus: false,
+      keepPreviousData: true,
+    }
+  )
+}
+
+export async function createSalesOrderReturn(
+  input: CreateSalesOrderReturnInput,
+  auth?: { apiKey?: string | null; apiSecret?: string | null; sid?: string | null }
+): Promise<CreateSalesOrderReturnResponse> {
+  const formData = new FormData()
+  const customerName = String(input.customerName ?? "").trim()
+  if (!customerName) {
+    throw new Error("Missing required field: customer_name")
+  }
+  formData.append("customer_name", customerName)
+  formData.append("return_for_invoice_no", input.returnForInvoiceNo)
+  formData.append("reason_for_return", input.reasonForReturn)
+  formData.append("date_of_request", input.dateOfRequest)
+  formData.append("products", JSON.stringify(input.products))
+
+  
+  for (const photo of input.photos ?? []) {
+    formData.append("photos", photo)
+  }
+
+  if (input.customerSignature) {
+    formData.append("customer_signature", input.customerSignature)
+  }
+
+  console.log("customer_name", customerName)
+  const candidateEndpoints = [
+    "/api/method/prosessed_orderit.orderit.create_sales_order_return",
+  ]
+
+  let lastError: unknown = null
+
+  for (const endpoint of candidateEndpoints) {
+    try {
+      const response = await apiClient.request<{ message?: CreateSalesOrderReturnResponse }>(endpoint, {
+        method: "POST",
+        body: formData,
+        auth,
+      })
+
+      const result = (response?.message ?? response) as CreateSalesOrderReturnResponse
+      if (result?.status === "error") {
+        throw new Error(result.message || "Failed to create return request.")
+      }
+
+      return result
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Failed to create return request.")
 }
 
 export function useInvoiceDetails(invoiceId: string | null) {

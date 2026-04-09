@@ -79,12 +79,29 @@ export default function SignUpPage() {
     setIsLoading(true)
 
     try {
+      const debugB2b =
+        process.env.NODE_ENV === "development" ||
+        process.env.NEXT_PUBLIC_DEBUG_B2B_REGISTRATION === "1"
+      if (debugB2b) {
+        console.groupCollapsed("[B2B] Signup submit")
+        console.log("portalUrl(raw):", portalUrl)
+        console.log("form(raw):", form)
+        console.groupEnd()
+      }
+
       let portal: string | undefined
       try {
         portal = normalizePortalUrl(portalUrl)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Invalid portal URL.")
         setIsLoading(false)
+        if (
+          (process.env.NODE_ENV === "development" ||
+            process.env.NEXT_PUBLIC_DEBUG_B2B_REGISTRATION === "1") &&
+          typeof window !== "undefined"
+        ) {
+          console.warn("[B2B] Invalid portal URL:", err)
+        }
         return
       }
 
@@ -102,10 +119,28 @@ export default function SignUpPage() {
         pincode: form.pincode.trim(),
       }
 
+      if (debugB2b) {
+        const safePayload = {
+          ...payload,
+          email:
+            typeof payload.email === "string" && payload.email.includes("@")
+              ? payload.email.replace(/(^.).*(@.*$)/, "$1***$2")
+              : payload.email,
+          phone:
+            typeof payload.phone === "string" && payload.phone.length > 4
+              ? `${payload.phone.slice(0, 2)}***${payload.phone.slice(-2)}`
+              : payload.phone,
+        }
+        console.log("[B2B] normalizedPortal:", portal || "(default)")
+        console.log("[B2B] payload:", safePayload)
+        console.log("[B2B] calling apiClient.createB2bRegistration…")
+      }
+
       const res = await apiClient.createB2bRegistration(payload, portal)
       const detail = formatApiMessage(res?.message)
       setSuccessDetail(detail || "Thank you — we have received your registration.")
       setIsSuccess(true)
+      if (debugB2b) console.log("[B2B] success:", res)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(
@@ -113,8 +148,22 @@ export default function SignUpPage() {
             ? err.message
             : "Registration failed. Please try again."
         )
+        if (
+          (process.env.NODE_ENV === "development" ||
+            process.env.NEXT_PUBLIC_DEBUG_B2B_REGISTRATION === "1") &&
+          typeof window !== "undefined"
+        ) {
+          console.error("[B2B] ApiError:", err.status, err.message)
+        }
       } else {
         setError("Something went wrong. Please try again.")
+        if (
+          (process.env.NODE_ENV === "development" ||
+            process.env.NEXT_PUBLIC_DEBUG_B2B_REGISTRATION === "1") &&
+          typeof window !== "undefined"
+        ) {
+          console.error("[B2B] Unknown error:", err)
+        }
       }
     } finally {
       setIsLoading(false)

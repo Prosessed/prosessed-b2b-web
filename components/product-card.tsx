@@ -12,6 +12,7 @@ import { formatPrice } from "@/lib/utils/currency"
 import { getDisplayImageUrl } from "@/lib/utils/image-url"
 import { parseTags } from "@/lib/utils/tags"
 import { TagBadge } from "@/components/tag-badge"
+import { getPriceDisplay } from "@/lib/utils/pricing"
 import { AnimatePresence, motion } from "framer-motion"
 import { Loader2, Minus, Plus } from "lucide-react"
 import Image from "next/image"
@@ -250,23 +251,41 @@ export function ProductCard({
 
           {/* Price Section */}
           <div className={view === "grid" ? "mb-2" : "mb-0"}>
-            {customerPriceMargin?.is_custom_price === 1 ? (
-              <div className="space-y-0.5">
-                <p className="text-[11px] font-medium text-amber-600 dark:text-amber-500">Custom Pricing</p>
-                <p className="text-[10px] text-muted-foreground">Contact for quote</p>
-              </div>
-            ) : customerPriceMargin?.is_custom_price === 0 ? (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Price on Request</p>
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                <p className="text-lg sm:text-xl font-black text-foreground leading-none">
-                  {formatPrice(price ?? 0, user?.defaultCurrency)}
-                </p>
-                <p className="text-[11px] text-muted-foreground font-medium">per {displayUnit}</p>
-              </div>
-            )}
+            {(() => {
+              const display = getPriceDisplay({
+                basePrice: Number(price ?? 0),
+                currency: user?.defaultCurrency,
+                marginInfo: customerPriceMargin,
+              })
+
+              if (display.kind === "hidden") {
+                return (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Price on Request</p>
+                  </div>
+                )
+              }
+
+              if (display.kind === "range") {
+                return (
+                  <div className="space-y-0.5">
+                    <p className="text-base sm:text-lg font-black text-foreground leading-none">
+                      {display.minLabel} - {display.maxLabel}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground font-medium">per {displayUnit}</p>
+                  </div>
+                )
+              }
+
+              return (
+                <div className="space-y-0.5">
+                  <p className="text-lg sm:text-xl font-black text-foreground leading-none">
+                    {display.label}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground font-medium">per {displayUnit}</p>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Add to Cart Button / Quantity Stepper */}
