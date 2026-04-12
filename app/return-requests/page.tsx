@@ -1,16 +1,14 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import Image from "next/image"
-import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
+import { getApiBaseUrl } from "@/lib/api/client"
 import {
   createSalesOrderReturn,
   useAllInvoices,
@@ -19,14 +17,14 @@ import {
   useSearch,
   type ReturnRequest,
 } from "@/lib/api/hooks"
-import { getApiBaseUrl } from "@/lib/api/client"
 import { useAuth } from "@/lib/auth/context"
-import { formatDate, formatPrice } from "@/lib/utils/currency"
+import { formatDate } from "@/lib/utils/currency"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { getPriceDisplay } from "@/lib/utils/pricing"
 import {
   AlertCircle,
   CheckCircle2,
+  Check,
   FileImage,
   LayoutGrid,
   Package,
@@ -36,6 +34,9 @@ import {
   Trash2,
   X,
 } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
 
 type ProductUomOption = {
   uom: string
@@ -449,19 +450,14 @@ export default function ReturnRequestsPage() {
           <div className="flex h-full min-h-0 flex-col">
             <SheetHeader className="border-b px-6 py-5 pr-14 text-left">
               <SheetTitle className="text-2xl">Create Return Request</SheetTitle>
-              <SheetDescription>
-                Search invoices, browse products, choose UOMs, preview added photos, and submit in one focused window.
-              </SheetDescription>
+
             </SheetHeader>
 
             <div className="grid min-h-0 flex-1 lg:grid-cols-[1.55fr_0.95fr]">
               <div className="flex min-h-0 flex-col border-b lg:border-b-0 lg:border-r">
                 <div className="border-b bg-muted/20 px-6 py-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold">Product Browser</p>
-                      <p className="text-sm text-muted-foreground">Products added here go to the return request only, never to the cart.</p>
-                    </div>
+
                     <Badge variant="secondary" className="w-fit">
                       <LayoutGrid className="h-3.5 w-3.5 mr-1" />
                       {selectedProducts.length} selected
@@ -527,41 +523,68 @@ export default function ReturnRequestsPage() {
                               : display.label
 
                         return (
-                          <Card key={item.item_code} className="overflow-hidden py-0 gap-0">
+                          <Card
+                            key={item.item_code}
+                            className={[
+                              "overflow-hidden py-0 gap-0 border-border/60",
+                              "transition-all hover:shadow-md hover:border-primary/30",
+                              isSelected ? "ring-1 ring-primary/20" : "",
+                            ].join(" ")}
+                          >
                             <div className="relative aspect-square bg-gradient-to-br from-muted/30 to-muted/10">
                               <Image
                                 src={imageUrl}
                                 alt={item.item_name || item.item_code || "Product"}
                                 fill
-                                className="object-contain p-5"
+                                className="object-contain p-6"
                                 sizes="(max-width: 1280px) 50vw, 25vw"
                               />
                               {isSelected && (
-                                <div className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">
+                                <div className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground flex items-center gap-1">
+                                  <Check className="h-3.5 w-3.5" />
                                   Added
                                 </div>
                               )}
                             </div>
-                            <CardContent className="space-y-4 pt-4">
-                              <div>
-                                <p className="font-semibold line-clamp-2">{item.item_name || item.item_code}</p>
-                                <p className="text-sm text-muted-foreground mt-1">
+                            <CardContent className="px-5 pt-5 pb-5">
+                              <div className="min-h-12">
+                                <p className="font-semibold leading-snug line-clamp-2">{item.item_name || item.item_code}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
                                   {item.item_code || "—"}
                                   {item.item_group ? ` · ${item.item_group}` : ""}
                                 </p>
                               </div>
-                              <div className="flex items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-base font-bold text-primary">
+                              <div className="mt-4 flex items-end justify-between gap-4">
+                                <div className="min-w-0">
+                                  <p className="text-base font-black text-primary tabular-nums leading-none">
                                     {priceLabel}
                                   </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {getAvailableUoms(item).map((entry) => entry.uom).join(", ")}
+                                  <p className="mt-2 text-[11px] text-muted-foreground line-clamp-1">
+                                    UOM: {getAvailableUoms(item).map((entry) => entry.uom).join(", ")}
                                   </p>
                                 </div>
-                                <Button type="button" variant={isSelected ? "secondary" : "default"} onClick={() => addProduct(item)}>
-                                  <Plus className="h-4 w-4 mr-1" />
-                                  Add
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={isSelected ? "secondary" : "default"}
+                                  onClick={() => addProduct(item)}
+                                  disabled={isSelected}
+                                  className={[
+                                    "rounded-full font-semibold shrink-0",
+                                    "min-w-24 justify-center",
+                                  ].join(" ")}
+                                >
+                                  {isSelected ? (
+                                    <>
+                                      <Check className="h-4 w-4 mr-1" />
+                                      Added
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="h-4 w-4 mr-1" />
+                                      Add
+                                    </>
+                                  )}
                                 </Button>
                               </div>
                             </CardContent>
@@ -635,7 +658,7 @@ export default function ReturnRequestsPage() {
                   </div>
 
                   <div className="rounded-2xl">
-                    
+
                     <div className="mt-4 space-y-3">
                       {
                         selectedProducts.map((product) => (
