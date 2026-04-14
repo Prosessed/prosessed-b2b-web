@@ -116,6 +116,8 @@ export default function ReturnRequestsPage() {
   const [dateOfRequest, setDateOfRequest] = useState(getTodayIsoDate())
   const [itemSearchTerm, setItemSearchTerm] = useState("")
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([])
+  /** Allows empty field while editing quantity (controlled number + min 1 blocked backspace). */
+  const [quantityDraftByCode, setQuantityDraftByCode] = useState<Record<string, string>>({})
   const [photos, setPhotos] = useState<File[]>([])
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([])
   const [submitError, setSubmitError] = useState("")
@@ -223,6 +225,49 @@ export default function ReturnRequestsPage() {
 
   const removeProduct = (itemCode: string) => {
     setSelectedProducts((current) => current.filter((product) => product.item_code !== itemCode))
+    setQuantityDraftByCode((prev) => {
+      const { [itemCode]: _, ...rest } = prev
+      return rest
+    })
+  }
+
+  const handleQuantityChange = (itemCode: string, raw: string) => {
+    if (raw !== "" && !/^\d*$/.test(raw)) return
+    setQuantityDraftByCode((prev) => ({ ...prev, [itemCode]: raw }))
+    if (raw !== "") {
+      const n = parseInt(raw, 10)
+      if (!Number.isNaN(n) && n >= 1) {
+        updateProduct(itemCode, { quantity: n })
+      }
+    }
+  }
+
+  const handleQuantityBlur = (itemCode: string, raw: string) => {
+    setSelectedProducts((current) =>
+      current.map((product) => {
+        if (product.item_code !== itemCode) return product
+        const fallback = product.quantity
+        let nextQty = fallback
+        if (raw !== "") {
+          const n = parseInt(raw, 10)
+          nextQty = Math.max(1, Number.isNaN(n) ? fallback : n)
+        } else {
+          nextQty = Math.max(1, fallback)
+        }
+        return { ...product, quantity: nextQty }
+      })
+    )
+    setQuantityDraftByCode((prev) => {
+      const { [itemCode]: _, ...rest } = prev
+      return rest
+    })
+  }
+
+  const resolveProductQuantity = (product: SelectedProduct) => {
+    const draft = quantityDraftByCode[product.item_code]
+    if (draft === undefined || draft === "") return Math.max(1, product.quantity)
+    const n = parseInt(draft, 10)
+    return Math.max(1, Number.isNaN(n) ? product.quantity : n)
   }
 
   const removePhoto = (indexToRemove: number) => {
@@ -236,6 +281,7 @@ export default function ReturnRequestsPage() {
     setDateOfRequest(getTodayIsoDate())
     setItemSearchTerm("")
     setSelectedProducts([])
+    setQuantityDraftByCode({})
     setPhotos([])
     setSubmitError("")
   }
@@ -262,10 +308,6 @@ export default function ReturnRequestsPage() {
       setSubmitError("Customer ID is missing. Please sign in again.")
       return
     }
-    if (!selectedInvoiceNo) {
-      setSubmitError("Please choose an invoice number.")
-      return
-    }
     if (!reasonForReturn.trim()) {
       setSubmitError("Reason for return is required.")
       return
@@ -281,13 +323,13 @@ export default function ReturnRequestsPage() {
         {
           // Backend validates this against Customer.name (e.g. "CUS-02195")
           customerName: customerIdForCreate,
-          returnForInvoiceNo: selectedInvoiceNo,
+          returnForInvoiceNo: selectedInvoiceNo.trim() || undefined,
           reasonForReturn: reasonForReturn.trim(),
           dateOfRequest,
           products: selectedProducts.map((product) => ({
             item_code: product.item_code,
             item_name: product.item_name,
-            quantity: product.quantity,
+            quantity: resolveProductQuantity(product),
             uom: product.uom,
           })),
           photos,
@@ -600,27 +642,41 @@ export default function ReturnRequestsPage() {
                 <form className="space-y-6 pb-8" onSubmit={handleSubmit}>
                   <div className="space-y-3">
                     <div>
-                      <p className="font-semibold">Invoice</p>
+                      <p className="font-semibold">Invoice (optional)</p>
+                      <p className="text-xs text-muted-foreground mt-1">Type an invoice number or pick from your invoices.</p>
                     </div>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setInvoiceDropdownOpen((open) => !open)}
-                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs"
-                      >
-                        <span className={selectedInvoiceNo ? "text-foreground" : "text-muted-foreground"}>
-                          {selectedInvoice ? getInvoiceLabel(selectedInvoice) : "Select invoice no"}
-                        </span>
-                        <Search className="h-4 w-4 text-muted-foreground" />
-                      </button>
+                    <div className="relative space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          id="return-invoice-no"
+                          value={selectedInvoiceNo}
+                          onChange={(event) => setSelectedInvoiceNo(event.target.value)}
+                          placeholder="Invoice number"
+                          className="h-10 flex-1"
+                          aria-label="Invoice number"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="shrink-0"
+                          onClick={() => setInvoiceDropdownOpen((open) => !open)}
+                          aria-expanded={invoiceDropdownOpen}
+                          aria-controls="invoice-browse-list"
+                        >
+                          Browse
+                        </Button>
+                      </div>
                       {invoiceDropdownOpen && (
-                        <div className="absolute z-50 mt-2 w-full rounded-xl border bg-popover p-2 shadow-lg">
+                        <div
+                          id="invoice-browse-list"
+                          className="absolute z-50 mt-1 w-full rounded-xl border bg-popover p-2 shadow-lg"
+                        >
                           <div className="relative mb-2">
                             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                               value={invoiceQuery}
                               onChange={(event) => setInvoiceQuery(event.target.value)}
-                              placeholder="Search invoice number"
+                              placeholder="Search invoices"
                               className="pl-9"
                               autoFocus
                             />
@@ -650,9 +706,9 @@ export default function ReturnRequestsPage() {
                         </div>
                       )}
                     </div>
-                    {selectedInvoice && (
+                    {selectedInvoice && selectedInvoiceNo.trim() === getInvoiceNumber(selectedInvoice) && (
                       <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
-                        Selected invoice: <span className="font-medium text-foreground">{getInvoiceLabel(selectedInvoice)}</span>
+                        Matched invoice: <span className="font-medium text-foreground">{getInvoiceLabel(selectedInvoice)}</span>
                       </div>
                     )}
                   </div>
@@ -679,15 +735,17 @@ export default function ReturnRequestsPage() {
                                 </label>
                                 <Input
                                   id={`qty-${product.item_code}`}
-                                  type="number"
-                                  min="1"
-                                  step="1"
-                                  value={product.quantity}
-                                  onChange={(event) =>
-                                    updateProduct(product.item_code, {
-                                      quantity: Math.max(1, Number(event.target.value) || 1),
-                                    })
+                                  type="text"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  aria-label={`Quantity for ${product.item_name || product.item_code}`}
+                                  value={
+                                    quantityDraftByCode[product.item_code] !== undefined
+                                      ? quantityDraftByCode[product.item_code]
+                                      : String(product.quantity)
                                   }
+                                  onChange={(event) => handleQuantityChange(product.item_code, event.target.value)}
+                                  onBlur={(event) => handleQuantityBlur(product.item_code, event.target.value)}
                                 />
                               </div>
                               <div className="space-y-2">
