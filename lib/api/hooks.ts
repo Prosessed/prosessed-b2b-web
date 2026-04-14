@@ -798,10 +798,17 @@ export interface BannersAndDealsResponse {
 }
 
 export function useBannersAndDeals() {
-  const key = "bannersAndDeals"
+  const { user, isLoading: authLoading } = useAuth()
 
-  return useSWR(
-    key,
+  // Session + company in the key so SWR does not reuse a stale cache after login
+  // or when switching tenant (was showing defaults until manual refresh).
+  const swrKey =
+    authLoading
+      ? null
+      : (["bannersAndDeals", user?.sid ?? "guest", user?.companyUrl ?? ""] as const)
+
+  const swr = useSWR(
+    swrKey,
     async () => {
       try {
         const response = await apiClient.request<any>(
@@ -809,6 +816,15 @@ export function useBannersAndDeals() {
           {
             method: "POST",
             body: JSON.stringify({}),
+            ...(user
+              ? {
+                  auth: {
+                    apiKey: user.apiKey,
+                    apiSecret: user.apiSecret,
+                    sid: user.sid,
+                  },
+                }
+              : {}),
           }
         )
 
@@ -833,6 +849,11 @@ export function useBannersAndDeals() {
       dedupingInterval: 60000, // Cache for 1 minute
     }
   )
+
+  return {
+    ...swr,
+    isLoading: authLoading || swr.isLoading,
+  }
 }
 
 /** `customerName` must be ERPNext `Customer.customer_name` (see `useCustomerName`), not document `name`. */
@@ -936,7 +957,7 @@ export interface CreateSalesOrderReturnProductInput {
 
 export interface CreateSalesOrderReturnInput {
   customerName: string
-  returnForInvoiceNo: string
+  returnForInvoiceNo?: string | null
   reasonForReturn: string
   dateOfRequest: string
   products: CreateSalesOrderReturnProductInput[]
@@ -1090,7 +1111,10 @@ export async function createSalesOrderReturn(
     throw new Error("Missing required field: customer_name")
   }
   formData.append("customer_name", customerName)
-  formData.append("return_for_invoice_no", input.returnForInvoiceNo)
+  const invoiceNo = String(input.returnForInvoiceNo ?? "").trim()
+  if (invoiceNo) {
+    formData.append("return_for_invoice_no", invoiceNo)
+  }
   formData.append("reason_for_return", input.reasonForReturn)
   formData.append("date_of_request", input.dateOfRequest)
   formData.append("products", JSON.stringify(input.products))
@@ -1104,7 +1128,6 @@ export async function createSalesOrderReturn(
     formData.append("customer_signature", input.customerSignature)
   }
 
-  console.log("customer_name", customerName)
   const candidateEndpoints = [
     "/api/method/prosessed_orderit.orderit.create_sales_order_return",
   ]

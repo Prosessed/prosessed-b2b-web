@@ -41,18 +41,7 @@ export function Navigation() {
   const [searchTerm, setSearchTerm] = useState("")
   const debouncedSearch = useDebounce(searchTerm, 400)
   const { data: searchResults, isValidating: isSearching } = useSearch(debouncedSearch)
-  const { data: bannersData } = useBannersAndDeals()
-
-  // Debug logging
-  useEffect(() => {
-    console.log("[Search Navigation] Term:", searchTerm, "Debounced:", debouncedSearch, "Results:", searchResults?.items?.length || 0, "IsSearching:", isSearching)
-    console.log("[Search Navigation] Full Results:", searchResults)
-    if (searchResults) {
-      console.log("[Search Navigation] Items:", searchResults.items)
-      console.log("[Search Navigation] Categories:", searchResults.categories)
-      console.log("[Search Navigation] Brands:", searchResults.brands)
-    }
-  }, [searchTerm, debouncedSearch, searchResults, isSearching])
+  const { data: bannersData, isLoading: bannersLoading } = useBannersAndDeals()
 
   const handleCategoriesNavClick = (e: React.MouseEvent) => {
     if (pathname !== "/") return
@@ -96,7 +85,9 @@ export function Navigation() {
         <div className="container mx-auto flex h-16 items-center gap-4 px-4">
         {/* Company Logo */}
         <Link href="/" className="flex items-center min-w-0 shrink-0">
-          {companyLogo ? (
+          {bannersLoading ? (
+            <Skeleton className="h-14 w-14 sm:h-16 sm:w-16 rounded-md" aria-hidden />
+          ) : companyLogo ? (
             <div className="relative h-14 w-14 sm:h-16 sm:w-16">
               <Image
                 src={companyLogo}
