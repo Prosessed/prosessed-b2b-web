@@ -17,11 +17,10 @@ import {
 import { parseTags } from "@/lib/utils/tags"
 import { useItems, useMostBoughtItems, useSearch, useTaggedItems } from "@/lib/api/hooks"
 import { getFirstImageUrl } from "@/lib/utils/image-url"
-import { fetchOrderitSettings } from "@/lib/api/orderit-settings"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
 import { useAuth } from "@/lib/auth/context"
 import { motion, AnimatePresence } from "framer-motion"
-import { Filter, LayoutGrid, List, Loader2, Package, X } from "lucide-react"
+import { Filter, LayoutGrid, List, Loader2, X } from "lucide-react"
 
 const getAllCategories = (tree: any[]): string[] => {
   const categories: string[] = []
@@ -88,17 +87,7 @@ export default function ProductsPage() {
   const pageSizeFromUrl = searchParams.get("page_size")
   const viewFromUrl = searchParams.get("view")
   const gridColsFromUrl = searchParams.get("cols")
-  const inStockOnlyParam = searchParams.get("in_stock_only")
-  /** Product page uses explicit on/off (no auto): true => inStockOnly=1, false => inStockOnly=0 */
-  const inStockOnlyFilter: boolean =
-    inStockOnlyParam === "true" || inStockOnlyParam === "1"
-      ? true
-      : inStockOnlyParam === "false" || inStockOnlyParam === "0"
-        ? false
-        : false
-
   const observerTarget = useRef<HTMLDivElement>(null)
-  const hasInitializedStockFromSettings = useRef(false)
 
   // Initialize state from URL params (legacy: featured/price-low/price-high still accepted)
   type SortByType = "recommended" | "name-asc" | "name-desc"
@@ -149,42 +138,6 @@ export default function ProductsPage() {
   const { data: categoryTree } = useItemGroupTree(false)
   const allCategories = useMemo(() => getAllCategories(categoryTree || []), [categoryTree])
 
-  // Initialize stock toggle based on OrderIT setting `show_in_stock_only`
-  useEffect(() => {
-    if (!user) return
-    if (hasInitializedStockFromSettings.current) return
-    if (
-      inStockOnlyParam === "true" ||
-      inStockOnlyParam === "false" ||
-      inStockOnlyParam === "1" ||
-      inStockOnlyParam === "0"
-    ) {
-      hasInitializedStockFromSettings.current = true
-      return
-    }
-
-    hasInitializedStockFromSettings.current = true
-    const run = async () => {
-      const settings = await fetchOrderitSettings({
-        apiKey: user.apiKey,
-        apiSecret: user.apiSecret,
-        sid: user.sid,
-      })
-      const showInStockOnly =
-        settings?.show_in_stock_only === 1 ||
-        settings?.show_in_stock_only === "1" ||
-        settings?.show_in_stock_only === true
-
-      // Only auto-enable when OrderIT explicitly forces it on.
-      if (!showInStockOnly) return
-
-      const params = new URLSearchParams(searchParams.toString())
-      params.set("in_stock_only", "1")
-      router.push(`/products?${params.toString()}`, { scroll: false })
-    }
-    run()
-  }, [user, inStockOnlyParam, router, searchParams])
-
   const slugifyCategory = useCallback((value: string) => {
     return value
       .toLowerCase()
@@ -216,7 +169,7 @@ export default function ProductsPage() {
     searchQuery || "",
     currentPage,
     pageSize,
-    { sortByQty: sortByQtyForApi, inStockOnly: inStockOnlyFilter }
+    { sortByQty: sortByQtyForApi }
   )
 
   // Fetch products: use items vtwo when any filter (category/brand) or search; use most-bought only when solely previously_bought
@@ -227,7 +180,6 @@ export default function ProductsPage() {
     page_size: shouldFetchItems ? pageSize : undefined,
     sortByQty: shouldFetchItems ? sortByQtyForApi : undefined,
     filterByBrand: shouldFetchItems && selectedBrands.length > 0 ? selectedBrands : undefined,
-    inStockOnly: shouldFetchItems ? inStockOnlyFilter : undefined,
   })
 
   const { data: mostBoughtData, isLoading: mostBoughtLoading, isValidating: mostBoughtValidating, error: mostBoughtError } = useMostBoughtItems({
@@ -236,13 +188,11 @@ export default function ProductsPage() {
     sortByQty: effectivePreviouslyBought ? sortByQtyForApi : undefined,
     filterByBrand: effectivePreviouslyBought && selectedBrands.length > 0 ? selectedBrands : undefined,
     time_frame: effectivePreviouslyBought ? "6 months" : undefined,
-    inStockOnly: effectivePreviouslyBought ? inStockOnlyFilter : undefined,
   })
 
   const useTaggedView = tagFromUrl || taggedFromUrl
   const { data: taggedItemsData, isLoading: taggedLoading, error: taggedError } = useTaggedItems(undefined, {
     sortByQty: useTaggedView ? sortByQtyForApi : undefined,
-    inStockOnly: useTaggedView ? inStockOnlyFilter : undefined,
   })
   const productsWhenTag = useMemo(() => {
     if (!useTaggedView || !taggedItemsData || !Array.isArray(taggedItemsData)) return []
@@ -297,8 +247,8 @@ export default function ProductsPage() {
   
   // Create filter key for comparison
   const currentFiltersKey = useMemo(() => {
-    return `${selectedCategory || ""}|${selectedBrandsKey}|${searchQuery || ""}|${tagFromUrl || ""}|${taggedFromUrl}|${pageSize}|${inStockOnlyParam || ""}|${sortBy}`
-  }, [selectedCategory, selectedBrandsKey, searchQuery, tagFromUrl, taggedFromUrl, pageSize, inStockOnlyParam, sortBy])
+    return `${selectedCategory || ""}|${selectedBrandsKey}|${searchQuery || ""}|${tagFromUrl || ""}|${taggedFromUrl}|${pageSize}|${sortBy}`
+  }, [selectedCategory, selectedBrandsKey, searchQuery, tagFromUrl, taggedFromUrl, pageSize, sortBy])
 
   // Sync state from URL params when they change (e.g., browser back/forward)
   useEffect(() => {
@@ -442,8 +392,6 @@ export default function ProductsPage() {
     cols?: 2 | 3 | 4
     tag?: string | null
     tagged?: string | null
-    /** true = in stock only, false = include all, null = remove param (follow settings) */
-    inStockOnly?: boolean | null
   }) => {
     const params = new URLSearchParams(searchParams.toString())
 
@@ -519,16 +467,6 @@ export default function ProductsPage() {
       }
     }
 
-    if (updates.inStockOnly !== undefined) {
-      if (updates.inStockOnly === true) {
-        params.set("in_stock_only", "1")
-      } else if (updates.inStockOnly === false) {
-        params.set("in_stock_only", "0")
-      } else {
-        params.delete("in_stock_only")
-      }
-    }
-
     router.push(`/products?${params.toString()}`, { scroll: false })
   }, [searchParams, router])
 
@@ -558,13 +496,8 @@ export default function ProductsPage() {
       sort: "recommended",
       tag: null,
       tagged: null,
-      inStockOnly: null,
     })
   }, [updateUrlParams])
-
-  const handleInStockToggle = useCallback(() => {
-    updateUrlParams({ inStockOnly: !inStockOnlyFilter })
-  }, [inStockOnlyFilter, updateUrlParams])
 
   const handleSortByChange = useCallback((value: string) => {
     if (!["recommended", "name-asc", "name-desc"].includes(value)) return
@@ -869,42 +802,8 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              {/* Row 2: In stock, View (Grid/List), Column selector */}
+              {/* Row 2: View (Grid/List), Column selector */}
               <div className="flex flex-wrap items-center gap-6 sm:gap-8 pt-4 border-t border-border/40">
-                {/* In stock */}
-                <div className="flex items-center gap-4 min-w-0">
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Package
-                      className={`h-4 w-4 ${inStockOnlyFilter === true ? "text-primary" : "text-muted-foreground"}`}
-                      aria-hidden
-                    />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap">
-                      In stock
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={inStockOnlyFilter === true}
-                      aria-label="Toggle in-stock only filter"
-                      onClick={handleInStockToggle}
-                      className={`
-                        relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200
-                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
-                        ${inStockOnlyFilter === true ? "bg-primary" : inStockOnlyFilter === false ? "bg-muted-foreground/40" : "bg-muted"}
-                      `}
-                    >
-                      <span
-                        className={`
-                          absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-background shadow-md transition-transform duration-200
-                          ${inStockOnlyFilter === true ? "translate-x-5" : "translate-x-0"}
-                        `}
-                      />
-                    </button>
-                  </div>
-                </div>
-
                 {/* View mode */}
                 <div className="flex items-center gap-4 min-w-0">
                   <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground shrink-0">
