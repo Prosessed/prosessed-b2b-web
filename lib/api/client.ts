@@ -29,6 +29,7 @@ export interface B2bRegistrationPayload {
   contact_person: string
   email: string
   phone: string
+  portal_link: string
   gst_number: string
   address_line_1: string
   address_line_2: string
@@ -165,6 +166,41 @@ const apiLogger = {
     console.error(error)
     console.groupEnd()
   },
+}
+
+/** Frappe often returns JSON with `exc_type`, `exception`, `_server_messages` instead of HTTP error text. */
+const parseFrappeErrorMessage = (data: unknown): string | undefined => {
+  if (data == null || typeof data !== "object") return undefined
+  const o = data as Record<string, unknown>
+
+  if (typeof o._server_messages === "string") {
+    try {
+      const parsed = JSON.parse(o._server_messages) as unknown
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const first = parsed[0] as { message?: string }
+        if (typeof first?.message === "string") return first.message
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (typeof o.exception === "string" && o.exception.trim()) {
+    const lines = o.exception.trim().split("\n")
+    const last = lines[lines.length - 1]?.trim()
+    if (last) return last
+  }
+
+  if (typeof o.message === "string" && o.message.trim()) return o.message
+
+  if (typeof o.exc_type === "string" && o.exc_type.trim()) return o.exc_type
+
+  return undefined
+}
+
+const isFrappeExceptionPayload = (data: unknown): boolean => {
+  if (data == null || typeof data !== "object") return false
+  return typeof (data as { exc_type?: unknown }).exc_type === "string"
 }
 
 /* ============================================================
@@ -570,16 +606,13 @@ export const apiClient = {
     throw new ApiError(502, "Unexpected statement response from server.")
   },
 
-  /* ------------------ B2B registration (public, no auth) ------------------ */
+  /**
+   * B2B registration — uses Frappe whitelisted method (same host + token as company lookup).
+   * Plain `/api/b2b-registration` is not a Frappe route and can yield DoesNotExistError.
+   */
   async createB2bRegistration(
-    payload: B2bRegistrationPayload,
-    companyUrl?: string | null
+    payload: B2bRegistrationPayload
   ): Promise<{ message?: unknown }> {
-    const trimmed = typeof companyUrl === "string" ? companyUrl.trim() : ""
-    if (trimmed) {
-      setApiBaseUrl(trimmed)
-    }
-
     const debugB2b =
       process.env.NODE_ENV === "development" ||
       process.env.NEXT_PUBLIC_DEBUG_B2B_REGISTRATION === "1"
@@ -596,19 +629,71 @@ export const apiClient = {
             : payload.phone,
       }
       console.groupCollapsed("[B2B] createB2bRegistration")
-      console.log("companyUrl:", trimmed || "(default)")
-      console.log("baseUrl:", getApiBaseUrl())
+      console.log("baseUrl:", COMPANY_FETCH_BASE_URL)
       console.log("payload:", safePayload)
       console.groupEnd()
     }
 
-    return this.request<{ message?: unknown }>(
-      "/api/method/prosessed_order.api.create_b2b_registration",
-      {
-        method: "POST",
+    const url = `${COMPANY_FETCH_BASE_URL.replace(/\/$/, "")}/api/resource/B2B Registration Form`
+    const method = "POST"
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      Authorization: `token ${FRAPPE_API_TOKEN}`,
+    })
+
+    apiLogger.request(method, url, headers, JSON.stringify(payload))
+    const start = performance.now()
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
         body: JSON.stringify(payload),
-        auth: {},
+        credentials: "omit",
+      })
+
+      const timeMs = Math.round(performance.now() - start)
+
+      let data: unknown = null
+      try {
+        data = await response.clone().json()
+      } catch {
+        data = "[Non-JSON response]"
       }
-    )
+
+      apiLogger.response(url, response.status, data, timeMs)
+
+      if (typeof data === "object" && data !== null && isFrappeExceptionPayload(data)) {
+        const errMsg =
+          parseFrappeErrorMessage(data) ||
+          "Registration could not be completed. Please verify your details or try again."
+        const status = response.ok ? 400 : response.status
+        throw new ApiError(status, errMsg)
+      }
+
+      if (!response.ok) {
+        const errMsg =
+          parseFrappeErrorMessage(data) ||
+          (() => {
+            const d = data as Record<string, unknown> | null
+            if (d && typeof d === "object") {
+              if (typeof d.message === "string") return d.message
+              if (typeof d.detail === "string") return d.detail
+              if (typeof d.error === "string") return d.error
+            }
+            const m = (data as { message?: unknown })?.message
+            if (typeof m === "string") return m
+            if (m != null) return JSON.stringify(m)
+            return response.statusText
+          })()
+        throw new ApiError(response.status, errMsg)
+      }
+
+      return data as { message?: unknown }
+    } catch (err) {
+      const timeMs = Math.round(performance.now() - start)
+      apiLogger.error(url, err, timeMs)
+      throw err
+    }
   },
 }

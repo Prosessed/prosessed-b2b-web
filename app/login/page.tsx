@@ -128,12 +128,12 @@ export default function LoginPage() {
                   )}
                 </Button>
 
-                {/* <p className="text-center text-sm text-muted-foreground pt-2">
+                <p className="text-center text-sm text-muted-foreground pt-2">
                   New to the portal?{" "}
                   <Link href="/signup" className="font-semibold text-primary hover:underline underline-offset-4">
                     Create an account
                   </Link>
-                </p> */}
+                </p>
 
               </CardContent>
             </form>

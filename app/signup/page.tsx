@@ -14,6 +14,8 @@ import {
   type B2bRegistrationPayload,
 } from "@/lib/api/client"
 
+type B2bRegistrationFormFields = Omit<B2bRegistrationPayload, "portal_link">
+
 const normalizePortalUrl = (raw: string): string | undefined => {
   const t = raw.trim()
   if (!t) return undefined
@@ -43,7 +45,7 @@ const formatApiMessage = (msg: unknown): string => {
   }
 }
 
-const initialForm: B2bRegistrationPayload = {
+const initialForm: B2bRegistrationFormFields = {
   company_name: "",
   contact_person: "",
   email: "",
@@ -59,14 +61,14 @@ const initialForm: B2bRegistrationPayload = {
 
 export default function SignUpPage() {
   const [portalUrl, setPortalUrl] = useState("")
-  const [form, setForm] = useState<B2bRegistrationPayload>(initialForm)
+  const [form, setForm] = useState<B2bRegistrationFormFields>(initialForm)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [isSuccess, setIsSuccess] = useState(false)
   const [successDetail, setSuccessDetail] = useState("")
 
   const handleFieldChange = useCallback(
-    (field: keyof B2bRegistrationPayload) =>
+    (field: keyof B2bRegistrationFormFields) =>
       (e: React.ChangeEvent<HTMLInputElement>) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }))
       },
@@ -105,11 +107,18 @@ export default function SignUpPage() {
         return
       }
 
+      if (!portal) {
+        setError("Please enter your portal URL.")
+        setIsLoading(false)
+        return
+      }
+
       const payload: B2bRegistrationPayload = {
         company_name: form.company_name.trim(),
         contact_person: form.contact_person.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
+        portal_link: portal,
         gst_number: form.gst_number.trim(),
         address_line_1: form.address_line_1.trim(),
         address_line_2: form.address_line_2.trim(),
@@ -136,7 +145,7 @@ export default function SignUpPage() {
         console.log("[B2B] calling apiClient.createB2bRegistration…")
       }
 
-      const res = await apiClient.createB2bRegistration(payload, portal)
+      const res = await apiClient.createB2bRegistration(payload)
       const detail = formatApiMessage(res?.message)
       setSuccessDetail(detail || "Thank you — we have received your registration.")
       setIsSuccess(true)
