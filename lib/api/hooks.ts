@@ -9,6 +9,8 @@ import {
   mergeOrderitIntoBody,
 } from "./orderit-settings"
 
+const isTruthyOne = (v: unknown): boolean => v === 1 || v === "1" || v === true
+
 type WarehousesByCustomerBranchResponse = {
   filtered?: boolean
   customer_branch?: string
@@ -122,14 +124,23 @@ export function useItems(params: UseItemsParams) {
 
       const body = mergeOrderitIntoBody(baseBody, settings, {
         // Do not apply in-stock filter from portal settings on initial load; only when user explicitly sets it
-        inStockOnlyOverride: params.inStockOnly === true ? true : false,
+        inStockOnlyOverride:
+          params.inStockOnly === true ? true : params.inStockOnly === false ? false : undefined,
         sortByQty:
           params.sortByQty === "asc" || params.sortByQty === "desc" ? params.sortByQty : undefined,
       })
 
       const extraParams = new URLSearchParams()
-      if (params.inStockOnly === true) {
-        extraParams.set("inStockOnly", "1")
+      const resolvedInStockOnly =
+        params.inStockOnly === true
+          ? "1"
+          : params.inStockOnly === false
+            ? "0"
+            : settings && isTruthyOne((settings as any).show_in_stock_only)
+              ? "1"
+              : "0"
+      extraParams.set("inStockOnly", resolvedInStockOnly)
+      if (resolvedInStockOnly === "1") {
         extraParams.set("warehouse", String(resolvedWarehouse || ""))
         if (!(params.sortByQty === "asc" || params.sortByQty === "desc")) {
           extraParams.set("sortByRecommended", "1")
@@ -241,14 +252,23 @@ export function useSearch(
       const requestBody = mergeOrderitIntoBody(baseBody, settings, {
         sortByQty: options?.sortByQty,
         // Same behavior as items/most-bought: only respect in-stock when user explicitly turns it on
-        inStockOnlyOverride: options?.inStockOnly === true ? true : false,
+        inStockOnlyOverride:
+          options?.inStockOnly === true ? true : options?.inStockOnly === false ? false : undefined,
       })
 
       console.log(`[Search API] Request:`, requestBody)
 
       const extraParams = new URLSearchParams()
-      if (options?.inStockOnly === true) {
-        extraParams.set("inStockOnly", "1")
+      const resolvedInStockOnly =
+        options?.inStockOnly === true
+          ? "1"
+          : options?.inStockOnly === false
+            ? "0"
+            : settings && isTruthyOne((settings as any).show_in_stock_only)
+              ? "1"
+              : "0"
+      extraParams.set("inStockOnly", resolvedInStockOnly)
+      if (resolvedInStockOnly === "1") {
         extraParams.set("warehouse", String(resolvedWarehouse || ""))
         if (!(options?.sortByQty === "asc" || options?.sortByQty === "desc")) {
           extraParams.set("sortByRecommended", "1")
@@ -388,7 +408,8 @@ export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
         sortByQty:
           params.sortByQty === "asc" || params.sortByQty === "desc" ? params.sortByQty : undefined,
         // Do not apply in-stock filter from portal settings on initial load; only when user explicitly sets it
-        inStockOnlyOverride: params.inStockOnly === true ? true : false,
+        inStockOnlyOverride:
+          params.inStockOnly === true ? true : params.inStockOnly === false ? false : undefined,
       })
 
       const extraParams = new URLSearchParams()
@@ -728,7 +749,8 @@ export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptio
             ? options.sortByQty
             : undefined,
         // Do not apply in-stock filter from portal settings on initial load; only when user explicitly sets it
-        inStockOnlyOverride: options?.inStockOnly === true ? true : false,
+        inStockOnlyOverride:
+          options?.inStockOnly === true ? true : options?.inStockOnly === false ? false : undefined,
       })
 
       const response = await apiClient.request<any>(

@@ -19,23 +19,11 @@ const isTruthyOne = (v: unknown): boolean =>
 
 type Auth = { apiKey?: string | null; apiSecret?: string | null; sid?: string | null }
 
-/** Short-lived cache per auth fingerprint to avoid N+1 before each product call. */
-const cache = new Map<string, { settings: OrderitSettings | null; expires: number }>()
-const TTL_MS = 60_000
-
-const cacheKey = (auth: Auth) =>
-  (auth.sid ? `sid:${auth.sid}` : `${auth.apiKey}:${auth.apiSecret}`).slice(0, 80)
-
 /**
  * Fetch OrderIT settings once (per auth) before product APIs.
- * Safe to call from every product hook fetcher — deduped via cache.
+ * Always fetches fresh (no cache) so flags stay up-to-date.
  */
 export const fetchOrderitSettings = async (auth: Auth): Promise<OrderitSettings | null> => {
-  const key = cacheKey(auth)
-  const now = Date.now()
-  const hit = cache.get(key)
-  if (hit && hit.expires > now) return hit.settings
-
   try {
     const response = await apiClient.request<{ message?: OrderitSettings } | OrderitSettings>(
       ORDERIT_SETTINGS_PATH,
@@ -51,10 +39,8 @@ export const fetchOrderitSettings = async (auth: Auth): Promise<OrderitSettings 
         : (response as OrderitSettings) && typeof response === "object" && !Array.isArray(response)
           ? (response as OrderitSettings)
           : null
-    cache.set(key, { settings, expires: now + TTL_MS })
     return settings
   } catch {
-    cache.set(key, { settings: null, expires: now + TTL_MS })
     return null
   }
 }
