@@ -4,8 +4,15 @@
  */
 export const parseTags = (tagsStr: string | undefined): string[] => {
   if (!tagsStr || typeof tagsStr !== "string") return []
-  return tagsStr
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean)
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const part of tagsStr.split(",")) {
+    const t = part.trim()
+    if (!t) continue
+    const key = t.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(t)
+  }
+  return out
 }

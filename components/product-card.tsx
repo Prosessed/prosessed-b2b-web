@@ -197,10 +197,11 @@ export function ProductCard({
       >
         {/* Tags – top-left overlay, grocery-style; click → /products?tag= */}
         {tagList.length > 0 && (
-          <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-1.5 max-w-[70%]" aria-label={`Tags: ${tagList.join(", ")}`}>
-            {tagList.slice(0, 2).map((tagLabel) => (
-              <TagBadge key={tagLabel} tag={tagLabel} variant="overlay" />
-            ))}
+          <div
+            className="absolute top-2.5 left-2.5 z-10 flex max-w-[65%] items-start justify-start text-left"
+            aria-label={`Tag: ${tagList[0]}`}
+          >
+            <TagBadge tag={tagList[0]} variant="overlay" />
           </div>
         )}
 
@@ -223,8 +224,9 @@ export function ProductCard({
               src={getDisplayImageUrl(image, getApiBaseUrl()) || "/placeholder.svg"}
               alt={name}
               fill
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="object-contain p-3 sm:p-4 group-hover:scale-110 transition-transform duration-500 ease-out"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
+              quality={90}
+              className="object-contain p-2 sm:p-3"
             />
           </div>
         </Link>

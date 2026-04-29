@@ -42,7 +42,7 @@ export function HeroCarousel({ banners }: HeroCarouselProps) {
   }
 
   return (
-    <div className="relative w-full aspect-[21/9] md:aspect-[3/1] lg:aspect-[21/6] overflow-hidden rounded-lg">
+    <div className="relative w-full aspect-[21/9] md:aspect-[3/1] lg:aspect-[21/6] overflow-hidden rounded-lg bg-muted">
       {/* Banners */}
       <div
         className="flex transition-transform duration-500 ease-out h-full"
@@ -53,12 +53,12 @@ export function HeroCarousel({ banners }: HeroCarouselProps) {
           const linkHref = banner.redirect_url || banner.ctaLink || "/products"
           
           return (
-            <div key={banner.id || index} className="min-w-full relative">
+            <div key={banner.id || index} className="min-w-full relative h-full bg-muted">
               <Image
                 src={imageSrc || "/placeholder.svg"}
                 alt={banner.title || "Banner"}
                 fill
-                className="object-cover"
+                className="object-contain object-center p-2 sm:p-3 md:p-4"
                 priority={currentIndex === 0}
               />
               {(banner.title || banner.subtitle) && (

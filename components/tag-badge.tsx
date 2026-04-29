@@ -13,17 +13,15 @@ interface TagBadgeProps {
 
 export function TagBadge({ tag, href: asLink = true, variant = "overlay", className = "" }: TagBadgeProps) {
   const baseOverlay =
-    "inline-block px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider shadow-md border-2 border-white/80 bg-primary text-primary-foreground"
+    "inline-block px-2 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wide text-left leading-tight shadow-sm border border-white/35 bg-black/55 text-white/95 backdrop-blur-[2px]"
   const baseChip =
     "inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20 hover:border-primary/50 transition-colors"
 
-  const style = variant === "overlay" ? { transform: "rotate(-3deg)" } : undefined
   const classNames = variant === "overlay" ? baseOverlay : baseChip
 
   const content = (
     <span
       className={`${classNames} ${className}`}
-      style={style}
       role={asLink ? undefined : "status"}
       aria-label={asLink ? `View products tagged ${tag}` : undefined}
     >

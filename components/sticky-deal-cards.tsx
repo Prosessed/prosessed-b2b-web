@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Sparkles, Tag, Zap } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import { motion } from "framer-motion"
 import Image from "next/image"
 import { useBannersAndDeals } from "@/lib/api/hooks"
@@ -21,7 +21,6 @@ const defaultDeals = [
     ctaText: "Shop Now",
     ctaLink: "/products?deal=flash-sale",
     badge: "Hot Deal",
-    icon: Zap,
     gradient: "from-orange-500 to-red-500",
   },
 ]
@@ -38,7 +37,6 @@ export function StickyDealCards() {
     ctaText: "View Deal",
     ctaLink: deal.redirect_url || "/products",
     badge: deal.tag || "Hot Deal",
-    icon: index % 3 === 0 ? Zap : index % 3 === 1 ? Sparkles : Tag,
     gradient: index % 3 === 0 ? "from-orange-500 to-red-500" : index % 3 === 1 ? "from-blue-500 to-purple-500" : "from-green-500 to-emerald-500",
   }))
 
@@ -87,7 +85,9 @@ export function StickyDealCards() {
                     src={getDisplayImageUrl(deal.image, getApiBaseUrl()) || "/placeholder.svg"}
                     alt={deal.title}
                     fill
-                    className="object-cover group-hover:scale-110 transition-transform duration-500"
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    quality={90}
+                    className="object-contain object-center bg-muted p-2 sm:p-3"
                   />
                   <div className={`absolute inset-0 bg-linear-to-br ${deal.gradient} opacity-60 group-hover:opacity-70 transition-opacity`} />
                   <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent" />
@@ -95,18 +95,17 @@ export function StickyDealCards() {
                 
                 {/* Content */}
                 <div className="relative p-6 flex flex-col h-full min-h-[200px]">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <Badge className="mb-2 bg-white/20 backdrop-blur-sm text-white border-white/30 font-bold">
-                        {deal.badge}
-                      </Badge>
-                      <h3 className="text-2xl font-black mb-1 text-white">{deal.title}</h3>
+                  <div className="mb-4 text-left">
+                    <Badge className="mb-2 bg-white/20 backdrop-blur-sm text-white border-white/30 font-bold">
+                      {deal.badge}
+                    </Badge>
+                    <h3 className="text-2xl font-black mb-1 text-white">{deal.title}</h3>
+                    {deal.subtitle ? (
                       <p className="text-lg font-bold text-white mb-2">{deal.subtitle}</p>
+                    ) : null}
+                    {deal.description && deal.description !== deal.badge ? (
                       <p className="text-sm text-white/90">{deal.description}</p>
-                    </div>
-                    <div className={`p-3 rounded-xl bg-white/20 backdrop-blur-sm text-white shadow-lg border border-white/30`}>
-                      <deal.icon className="h-6 w-6" />
-                    </div>
+                    ) : null}
                   </div>
                   <div className="mt-auto">
                     <div className="flex items-center gap-2 text-white font-bold group-hover:gap-3 transition-all bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg w-fit border border-white/30">
