@@ -133,6 +133,7 @@ export default function ProductsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const loadMoreStartedAtRef = useRef<number | null>(null)
+  const pendingLoadMoreRef = useRef(false)
   const [canLoadMoreFallback, setCanLoadMoreFallback] = useState(true)
   const [isCategoryChanging, setIsCategoryChanging] = useState(false)
   const isResettingRef = useRef(false)
@@ -406,16 +407,34 @@ export default function ProductsPage() {
     return () => window.clearTimeout(t)
   }, [isLoadingMore, isValidating])
 
+  // If the sentinel intersected during validation, run it once validation completes.
+  useEffect(() => {
+    if (!pendingLoadMoreRef.current) return
+    if (!hasNextPage) return
+    if (isLoadingMore) return
+    if (isValidating) return
+    if (isCategoryChanging) return
+    pendingLoadMoreRef.current = false
+    setIsLoadingMore(true)
+    setCurrentPage((prev) => prev + 1)
+  }, [hasNextPage, isLoadingMore, isValidating, isCategoryChanging])
+
   // Infinite scroll observer
   useEffect(() => {
     if (!hasNextPage) return
     if (isLoadingMore) return
-    if (isValidating) return
     if (isCategoryChanging) return
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
+          if (!hasNextPage) return
+          if (isLoadingMore) return
+          if (isValidating) {
+            pendingLoadMoreRef.current = true
+            return
+          }
+          if (isCategoryChanging) return
           setIsLoadingMore(true)
           setCurrentPage((prev) => prev + 1)
         }
