@@ -30,6 +30,7 @@ export interface CreateCartParams {
   payment_terms_template?: string
   coupon_code?: string
   trip_id?: string
+  custom_order_source?: "B2B Portal" | string
 }
 
 export interface CartResponse {
@@ -204,6 +205,7 @@ export interface CreateSalesOrderFromCartParams {
   longitude: string
   /** Expected format: YYYY-MM-DD */
   delivery_date: string
+  custom_order_source?: "App" | string
 }
 
 export interface CreateSalesOrderFromCartResponse {
@@ -231,6 +233,7 @@ export async function createCart(
         customer_id: user.customerId,
         company: user.companyName,
         ...params,
+        custom_order_source: "B2B Portal",
       }),
       auth: {
         apiKey: user.apiKey,

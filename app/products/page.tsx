@@ -127,7 +127,7 @@ export default function ProductsPage() {
     return []
   })
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
-  const [isDesktopFiltersCollapsed, setIsDesktopFiltersCollapsed] = useState(false)
+  const [isDesktopFiltersCollapsed, setIsDesktopFiltersCollapsed] = useState(true)
   const [isDesktopViewport, setIsDesktopViewport] = useState(false)
   const [allProducts, setAllProducts] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -311,6 +311,8 @@ export default function ProductsPage() {
     prevFiltersRef.current = currentFiltersKey
     isResettingRef.current = true
     setCurrentPage(1)
+    setIsLoadingMore(false)
+    loadMoreStartedAtRef.current = null
     setCanLoadMoreFallback(true)
     // Only clear products if we're actually changing filters (not on initial mount with same filters)
     if (allProducts.length > 0) {
@@ -342,19 +344,8 @@ export default function ProductsPage() {
     }
     
     // When we have new data for page 1, always apply it (even during reset window) so products show after category/nav click
-    if (currentPage === 1 && products.length > 0) {
-      setAllProducts(products)
-      setIsCategoryChanging(false)
-      // If backend doesn't send pagination, infer "may have more" from first page size.
-      if (typeof pagination?.has_next_page !== "boolean") {
-        setCanLoadMoreFallback(products.length >= pageSize)
-      }
-      prevProductsLengthRef.current = products.length
-      prevPageRef.current = currentPage
-      return
-    }
-    
-    if (isResettingRef.current && currentPage === 1) {
+    // Avoid applying stale cached page-1 data while SWR is validating a new key (common when page_size changes).
+    if (currentPage === 1 && (isResettingRef.current || isValidating)) {
       return
     }
     
@@ -676,7 +667,7 @@ export default function ProductsPage() {
         `}
         >
           <Card
-            className={`h-full lg:h-[calc(100vh-6rem)] lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border shadow-none lg:shadow-xl shadow-primary/5 overflow-y-auto overscroll-contain scroll-smooth ${
+            className={`h-full lg:h-[calc(100vh-6rem)] lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border-0 shadow-none lg:shadow-none overflow-y-auto overscroll-contain scroll-smooth ${
               isDesktopFiltersCollapsed ? "p-3" : "p-5 sm:p-6"
             }`}
           >
@@ -710,12 +701,8 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            <div className="hidden lg:flex items-center justify-between gap-3 mb-5">
-              {!isDesktopFiltersCollapsed ? (
-                <h2 className="text-xl font-black tracking-tight">Refine Results</h2>
-              ) : (
-                <span className="sr-only">Filters</span>
-              )}
+            <div className="hidden lg:flex items-center justify-end gap-3 mb-5">
+              <span className="sr-only">Filters</span>
               <Button
                 type="button"
                 variant="outline"
