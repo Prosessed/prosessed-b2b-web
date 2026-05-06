@@ -311,8 +311,6 @@ export default function ProductsPage() {
     prevFiltersRef.current = currentFiltersKey
     isResettingRef.current = true
     setCurrentPage(1)
-    setIsLoadingMore(false)
-    loadMoreStartedAtRef.current = null
     setCanLoadMoreFallback(true)
     // Only clear products if we're actually changing filters (not on initial mount with same filters)
     if (allProducts.length > 0) {
@@ -344,8 +342,19 @@ export default function ProductsPage() {
     }
     
     // When we have new data for page 1, always apply it (even during reset window) so products show after category/nav click
-    // Avoid applying stale cached page-1 data while SWR is validating a new key (common when page_size changes).
-    if (currentPage === 1 && (isResettingRef.current || isValidating)) {
+    if (currentPage === 1 && products.length > 0) {
+      setAllProducts(products)
+      setIsCategoryChanging(false)
+      // If backend doesn't send pagination, infer "may have more" from first page size.
+      if (typeof pagination?.has_next_page !== "boolean") {
+        setCanLoadMoreFallback(products.length >= pageSize)
+      }
+      prevProductsLengthRef.current = products.length
+      prevPageRef.current = currentPage
+      return
+    }
+    
+    if (isResettingRef.current && currentPage === 1) {
       return
     }
     
