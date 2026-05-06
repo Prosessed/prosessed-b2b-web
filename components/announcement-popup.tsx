@@ -93,7 +93,7 @@ export function AnnouncementPopup({
         >
           <div className="w-full">
             <DialogPrimitive.Title className="sr-only">Announcement</DialogPrimitive.Title>
-            <div className="relative w-full bg-muted">
+            <div className="relative w-full bg-background">
               <div className="relative w-full aspect-video sm:aspect-21/9 max-h-[70vh]">
                 {announcement.image_url ? (
                   <Image
@@ -101,7 +101,8 @@ export function AnnouncementPopup({
                     alt="Announcement"
                     fill
                     priority
-                    className="object-cover"
+                    className="object-contain object-center"
+                    sizes="(max-width: 640px) calc(100vw - 2rem), 980px"
                   />
                 ) : null}
               </div>

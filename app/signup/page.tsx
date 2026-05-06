@@ -7,29 +7,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, ArrowLeft, Building2, CheckCircle2, Mail, MapPin, UserCircle } from "lucide-react"
+import { Loader2, ArrowLeft, CheckCircle2, Mail, UserCircle } from "lucide-react"
 import {
   apiClient,
   ApiError,
   type B2bRegistrationPayload,
 } from "@/lib/api/client"
 
-type B2bRegistrationFormFields = Omit<B2bRegistrationPayload, "portal_link">
-
-const normalizePortalUrl = (raw: string): string | undefined => {
-  const t = raw.trim()
-  if (!t) return undefined
-  let url = t
-  if (!/^https?:\/\//i.test(url)) {
-    url = `https://${url}`
-  }
-  try {
-    const parsed = new URL(url)
-    return `${parsed.protocol}//${parsed.host}`
-  } catch {
-    throw new Error("Enter a valid portal URL (for example https://your-company.com)")
-  }
-}
+type B2bRegistrationFormFields = Pick<B2bRegistrationPayload, "contact_person" | "email" | "phone">
 
 const formatApiMessage = (msg: unknown): string => {
   if (msg == null) return ""
@@ -46,21 +31,12 @@ const formatApiMessage = (msg: unknown): string => {
 }
 
 const initialForm: B2bRegistrationFormFields = {
-  company_name: "",
   contact_person: "",
   email: "",
   phone: "",
-  gst_number: "",
-  address_line_1: "",
-  address_line_2: "",
-  city: "",
-  state: "",
-  country: "Australia",
-  pincode: "",
 }
 
 export default function SignUpPage() {
-  const [portalUrl, setPortalUrl] = useState("")
   const [form, setForm] = useState<B2bRegistrationFormFields>(initialForm)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -84,48 +60,34 @@ export default function SignUpPage() {
       const debugB2b =
         process.env.NODE_ENV === "development" ||
         process.env.NEXT_PUBLIC_DEBUG_B2B_REGISTRATION === "1"
+      const portalLink = typeof window !== "undefined" ? window.location.origin : ""
+      const derivedCompanyName = (() => {
+        const email = form.email.trim()
+        const domain = email.includes("@") ? email.split("@")[1] : ""
+        const base = domain.split(".")[0]
+        return (base || form.contact_person.trim() || "Business").slice(0, 140)
+      })()
+
       if (debugB2b) {
         console.groupCollapsed("[B2B] Signup submit")
-        console.log("portalUrl(raw):", portalUrl)
+        console.log("portal_link (browser URL):", portalLink)
         console.log("form(raw):", form)
         console.groupEnd()
       }
 
-      let portal: string | undefined
-      try {
-        portal = normalizePortalUrl(portalUrl)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Invalid portal URL.")
-        setIsLoading(false)
-        if (
-          (process.env.NODE_ENV === "development" ||
-            process.env.NEXT_PUBLIC_DEBUG_B2B_REGISTRATION === "1") &&
-          typeof window !== "undefined"
-        ) {
-          console.warn("[B2B] Invalid portal URL:", err)
-        }
-        return
-      }
-
-      if (!portal) {
-        setError("Please enter your portal URL.")
-        setIsLoading(false)
-        return
-      }
-
       const payload: B2bRegistrationPayload = {
-        company_name: form.company_name.trim(),
+        company_name: derivedCompanyName,
         contact_person: form.contact_person.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
-        portal_link: portal,
-        gst_number: form.gst_number.trim(),
-        address_line_1: form.address_line_1.trim(),
-        address_line_2: form.address_line_2.trim(),
-        city: form.city.trim(),
-        state: form.state.trim(),
-        country: form.country.trim(),
-        pincode: form.pincode.trim(),
+        portal_link: portalLink,
+        gst_number: "",
+        address_line_1: "",
+        address_line_2: "",
+        city: "",
+        state: "",
+        country: "Australia",
+        pincode: "",
       }
 
       if (debugB2b) {
@@ -140,7 +102,7 @@ export default function SignUpPage() {
               ? `${payload.phone.slice(0, 2)}***${payload.phone.slice(-2)}`
               : payload.phone,
         }
-        console.log("[B2B] normalizedPortal:", portal || "(default)")
+        console.log("[B2B] portal_link:", portalLink)
         console.log("[B2B] payload:", safePayload)
         console.log("[B2B] calling apiClient.createB2bRegistration…")
       }
@@ -229,7 +191,7 @@ export default function SignUpPage() {
             </Button>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Register your business</h1>
             <p className="text-muted-foreground mt-2 max-w-2xl">
-              Submit your details to request B2B portal access. Fields marked with <span className="text-destructive">*</span> are required.
+              Share your contact details to request B2B portal access. Fields marked with <span className="text-destructive">*</span> are required.
             </p>
           </div>
 
@@ -237,10 +199,10 @@ export default function SignUpPage() {
             <CardHeader className="border-b border-border/40 bg-muted/20 pb-6">
               <div className="flex items-start gap-3">
                 <div className="shrink-0 w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Building2 className="h-6 w-6 text-primary" aria-hidden />
+                  <UserCircle className="h-6 w-6 text-primary" aria-hidden />
                 </div>
                 <div className="space-y-1 min-w-0">
-                  <CardTitle className="text-xl md:text-2xl">Business registration</CardTitle>
+                  <CardTitle className="text-xl md:text-2xl">Registration</CardTitle>
                   <CardDescription className="text-sm md:text-base leading-relaxed">
                     Requests are reviewed by your distributor.
                   </CardDescription>
@@ -250,61 +212,6 @@ export default function SignUpPage() {
 
             <CardContent className="pt-8 pb-8">
               <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="space-y-2">
-                  <Label htmlFor="portal-url" className="text-sm font-medium">
-                    Portal URL <span className="text-muted-foreground font-normal">(optional)</span>
-                  </Label>
-                  <Input
-                    id="portal-url"
-                    type="text"
-                    inputMode="url"
-                    autoComplete="url"
-                    placeholder="https://your-company.com"
-                    value={portalUrl}
-                    onChange={(e) => setPortalUrl(e.target.value)}
-                    disabled={isLoading}
-                    className="h-11 rounded-xl bg-muted/30 border-border/60"
-                    aria-describedby="portal-url-hint"
-                  />
-                  <p id="portal-url-hint" className="text-xs text-muted-foreground">
-                    Your Website URL.
-                  </p>
-                </div>
-
-                <section aria-labelledby="company-heading" className="space-y-4">
-                  <h2 id="company-heading" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <Building2 className="h-4 w-4" aria-hidden />
-                    Company
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="company_name">
-                        Legal / trading name <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="company_name"
-                        required
-                        value={form.company_name}
-                        onChange={handleFieldChange("company_name")}
-                        disabled={isLoading}
-                        className="h-11 rounded-xl bg-muted/30 border-border/60"
-                        placeholder="Acme Wholesale Pty Ltd"
-                      />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="gst_number">GST / ABN / VAT (optional)</Label>
-                      <Input
-                        id="gst_number"
-                        value={form.gst_number}
-                        onChange={handleFieldChange("gst_number")}
-                        disabled={isLoading}
-                        className="h-11 rounded-xl bg-muted/30 border-border/60"
-                        placeholder=""
-                      />
-                    </div>
-                  </div>
-                </section>
-
                 <section aria-labelledby="contact-heading" className="space-y-4">
                   <h2 id="contact-heading" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <UserCircle className="h-4 w-4" aria-hidden />
@@ -358,96 +265,6 @@ export default function SignUpPage() {
                         disabled={isLoading}
                         className="h-11 rounded-xl bg-muted/30 border-border/60"
                         placeholder="+61 400 000 000"
-                      />
-                    </div>
-                  </div>
-                </section>
-
-                <section aria-labelledby="address-heading" className="space-y-4">
-                  <h2 id="address-heading" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <MapPin className="h-4 w-4" aria-hidden />
-                    Address
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="address_line_1">
-                        Address line 1 <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="address_line_1"
-                        required
-                        value={form.address_line_1}
-                        onChange={handleFieldChange("address_line_1")}
-                        disabled={isLoading}
-                        className="h-11 rounded-xl bg-muted/30 border-border/60"
-                        placeholder="1 Example Street"
-                      />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="address_line_2">Address line 2</Label>
-                      <Input
-                        id="address_line_2"
-                        value={form.address_line_2}
-                        onChange={handleFieldChange("address_line_2")}
-                        disabled={isLoading}
-                        className="h-11 rounded-xl bg-muted/30 border-border/60"
-                        placeholder=""
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city">
-                        City <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="city"
-                        required
-                        value={form.city}
-                        onChange={handleFieldChange("city")}
-                        disabled={isLoading}
-                        className="h-11 rounded-xl bg-muted/30 border-border/60"
-                        placeholder="Melbourne"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="state">
-                        State / region <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="state"
-                        required
-                        value={form.state}
-                        onChange={handleFieldChange("state")}
-                        disabled={isLoading}
-                        className="h-11 rounded-xl bg-muted/30 border-border/60"
-                        placeholder="VIC"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="country">
-                        Country <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="country"
-                        required
-                        value={form.country}
-                        onChange={handleFieldChange("country")}
-                        disabled={isLoading}
-                        className="h-11 rounded-xl bg-muted/30 border-border/60"
-                        placeholder="Australia"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pincode">
-                        Postcode <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="pincode"
-                        required
-                        value={form.pincode}
-                        onChange={handleFieldChange("pincode")}
-                        disabled={isLoading}
-                        className="h-11 rounded-xl bg-muted/30 border-border/60"
-                        placeholder="3000"
                       />
                     </div>
                   </div>

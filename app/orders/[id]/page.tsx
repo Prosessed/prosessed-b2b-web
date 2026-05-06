@@ -1,19 +1,19 @@
 "use client"
 
-import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import Image from "next/image"
-import { useOrderDetails } from "@/lib/api/hooks"
-import { useAuth } from "@/lib/auth/context"
-import { getApiBaseUrl } from "@/lib/api/client"
-import { formatPrice, formatDate } from "@/lib/utils/currency"
-import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
-import { ArrowLeft, Package, FileText, User, MapPin, Phone, Mail, Loader2 } from "lucide-react"
-import { useParams } from "next/navigation"
+import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { getApiBaseUrl } from "@/lib/api/client"
+import { useOrderDetails } from "@/lib/api/hooks"
 import { fetchSalesOrderPdfBlob, useDefaultSalesOrderPrintFormat } from "@/lib/api/print"
+import { useAuth } from "@/lib/auth/context"
+import { formatDate, formatPrice } from "@/lib/utils/currency"
+import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
+import { ArrowLeft, FileText, Loader2, Mail, MapPin, Package, Phone, User } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { useParams } from "next/navigation"
 import { useCallback, useState } from "react"
 
 export default function OrderDetailPage() {
@@ -177,11 +177,7 @@ export default function OrderDetailPage() {
                   {workflowStatus && (
                     <Badge className="bg-primary/10 text-primary">{workflowStatus}</Badge>
                   )}
-                  {docStatus != null && (
-                    <span className="text-xs text-muted-foreground">
-                      Doc status: {docStatus === 1 ? "Submitted" : docStatus === 0 ? "Draft" : "Cancelled"}
-                    </span>
-                  )}
+
                 </div>
               </div>
               {pdfError && (

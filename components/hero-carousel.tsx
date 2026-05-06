@@ -42,7 +42,7 @@ export function HeroCarousel({ banners }: HeroCarouselProps) {
   }
 
   return (
-    <div className="relative w-full aspect-[21/9] md:aspect-[3/1] lg:aspect-[21/6] overflow-hidden rounded-lg bg-muted">
+    <div className="relative w-full aspect-video sm:aspect-21/9 md:aspect-21/7 lg:aspect-21/7 overflow-hidden rounded-lg bg-transparent">
       {/* Banners */}
       <div
         className="flex transition-transform duration-500 ease-out h-full"
@@ -53,35 +53,40 @@ export function HeroCarousel({ banners }: HeroCarouselProps) {
           const linkHref = banner.redirect_url || banner.ctaLink || "/products"
           
           return (
-            <div key={banner.id || index} className="min-w-full relative h-full bg-muted">
-              <Image
-                src={imageSrc || "/placeholder.svg"}
-                alt={banner.title || "Banner"}
-                fill
-                className="object-contain object-center p-2 sm:p-3 md:p-4"
-                priority={currentIndex === 0}
-              />
-              {(banner.title || banner.subtitle) && (
-                <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent flex items-center">
-                  <div className="container mx-auto px-4 md:px-8 lg:px-12">
-                    <div className="max-w-xl">
-                      {banner.title && (
-                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">{banner.title}</h2>
-                      )}
-                      {banner.subtitle && (
-                        <p className="text-lg md:text-xl text-white/90 mb-6">{banner.subtitle}</p>
-                      )}
-                      {banner.ctaText && (
-                        <Link href={linkHref}>
-                          <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                            {banner.ctaText}
-                          </Button>
-                        </Link>
-                      )}
+            <div key={banner.id || index} className="min-w-full relative h-full bg-transparent">
+              <div className="absolute inset-0 p-2 sm:p-3 md:p-4">
+                <div className="relative h-full w-full overflow-hidden rounded-lg bg-transparent">
+                  <Image
+                    src={imageSrc || "/placeholder.svg"}
+                    alt={banner.title || "Banner"}
+                    fill
+                    className="object-contain object-center"
+                    sizes="(max-width: 768px) calc(100vw - 2rem), 1200px"
+                    priority={currentIndex === 0}
+                  />
+                  {(banner.title || banner.subtitle) && (
+                    <div className="absolute inset-0 bg-linear-to-r from-black/60 to-transparent flex items-center">
+                      <div className="container mx-auto px-4 md:px-8 lg:px-12">
+                        <div className="max-w-xl">
+                          {banner.title && (
+                            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">{banner.title}</h2>
+                          )}
+                          {banner.subtitle && (
+                            <p className="text-lg md:text-xl text-white/90 mb-6">{banner.subtitle}</p>
+                          )}
+                          {banner.ctaText && (
+                            <Link href={linkHref}>
+                              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                                {banner.ctaText}
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )
         })}

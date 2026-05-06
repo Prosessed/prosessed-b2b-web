@@ -20,7 +20,7 @@ import { getFirstImageUrl } from "@/lib/utils/image-url"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
 import { useAuth } from "@/lib/auth/context"
 import { motion, AnimatePresence } from "framer-motion"
-import { Filter, LayoutGrid, List, Loader2, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Filter, LayoutGrid, List, Loader2, X } from "lucide-react"
 
 const getAllCategories = (tree: any[]): string[] => {
   const categories: string[] = []
@@ -127,9 +127,13 @@ export default function ProductsPage() {
     return []
   })
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
+  const [isDesktopFiltersCollapsed, setIsDesktopFiltersCollapsed] = useState(false)
+  const [isDesktopViewport, setIsDesktopViewport] = useState(false)
   const [allProducts, setAllProducts] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const loadMoreStartedAtRef = useRef<number | null>(null)
+  const [canLoadMoreFallback, setCanLoadMoreFallback] = useState(true)
   const [isCategoryChanging, setIsCategoryChanging] = useState(false)
   const isResettingRef = useRef(false)
   const prevFiltersRef = useRef<string>("")
@@ -221,7 +225,11 @@ export default function ProductsPage() {
     : (effectivePreviouslyBought
       ? (mostBoughtData?.message?.pagination || mostBoughtData?.pagination)
       : itemsData?.message?.pagination)
-  const hasNextPage = useTaggedView ? false : (pagination?.has_next_page || false)
+  const hasNextPage = useMemo(() => {
+    if (useTaggedView) return false
+    if (typeof pagination?.has_next_page === "boolean") return pagination.has_next_page
+    return canLoadMoreFallback
+  }, [canLoadMoreFallback, pagination?.has_next_page, useTaggedView])
   
   // Debug: Log first product to check rate field
   if (products.length > 0 && process.env.NODE_ENV === "development") {
@@ -284,6 +292,15 @@ export default function ProductsPage() {
     }
   }, [brandsFromUrl, sortFromUrl, pageSizeFromUrl, viewFromUrl, gridColsFromUrl])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const media = window.matchMedia("(min-width: 1024px)")
+    const handleChange = () => setIsDesktopViewport(media.matches)
+    handleChange()
+    media.addEventListener("change", handleChange)
+    return () => media.removeEventListener("change", handleChange)
+  }, [])
+
   // Reset when category, search, or filters change
   useEffect(() => {
     // Skip if filters haven't actually changed (prevents reset on initial mount)
@@ -294,6 +311,7 @@ export default function ProductsPage() {
     prevFiltersRef.current = currentFiltersKey
     isResettingRef.current = true
     setCurrentPage(1)
+    setCanLoadMoreFallback(true)
     // Only clear products if we're actually changing filters (not on initial mount with same filters)
     if (allProducts.length > 0) {
       setAllProducts([])
@@ -327,6 +345,10 @@ export default function ProductsPage() {
     if (currentPage === 1 && products.length > 0) {
       setAllProducts(products)
       setIsCategoryChanging(false)
+      // If backend doesn't send pagination, infer "may have more" from first page size.
+      if (typeof pagination?.has_next_page !== "boolean") {
+        setCanLoadMoreFallback(products.length >= pageSize)
+      }
       prevProductsLengthRef.current = products.length
       prevPageRef.current = currentPage
       return
@@ -344,21 +366,52 @@ export default function ProductsPage() {
     if (currentPage === 1) {
       setAllProducts(products)
       setIsCategoryChanging(false)
+      if (typeof pagination?.has_next_page !== "boolean") {
+        setCanLoadMoreFallback(products.length >= pageSize)
+      }
     } else if (products.length > 0) {
       // For subsequent pages, append new products
+      let appendedCount = 0
       setAllProducts((prev) => {
         const existingIds = new Set(prev.map((p: any) => p.item_code))
         const newProducts = products.filter((p: any) => !existingIds.has(p.item_code))
+        appendedCount = newProducts.length
         if (newProducts.length === 0) return prev
         return [...prev, ...newProducts]
       })
-      setIsLoadingMore(false)
+      // If backend doesn't send pagination, stop when we get a short page or no new unique items.
+      if (typeof pagination?.has_next_page !== "boolean") {
+        if (products.length < pageSize || appendedCount === 0) {
+          setCanLoadMoreFallback(false)
+        }
+      }
     }
-  }, [products, currentPage, currentFiltersKey])
+  }, [products, currentPage, currentFiltersKey, pageSize, pagination?.has_next_page])
+
+  // Always stop the "load more" spinner when the request finishes (even if API returns 0 items or errors)
+  useEffect(() => {
+    if (!isLoadingMore) return
+    if (!loadMoreStartedAtRef.current) loadMoreStartedAtRef.current = Date.now()
+    if (isValidating) return
+
+    const minVisibleMs = 550
+    const elapsed = Date.now() - (loadMoreStartedAtRef.current ?? Date.now())
+    const remaining = Math.max(0, minVisibleMs - elapsed)
+
+    const t = window.setTimeout(() => {
+      setIsLoadingMore(false)
+      loadMoreStartedAtRef.current = null
+    }, remaining)
+
+    return () => window.clearTimeout(t)
+  }, [isLoadingMore, isValidating])
 
   // Infinite scroll observer
   useEffect(() => {
-    if (!hasNextPage || isLoading || isLoadingMore || isCategoryChanging) return
+    if (!hasNextPage) return
+    if (isLoadingMore) return
+    if (isValidating) return
+    if (isCategoryChanging) return
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -367,7 +420,7 @@ export default function ProductsPage() {
           setCurrentPage((prev) => prev + 1)
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0, rootMargin: "240px 0px" }
     )
 
     const currentTarget = observerTarget.current
@@ -380,7 +433,7 @@ export default function ProductsPage() {
         observer.unobserve(currentTarget)
       }
     }
-  }, [hasNextPage, isLoading, isLoadingMore, isCategoryChanging])
+  }, [hasNextPage, isLoadingMore, isValidating, isCategoryChanging])
 
   // Helper to update URL with current filter state; when any filter is set, drop previously_bought so we use items vtwo API
   const updateUrlParams = useCallback((updates: {
@@ -606,129 +659,226 @@ export default function ProductsPage() {
 
         {/* Filters Sidebar */}
         {!effectivePreviouslyBought && !useTaggedView && (
-        <aside
+        <motion.aside
+          layout
+          initial={false}
+          animate={
+            isDesktopViewport
+              ? { width: isDesktopFiltersCollapsed ? 84 : 288 }
+              : { width: "100%" }
+          }
+          transition={{ type: "spring", stiffness: 260, damping: 28 }}
           className={`
-          fixed inset-0 z-40 lg:relative lg:inset-auto lg:block w-full lg:w-72 shrink-0
+          fixed inset-0 z-40 lg:relative lg:inset-auto lg:block w-full shrink-0
           bg-background lg:bg-transparent transition-transform duration-300
           ${isMobileFiltersOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
+          ${isDesktopFiltersCollapsed ? "lg:w-[84px]" : "lg:w-72"}
         `}
         >
-          <Card className="h-full lg:h-[calc(100vh-6rem)] p-5 sm:p-6 lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border shadow-none lg:shadow-xl shadow-primary/5 overflow-y-auto overscroll-contain scroll-smooth">
-            <div className="flex items-center justify-between mb-6 lg:hidden">
-              <h2 className="text-xl font-bold">Filters</h2>
-              <Button variant="ghost" size="icon" onClick={() => setIsMobileFiltersOpen(false)}>
-                <X className="h-6 w-6" />
+          <Card
+            className={`h-full lg:h-[calc(100vh-6rem)] lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border shadow-none lg:shadow-xl shadow-primary/5 overflow-y-auto overscroll-contain scroll-smooth ${
+              isDesktopFiltersCollapsed ? "p-3" : "p-5 sm:p-6"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-3 mb-6 lg:hidden">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold">Filters</h2>
+                {hasActiveFilters && (
+                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary/10 px-2 text-xs font-bold text-primary tabular-nums">
+                    {selectedBrands.length + (selectedCategory ? 1 : 0)}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="rounded-xl border-border/60 bg-background/60 hover:bg-muted/40"
+                  onClick={() => setIsDesktopFiltersCollapsed((v) => !v)}
+                  aria-label={isDesktopFiltersCollapsed ? "Expand filters content" : "Collapse filters content"}
+                >
+                  {isDesktopFiltersCollapsed ? (
+                    <ChevronRight className="h-4 w-4" />
+                  ) : (
+                    <ChevronLeft className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setIsMobileFiltersOpen(false)} aria-label="Close filters">
+                  <X className="h-6 w-6" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="hidden lg:flex items-center justify-between gap-3 mb-5">
+              {!isDesktopFiltersCollapsed ? (
+                <h2 className="text-xl font-black tracking-tight">Refine Results</h2>
+              ) : (
+                <span className="sr-only">Filters</span>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="rounded-xl border-border/60 bg-background/60 hover:bg-muted/40"
+                onClick={() => setIsDesktopFiltersCollapsed((v) => !v)}
+                aria-label={isDesktopFiltersCollapsed ? "Expand filters sidebar" : "Collapse filters sidebar"}
+              >
+                {isDesktopFiltersCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4" />
+                )}
               </Button>
             </div>
 
-            <h2 className="hidden lg:block text-xl font-black mb-5 tracking-tight">Refine Results</h2>
-
             {/* Category Filter */}
-            {allCategories.length > 0 && (
-              <section className="mb-6">
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <h3 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
-                    Categories
-                  </h3>
-                  {selectedCategory && (
-                    <button
-                      type="button"
-                      onClick={() => updateUrlParams({ category: null })}
-                      className="text-[11px] font-bold text-primary hover:underline underline-offset-4"
-                      aria-label="Clear category filter"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div className="rounded-2xl border border-border/60 bg-background/60 p-2.5 max-h-[320px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
-                  {allCategories.map((category) => (
-                    <label
-                      key={category}
-                      className="flex items-start gap-3 rounded-xl px-2.5 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
-                    >
-                      <Checkbox
-                        id={`category-${category}`}
-                        checked={selectedCategory === category}
-                        onCheckedChange={() => handleCategoryChange(category)}
-                        className="mt-0.5 h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
-                      />
-                      <span
-                        className={`text-sm font-bold transition-colors ${
-                          selectedCategory === category
-                            ? "text-primary"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
+            <AnimatePresence initial={false}>
+              {!isDesktopFiltersCollapsed && allCategories.length > 0 ? (
+                <motion.section
+                  key="categories-expanded"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="mb-6 overflow-hidden"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h3 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                      Categories
+                    </h3>
+                    {selectedCategory && (
+                      <button
+                        type="button"
+                        onClick={() => updateUrlParams({ category: null })}
+                        className="text-[11px] font-bold text-primary hover:underline underline-offset-4"
+                        aria-label="Clear category filter"
                       >
-                        {category}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Brand Filter */}
-            {brands.length > 0 && (
-              <section className="mb-6">
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <h3 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
-                    Brands
-                  </h3>
-                  {selectedBrands.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => updateUrlParams({ brands: [] })}
-                      className="text-[11px] font-bold text-primary hover:underline underline-offset-4"
-                      aria-label="Clear brand filters"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div className="rounded-2xl border border-border/60 bg-background/60 p-2.5 max-h-[240px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
-                  {brands.map((brand) => (
-                    <label
-                      key={brand.name}
-                      className="flex items-start justify-between gap-3 rounded-xl px-2.5 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-background/60 p-2.5 max-h-[320px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
+                    {allCategories.map((category) => (
+                      <label
+                        key={category}
+                        className="flex items-start gap-3 rounded-xl px-2.5 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
+                      >
                         <Checkbox
-                          id={`brand-${brand.name}`}
-                          checked={selectedBrands.includes(brand.name)}
-                          onCheckedChange={() => handleBrandToggle(brand.name)}
+                          id={`category-${category}`}
+                          checked={selectedCategory === category}
+                          onCheckedChange={() => handleCategoryChange(category)}
                           className="mt-0.5 h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
                         />
                         <span
-                          className={`text-sm font-bold transition-colors truncate ${
-                            selectedBrands.includes(brand.name)
+                          className={`text-sm font-bold transition-colors ${
+                            selectedCategory === category
                               ? "text-primary"
                               : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
-                          {brand.name}
+                          {category}
                         </span>
-                      </div>
-                      <span className="text-xs text-muted-foreground font-semibold tabular-nums">
-                        {brand.count}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </section>
-            )}
+                      </label>
+                    ))}
+                  </div>
+                </motion.section>
+              ) : null}
+            </AnimatePresence>
 
-            {hasActiveFilters && (
-              <Button
-                variant="outline"
-                className="w-full rounded-xl border-primary/20 text-primary font-bold hover:bg-primary/5 h-11 transition-all bg-transparent"
-                onClick={handleClearFilters}
-              >
-                Reset All Filters
-              </Button>
-            )}
+            {/* Brand Filter */}
+            <AnimatePresence initial={false}>
+              {!isDesktopFiltersCollapsed && brands.length > 0 ? (
+                <motion.section
+                  key="brands-expanded"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="mb-6 overflow-hidden"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h3 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                      Brands
+                    </h3>
+                    {selectedBrands.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => updateUrlParams({ brands: [] })}
+                        className="text-[11px] font-bold text-primary hover:underline underline-offset-4"
+                        aria-label="Clear brand filters"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-background/60 p-2.5 max-h-[240px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
+                    {brands.map((brand) => (
+                      <label
+                        key={brand.name}
+                        className="flex items-start justify-between gap-3 rounded-xl px-2.5 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <Checkbox
+                            id={`brand-${brand.name}`}
+                            checked={selectedBrands.includes(brand.name)}
+                            onCheckedChange={() => handleBrandToggle(brand.name)}
+                            className="mt-0.5 h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
+                          />
+                          <span
+                            className={`text-sm font-bold transition-colors truncate ${
+                              selectedBrands.includes(brand.name)
+                                ? "text-primary"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {brand.name}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground font-semibold tabular-nums">
+                          {brand.count}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </motion.section>
+              ) : null}
+            </AnimatePresence>
+
+            {hasActiveFilters ? (
+              isDesktopFiltersCollapsed ? (
+                <div className="hidden lg:flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="rounded-xl border-primary/20 text-primary hover:bg-primary/5 h-11 w-full"
+                    onClick={handleClearFilters}
+                    aria-label="Reset all filters"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <div className="flex items-center justify-center">
+                    <span
+                      className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary/10 px-2 text-xs font-bold text-primary tabular-nums"
+                      aria-label="Active filters count"
+                    >
+                      {selectedBrands.length + (selectedCategory ? 1 : 0)}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl border-primary/20 text-primary font-bold hover:bg-primary/5 h-11 transition-all bg-transparent"
+                  onClick={handleClearFilters}
+                >
+                  Reset All Filters
+                </Button>
+              )
+            ) : null}
           </Card>
-        </aside>
+        </motion.aside>
         )}
 
         {/* Products Grid */}
@@ -957,11 +1107,13 @@ export default function ProductsPage() {
                   <div ref={observerTarget} className="mt-8">
                     {isLoadingMore ? (
                       <div className="space-y-4">
-                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                          <span className="text-sm font-semibold">Loading more products…</span>
+                        <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 px-4">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/95 px-4 py-2 text-muted-foreground shadow-xl shadow-primary/10 backdrop-blur">
+                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                            <span className="text-sm font-semibold">Loading more products…</span>
+                          </div>
                         </div>
-                        {sortedProducts.length >= 20 && (
+                        {sortedProducts.length >= pageSize && (
                           <div
                             className={viewMode === "grid"
                               ? gridClassName
@@ -969,7 +1121,12 @@ export default function ProductsPage() {
                             }
                             aria-label="Loading more products"
                           >
-                            {Array.from({ length: viewMode === "grid" ? 8 : 4 }).map((_, i) => (
+                            {Array.from({
+                              length:
+                                viewMode === "grid"
+                                  ? Math.min(12, Math.max(8, Math.floor(pageSize / 5)))
+                                  : Math.min(8, Math.max(4, Math.floor(pageSize / 10))),
+                            }).map((_, i) => (
                               viewMode === "grid" ? (
                                 <SkeletonCard key={i} />
                               ) : (
