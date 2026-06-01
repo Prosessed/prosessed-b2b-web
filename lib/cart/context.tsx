@@ -25,6 +25,7 @@ import {
   useState,
 } from "react"
 import useSWR from "swr"
+import { findCartLineByItemCode } from "@/lib/cart/utils"
 
 interface CartContextType {
   /** Full cart when on cart page or sidebar (get_full_cart); otherwise get_cart_v2. */
@@ -163,6 +164,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
 
       try {
+        const existingLine = findCartLineByItemCode(
+          data?.cart?.items,
+          validatedItem.item_code
+        )
+
         if (!currentQuotationId) {
           const response = await createCart({ items: [validatedItem] }, user)
           const wrapped = response as typeof response & {
@@ -177,6 +183,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
             await new Promise((r) => setTimeout(r, 200))
           }
 
+          await revalidateAfterModify()
+        } else if (existingLine) {
+          // Same item already in cart — set qty (do not add a duplicate line)
+          await modifyCart(
+            {
+              quotation_id: currentQuotationId,
+              update_item: {
+                item_id: existingLine.name,
+                qty: validatedItem.qty,
+                rate: validatedItem.rate,
+                uom: validatedItem.uom,
+                warehouse: validatedItem.warehouse,
+                ...(validatedItem.custom_quotation_item_details != null && {
+                  custom_quotation_item_details:
+                    validatedItem.custom_quotation_item_details,
+                }),
+              },
+            },
+            user
+          )
           await revalidateAfterModify()
         } else {
           await modifyCart(

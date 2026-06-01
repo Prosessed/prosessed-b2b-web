@@ -152,18 +152,24 @@
     @apply max-w-full h-auto;
   }
 
-  /* Native date picker icon visible in dark mode */
-  .dark input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-    opacity: 0.9;
-    cursor: pointer;
-  }
+}
 
-  .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-    opacity: 0.9;
-    cursor: pointer;
-  }
+/* Date inputs: custom Lucide trigger (see DateInput) — hide native glyph */
+.date-input-custom-indicator::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  width: 2.5rem;
+  height: 100%;
+  cursor: pointer;
+}
+
+/* Fallback for plain type="date" without DateInput */
+html.dark input[type="date"]:not(.date-input-custom-indicator)::-webkit-calendar-picker-indicator,
+html.dark input[type="datetime-local"]:not(.date-input-custom-indicator)::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.15);
+  opacity: 1;
+  cursor: pointer;
 }
 
 /* Enhanced button visibility and contrast */

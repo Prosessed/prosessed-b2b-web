@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { useAuth } from "@/lib/auth/context"
 import { useCartContext } from "@/lib/cart/context"
+import { findCartLineByItemCode } from "@/lib/cart/utils"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { formatPrice } from "@/lib/utils/currency"
 import { getDisplayImageUrl } from "@/lib/utils/image-url"
@@ -61,7 +62,7 @@ export function ProductCard({
   const [isMutating, setIsMutating] = useState(false)
   const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
 
-  const cartItem = cart?.items?.find((item) => item.item_code === id)
+  const cartItem = findCartLineByItemCode(cart?.items, id)
   const quantity = cartItem?.qty || 0
   const [inputVal, setInputVal] = useState(String(quantity))
   useEffect(() => {

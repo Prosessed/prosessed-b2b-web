@@ -2,12 +2,12 @@
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { DateInput } from "@/components/ui/date-input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCustomerName, useCustomerStatement } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
-import { AlertCircle, Calendar, Download, ExternalLink, FileText, Loader, ZoomIn, ZoomOut } from "lucide-react"
+import { AlertCircle, Download, ExternalLink, FileText, Loader, ZoomIn, ZoomOut } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 
@@ -140,33 +140,31 @@ export default function StatementsPage() {
 
                 {/* Start Date */}
                 <div>
-                  <Label htmlFor="startDate" className="text-sm font-medium flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  <Label htmlFor="startDate" className="text-sm font-medium">
                     Start Date <span className="text-destructive">*</span>
                   </Label>
-                  <Input
+                  <DateInput
                     id="startDate"
-                    type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="mt-2 dark:scheme-dark"
+                    className="mt-2"
                     disabled={isLoading}
+                    aria-label="Start date"
                   />
                 </div>
 
                 {/* End Date */}
                 <div>
-                  <Label htmlFor="endDate" className="text-sm font-medium flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  <Label htmlFor="endDate" className="text-sm font-medium">
                     End Date <span className="text-destructive">*</span>
                   </Label>
-                  <Input
+                  <DateInput
                     id="endDate"
-                    type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="mt-2 dark:scheme-dark"
+                    className="mt-2"
                     disabled={isLoading}
+                    aria-label="End date"
                   />
                 </div>
 

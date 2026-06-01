@@ -22,6 +22,8 @@ import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { parseTags } from "@/lib/utils/tags"
 import { TagBadge } from "@/components/tag-badge"
 import { getPriceDisplay } from "@/lib/utils/pricing"
+import { findCartLineByItemCode } from "@/lib/cart/utils"
+import type { CartItemResponse } from "@/lib/api/cart"
 import { motion } from "framer-motion"
 
 export default function ProductDetailPage() {
@@ -33,21 +35,29 @@ export default function ProductDetailPage() {
   const [note, setNote] = useState("")
   const [isSyncing, setIsSyncing] = useState(false)
   const skipCartSyncRef = useRef(false)
+  const syncInFlightRef = useRef(false)
+  const cartItemsRef = useRef<CartItemResponse[] | undefined>(undefined)
 
   const { user } = useAuth()
-  const { addItem, cart, updateItem, removeItem } = useCartContext()
+  const { addItem, cart, updateItem, removeItem, refreshCart } = useCartContext()
   const { openDrawer } = useCartDrawer()
   const { data: warehousesData } = useWarehousesByCustomerBranch()
   const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
   const { data, isLoading, error } = useItemDetails(itemCode, quantity)
 
-  // Check if item is already in cart
-  const cartItem = useMemo(() => {
-    if (!cart?.items) return null
-    return cart.items.find((item: any) => item.item_code === itemCode)
-  }, [cart?.items, itemCode])
-
   const product = data
+  const matchItemCode = product?.item_code ?? itemCode
+
+  cartItemsRef.current = cart?.items
+
+  const resolveCartLine = useCallback((): CartItemResponse | null => {
+    return findCartLineByItemCode(cartItemsRef.current, matchItemCode)
+  }, [matchItemCode])
+
+  const cartItem = useMemo(
+    () => findCartLineByItemCode(cart?.items, matchItemCode),
+    [cart?.items, matchItemCode]
+  )
 
   // Debug logging
   useEffect(() => {
@@ -105,7 +115,7 @@ export default function ProductDetailPage() {
 
   const applyQuantityToCart = useCallback(
     async (targetQty: number, options?: { openDrawerOnFirstAdd?: boolean }) => {
-      if (!user || !product) return
+      if (!user || !product || syncInFlightRef.current) return
 
       if (!currentRate || currentRate <= 0) {
         console.error(`Cannot sync item ${product.item_code}: Invalid rate (${currentRate})`)
@@ -116,20 +126,24 @@ export default function ProductDetailPage() {
       const uom = selectedUom || product.uom || product.stock_uom
       const notePayload = note.trim() ? { custom_quotation_item_details: note.trim() } : {}
 
+      syncInFlightRef.current = true
       skipCartSyncRef.current = true
       setIsSyncing(true)
       try {
-        if (cartItem) {
+        const line = resolveCartLine()
+
+        if (line) {
           if (qty < 1) {
-            await removeItem(cartItem.name)
+            await removeItem(line.name)
             setQuantity(1)
             return
           }
-          await updateItem(cartItem.name, {
+          await updateItem(line.name, {
             qty,
             ...notePayload,
           })
           setQuantity(qty)
+          await refreshCart()
           return
         }
 
@@ -148,7 +162,7 @@ export default function ProductDetailPage() {
           ...notePayload,
         })
         setQuantity(qty)
-        await new Promise((resolve) => setTimeout(resolve, 200))
+        await refreshCart()
         if (shouldAutoOpenCart) {
           openDrawer()
         }
@@ -156,6 +170,7 @@ export default function ProductDetailPage() {
         console.error("Failed to sync cart:", error)
       } finally {
         skipCartSyncRef.current = false
+        syncInFlightRef.current = false
         setIsSyncing(false)
       }
     },
@@ -165,12 +180,13 @@ export default function ProductDetailPage() {
       currentRate,
       selectedUom,
       note,
-      cartItem,
       cart?.items?.length,
       resolvedWarehouse,
+      resolveCartLine,
       addItem,
       updateItem,
       removeItem,
+      refreshCart,
       openDrawer,
     ]
   )
@@ -178,19 +194,20 @@ export default function ProductDetailPage() {
   const handleIncrement = () => {
     const next = quantity + 1
     setQuantity(next)
-    if (cartItem) {
+    if (resolveCartLine() || cartItem) {
       void applyQuantityToCart(next)
     }
   }
 
   const handleDecrement = () => {
-    if (cartItem && quantity <= 1) {
+    const line = resolveCartLine() ?? cartItem
+    if (line && quantity <= 1) {
       void applyQuantityToCart(0)
       return
     }
     const next = Math.max(1, quantity - 1)
     setQuantity(next)
-    if (cartItem) {
+    if (line) {
       void applyQuantityToCart(next)
     }
   }
@@ -201,7 +218,7 @@ export default function ProductDetailPage() {
   }
 
   const handleQuantityCommit = () => {
-    if (cartItem) {
+    if (resolveCartLine() || cartItem) {
       void applyQuantityToCart(quantity)
     }
   }

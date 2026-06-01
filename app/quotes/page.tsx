@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { DateInput } from "@/components/ui/date-input"
 import { useQuotations } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
 import { formatPrice, formatDate } from "@/lib/utils/currency"
@@ -126,9 +126,8 @@ export default function QuotesPage() {
                   <label htmlFor="quotes-start" className="text-xs font-semibold text-muted-foreground block">
                     From
                   </label>
-                  <Input
+                  <DateInput
                     id="quotes-start"
-                    type="date"
                     value={startDate}
                     onChange={(e) => {
                       setStartDate(e.target.value)
@@ -142,9 +141,8 @@ export default function QuotesPage() {
                   <label htmlFor="quotes-end" className="text-xs font-semibold text-muted-foreground block">
                     To
                   </label>
-                  <Input
+                  <DateInput
                     id="quotes-end"
-                    type="date"
                     value={endDate}
                     onChange={(e) => {
                       setEndDate(e.target.value)

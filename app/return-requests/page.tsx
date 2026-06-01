@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { DateInput } from "@/components/ui/date-input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -777,11 +778,11 @@ export default function ReturnRequestsPage() {
                     <label htmlFor="return-date" className="text-sm font-medium">
                       Date of Request
                     </label>
-                    <Input
+                    <DateInput
                       id="return-date"
-                      type="date"
                       value={dateOfRequest}
                       onChange={(event) => setDateOfRequest(event.target.value)}
+                      aria-label="Date of request"
                     />
                   </div>
 

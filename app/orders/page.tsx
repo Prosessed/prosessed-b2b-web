@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { DateInput } from "@/components/ui/date-input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useSalesPersonOrders } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
@@ -162,9 +162,8 @@ export default function OrdersPage() {
                   <label htmlFor="orders-start" className="text-xs font-semibold text-muted-foreground block">
                     From
                   </label>
-                  <Input
+                  <DateInput
                     id="orders-start"
-                    type="date"
                     value={startDate}
                     onChange={(e) => {
                       setStartDate(e.target.value)
@@ -178,9 +177,8 @@ export default function OrdersPage() {
                   <label htmlFor="orders-end" className="text-xs font-semibold text-muted-foreground block">
                     To
                   </label>
-                  <Input
+                  <DateInput
                     id="orders-end"
-                    type="date"
                     value={endDate}
                     onChange={(e) => {
                       setEndDate(e.target.value)
