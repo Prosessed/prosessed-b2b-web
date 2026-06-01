@@ -1,5 +1,5 @@
 "use client"
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
@@ -31,10 +31,11 @@ export default function ProductDetailPage() {
   const [selectedUom, setSelectedUom] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [note, setNote] = useState("")
-  const [isAdding, setIsAdding] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const skipCartSyncRef = useRef(false)
 
   const { user } = useAuth()
-  const { addItem, cart, updateItem } = useCartContext()
+  const { addItem, cart, updateItem, removeItem } = useCartContext()
   const { openDrawer } = useCartDrawer()
   const { data: warehousesData } = useWarehousesByCustomerBranch()
   const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
@@ -66,8 +67,17 @@ export default function ProductDetailPage() {
     setSelectedUom(null)
     setQuantity(1)
     setNote("")
-    // SWR will automatically refetch when itemCode changes due to key change
+    skipCartSyncRef.current = false
   }, [itemCode])
+
+  // Keep detail quantity in sync with cart (e.g. after edits elsewhere)
+  useEffect(() => {
+    if (skipCartSyncRef.current || !cartItem) return
+    setQuantity(cartItem.qty)
+    if (cartItem.custom_quotation_item_details) {
+      setNote(cartItem.custom_quotation_item_details)
+    }
+  }, [cartItem?.name, cartItem?.qty, cartItem?.custom_quotation_item_details])
 
   // Set default UOM when data loads
   useEffect(() => {
@@ -93,50 +103,111 @@ export default function ProductDetailPage() {
 
   const totalPrice = currentRate * quantity
 
-  const increment = () => setQuantity((prev) => prev + 1)
-  const decrement = () => setQuantity((prev) => (prev > 1 ? prev - 1 : 1))
+  const applyQuantityToCart = useCallback(
+    async (targetQty: number, options?: { openDrawerOnFirstAdd?: boolean }) => {
+      if (!user || !product) return
 
-  const handleAddToCart = async () => {
-    if (!user || !product) return
-    const shouldAutoOpenCart = (cart?.items?.length ?? 0) === 0
-    
-    // Ensure we have a valid rate before adding to cart
-    if (!currentRate || currentRate <= 0) {
-      console.error(`Cannot add item ${product.item_code}: Invalid rate (${currentRate})`)
-      return
-    }
-    
-    setIsAdding(true)
-    try {
-      if (cartItem) {
-        // Item already in cart - update quantity and note instead of creating duplicate
-        const newQuantity = cartItem.qty + quantity
-        await updateItem(cartItem.name, { 
-          qty: newQuantity,
-          ...(note && { custom_quotation_item_details: note })
-        })
-      } else {
-        // Item not in cart - add it
+      if (!currentRate || currentRate <= 0) {
+        console.error(`Cannot sync item ${product.item_code}: Invalid rate (${currentRate})`)
+        return
+      }
+
+      const qty = Math.max(0, Math.floor(targetQty))
+      const uom = selectedUom || product.uom || product.stock_uom
+      const notePayload = note.trim() ? { custom_quotation_item_details: note.trim() } : {}
+
+      skipCartSyncRef.current = true
+      setIsSyncing(true)
+      try {
+        if (cartItem) {
+          if (qty < 1) {
+            await removeItem(cartItem.name)
+            setQuantity(1)
+            return
+          }
+          await updateItem(cartItem.name, {
+            qty,
+            ...notePayload,
+          })
+          setQuantity(qty)
+          return
+        }
+
+        if (qty < 1) {
+          setQuantity(1)
+          return
+        }
+
+        const shouldAutoOpenCart = options?.openDrawerOnFirstAdd ?? (cart?.items?.length ?? 0) === 0
         await addItem({
           item_code: product.item_code,
-          qty: quantity,
+          qty,
           rate: currentRate,
           warehouse: resolvedWarehouse,
-          uom: selectedUom || product.uom || product.stock_uom,
-          custom_quotation_item_details: note || undefined,
+          uom,
+          ...notePayload,
         })
+        setQuantity(qty)
+        await new Promise((resolve) => setTimeout(resolve, 200))
+        if (shouldAutoOpenCart) {
+          openDrawer()
+        }
+      } catch (error) {
+        console.error("Failed to sync cart:", error)
+      } finally {
+        skipCartSyncRef.current = false
+        setIsSyncing(false)
       }
-      // Small delay for smooth UI update
-      await new Promise((resolve) => setTimeout(resolve, 200))
-      // Open cart drawer only on first item add
-      if (shouldAutoOpenCart) {
-        openDrawer()
-      }
-    } catch (error) {
-      console.error("Failed to add to cart:", error)
-    } finally {
-      setIsAdding(false)
+    },
+    [
+      user,
+      product,
+      currentRate,
+      selectedUom,
+      note,
+      cartItem,
+      cart?.items?.length,
+      resolvedWarehouse,
+      addItem,
+      updateItem,
+      removeItem,
+      openDrawer,
+    ]
+  )
+
+  const handleIncrement = () => {
+    const next = quantity + 1
+    setQuantity(next)
+    if (cartItem) {
+      void applyQuantityToCart(next)
     }
+  }
+
+  const handleDecrement = () => {
+    if (cartItem && quantity <= 1) {
+      void applyQuantityToCart(0)
+      return
+    }
+    const next = Math.max(1, quantity - 1)
+    setQuantity(next)
+    if (cartItem) {
+      void applyQuantityToCart(next)
+    }
+  }
+
+  const handleQuantityInputChange = (raw: string) => {
+    const parsed = Math.max(1, Number.parseInt(raw, 10) || 1)
+    setQuantity(parsed)
+  }
+
+  const handleQuantityCommit = () => {
+    if (cartItem) {
+      void applyQuantityToCart(quantity)
+    }
+  }
+
+  const handleAddToCart = () => {
+    void applyQuantityToCart(quantity, { openDrawerOnFirstAdd: true })
   }
 
   if (isLoading) {
@@ -325,11 +396,11 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-0 border-2 rounded-xl overflow-hidden bg-background">
                 <Button
-                  onClick={decrement}
+                  onClick={handleDecrement}
                   variant="ghost"
                   size="icon"
                   className="h-12 w-12 rounded-none cursor-pointer"
-                  disabled={quantity <= 1 || isAdding}
+                  disabled={(!cartItem && quantity <= 1) || isSyncing}
                   aria-label="Decrease quantity"
                 >
                   <Minus className="h-5 w-5" />
@@ -337,30 +408,37 @@ export default function ProductDetailPage() {
                 <input
                   type="number"
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, Number.parseInt(e.target.value) || 1))}
+                  onChange={(e) => handleQuantityInputChange(e.target.value)}
+                  onBlur={handleQuantityCommit}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault()
-                      handleAddToCart()
+                      if (cartItem) {
+                        handleQuantityCommit()
+                      } else {
+                        handleAddToCart()
+                      }
                     }
                     if (e.key === "ArrowUp") {
                       e.preventDefault()
-                      setQuantity((prev) => prev + 1)
+                      handleIncrement()
                     }
                     if (e.key === "ArrowDown") {
                       e.preventDefault()
-                      setQuantity((prev) => (prev > 1 ? prev - 1 : 1))
+                      handleDecrement()
                     }
                   }}
                   className="w-20 text-center text-lg font-bold bg-transparent border-none focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   min="1"
+                  disabled={isSyncing}
+                  aria-label="Quantity"
                 />
                 <Button
-                  onClick={increment}
+                  onClick={handleIncrement}
                   variant="ghost"
                   size="icon"
                   className="h-12 w-12 rounded-none cursor-pointer"
-                  disabled={isAdding}
+                  disabled={isSyncing}
                   aria-label="Increase quantity"
                 >
                   <Plus className="h-5 w-5" />
@@ -391,16 +469,16 @@ export default function ProductDetailPage() {
             size="lg"
             className="w-full text-lg h-14 rounded-xl font-bold cursor-pointer"
             onClick={handleAddToCart}
-            disabled={isAdding}
+            disabled={isSyncing}
             variant={cartItem ? "outline" : "default"}
           >
-            {isAdding ? (
+            {isSyncing ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="h-5 w-5 animate-spin" />
                 {cartItem ? "Updating..." : "Adding..."}
               </span>
             ) : cartItem ? (
-              `Update Cart - ${formatPrice(totalPrice, user?.defaultCurrency)}`
+              `In Cart - ${formatPrice(totalPrice, user?.defaultCurrency)}`
             ) : (
               `Add to Cart - ${formatPrice(totalPrice, user?.defaultCurrency)}`
             )}

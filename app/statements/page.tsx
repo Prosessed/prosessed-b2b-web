@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCustomerName, useCustomerStatement } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
-import { AlertCircle, Download, ExternalLink, FileText, Loader, ZoomIn, ZoomOut } from "lucide-react"
+import { AlertCircle, Calendar, Download, ExternalLink, FileText, Loader, ZoomIn, ZoomOut } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 
@@ -55,6 +55,10 @@ export default function StatementsPage() {
   const zoomIn = () => setZoom((z) => Math.min(2, +(z + 0.1).toFixed(2)))
   const zoomOut = () => setZoom((z) => Math.max(0.4, +(z - 0.1).toFixed(2)))
   const resetZoom = () => setZoom(1)
+
+  /** ~US Letter height at 96dpi — show at least one full PDF page in the preview */
+  const PDF_PAGE_HEIGHT_PX = 1056
+  const previewHeightPx = Math.round(PDF_PAGE_HEIGHT_PX * zoom)
 
   if (!isAuthenticated || !user) {
     return (
@@ -136,7 +140,8 @@ export default function StatementsPage() {
 
                 {/* Start Date */}
                 <div>
-                  <Label htmlFor="startDate" className="text-sm font-medium">
+                  <Label htmlFor="startDate" className="text-sm font-medium flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-primary shrink-0" aria-hidden />
                     Start Date <span className="text-destructive">*</span>
                   </Label>
                   <Input
@@ -144,14 +149,15 @@ export default function StatementsPage() {
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="mt-2"
+                    className="mt-2 dark:scheme-dark"
                     disabled={isLoading}
                   />
                 </div>
 
                 {/* End Date */}
                 <div>
-                  <Label htmlFor="endDate" className="text-sm font-medium">
+                  <Label htmlFor="endDate" className="text-sm font-medium flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-primary shrink-0" aria-hidden />
                     End Date <span className="text-destructive">*</span>
                   </Label>
                   <Input
@@ -159,7 +165,7 @@ export default function StatementsPage() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="mt-2"
+                    className="mt-2 dark:scheme-dark"
                     disabled={isLoading}
                   />
                 </div>
@@ -260,18 +266,18 @@ export default function StatementsPage() {
                   </div>
 
                   {/* PDF Preview or Details */}
-                  <div className="bg-muted rounded-lg p-4 min-h-96 flex items-center justify-center">
+                  <div className="bg-muted rounded-lg p-4">
                     {statementUrl?.url ? (
                       <div className="w-full">
-                        <div className="flex items-center justify-end gap-2 mb-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                           <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={zoomOut}>
+                            <Button variant="outline" size="sm" onClick={zoomOut} aria-label="Zoom out">
                               <ZoomOut className="h-4 w-4" />
                             </Button>
                             <Button variant="outline" size="sm" onClick={resetZoom}>
                               {Math.round(zoom * 100)}%
                             </Button>
-                            <Button variant="outline" size="sm" onClick={zoomIn}>
+                            <Button variant="outline" size="sm" onClick={zoomIn} aria-label="Zoom in">
                               <ZoomIn className="h-4 w-4" />
                             </Button>
                           </div>
@@ -291,14 +297,17 @@ export default function StatementsPage() {
                           </div>
                         </div>
 
-                        <div className="rounded border border-border overflow-hidden">
+                        <div className="rounded border border-border overflow-auto max-h-[min(85vh,1200px)] bg-background">
                           <iframe
                             src={statementUrl.url}
-                            className="w-full h-96"
+                            className="w-full border-0 block"
                             title="Customer Statement"
-                            style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+                            style={{ height: `${previewHeightPx}px`, minHeight: `${PDF_PAGE_HEIGHT_PX}px` }}
                           />
                         </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Scroll inside the preview for additional pages.
+                        </p>
                       </div>
                     ) : (
                       <div className="text-center">

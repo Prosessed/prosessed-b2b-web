@@ -130,7 +130,7 @@ export default function AccountPage() {
 
         {/* Account Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Link href="/orders">
+          <Link href="/my-invoices">
             <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
               <CardContent className="pt-6 text-center">
                 <Package className="h-8 w-8 mx-auto mb-2 text-primary" />
