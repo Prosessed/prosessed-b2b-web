@@ -49,7 +49,7 @@ export async function login(credentials: AuthCredentials): Promise<AuthResponse>
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({ ...credentials, platform: "web" }),
     })
 
     if (!response.ok) {

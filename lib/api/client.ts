@@ -253,6 +253,7 @@ export const apiClient = {
         body: JSON.stringify({
           usr: email,
           pwd: password,
+          platform: "web",
         }),
         auth: {}, // no token for login
       }
