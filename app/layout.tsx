@@ -9,6 +9,7 @@ import { CartProvider } from "@/lib/cart/context"
 import { CartDrawerProvider } from "@/lib/cart/drawer-context"
 import { CartDrawer } from "@/components/cart-drawer"
 import { AuthGuard } from "@/components/auth-guard"
+import { ThemeScript } from "@/components/theme-script"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -30,7 +31,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body className={`font-sans antialiased`}>
         <AuthProvider>
           <CartProvider>

@@ -29,6 +29,12 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { AnnouncementPopup } from "@/components/announcement-popup"
+import {
+  applyThemeToDocument,
+  persistTheme,
+  readStoredTheme,
+  type ThemeMode,
+} from "@/lib/theme/constants"
 
 export function Navigation() {
   const { user, logout, isAuthenticated } = useAuth()
@@ -62,14 +68,20 @@ export function Navigation() {
   }
 
   useEffect(() => {
-    const isDarkMode = document.documentElement.classList.contains("dark")
-    setIsDark(isDarkMode)
+    const stored = readStoredTheme()
+    if (stored) {
+      applyThemeToDocument(stored)
+      setIsDark(stored === "dark")
+      return
+    }
+    setIsDark(document.documentElement.classList.contains("dark"))
   }, [])
 
   const toggleTheme = () => {
-    const newMode = !isDark
-    setIsDark(newMode)
-    document.documentElement.classList.toggle("dark", newMode)
+    const nextTheme: ThemeMode = isDark ? "light" : "dark"
+    setIsDark(nextTheme === "dark")
+    applyThemeToDocument(nextTheme)
+    persistTheme(nextTheme)
   }
 
   // Get company logo from banners data or fallback to company name

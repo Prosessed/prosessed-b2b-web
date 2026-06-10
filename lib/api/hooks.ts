@@ -1151,7 +1151,7 @@ export async function createSalesOrderReturn(
   }
 
   const candidateEndpoints = [
-    "/api/method/prosessed_orderit.orderit.create_sales_order_return",
+    "/api/method/prosessed_orderit.orderit_app.apis.returns.create_return_req.create_sales_order_return",
   ]
 
   let lastError: unknown = null
