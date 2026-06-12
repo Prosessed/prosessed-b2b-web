@@ -571,6 +571,19 @@ export default function ProductsPage() {
     })
   }, [updateUrlParams])
 
+  const handleCloseMobileFilters = useCallback(() => {
+    setIsMobileFiltersOpen(false)
+  }, [])
+
+  useEffect(() => {
+    if (!isMobileFiltersOpen || isDesktopViewport) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isMobileFiltersOpen, isDesktopViewport])
+
   const handleSortByChange = useCallback((value: string) => {
     if (!["recommended", "name-asc", "name-desc"].includes(value)) return
     const next = value as SortByType
@@ -596,7 +609,7 @@ export default function ProductsPage() {
   }, [updateUrlParams])
 
   const hasActiveFilters = selectedBrands.length > 0 || !!selectedCategory || !!tagFromUrl || taggedFromUrl
-
+  const showExpandedFilterContent = !isDesktopViewport || !isDesktopFiltersCollapsed
 
   // Filter by tag (client-side); name sort client-side
   const sortedProducts = useMemo(() => {
@@ -623,6 +636,8 @@ export default function ProductsPage() {
     }
     return list
   }, [allProducts, sortBy, tagFromUrl])
+
+  const mobileFilterResultsCount = pagination?.total_records ?? sortedProducts.length
 
   const gridClassName = useMemo(() => {
     if (viewMode !== "grid") return ""
@@ -678,6 +693,22 @@ export default function ProductsPage() {
 
         {/* Filters Sidebar */}
         {!effectivePreviouslyBought && !useTaggedView && (
+        <>
+          <AnimatePresence>
+            {isMobileFiltersOpen && !isDesktopViewport && (
+              <motion.button
+                type="button"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px] lg:hidden"
+                onClick={handleCloseMobileFilters}
+                aria-label="Close filters"
+              />
+            )}
+          </AnimatePresence>
+
         <motion.aside
           layout
           initial={false}
@@ -688,47 +719,51 @@ export default function ProductsPage() {
           }
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
           className={`
-          fixed inset-0 z-40 lg:relative lg:inset-auto lg:block w-full shrink-0
-          bg-background lg:bg-transparent transition-transform duration-300
-          ${isMobileFiltersOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
+          fixed inset-x-0 bottom-0 z-50 lg:relative lg:inset-auto lg:block w-full shrink-0
+          max-h-[88vh] rounded-t-2xl border-t border-border/60 shadow-2xl lg:max-h-none lg:rounded-none lg:border-0 lg:shadow-none
+          bg-background lg:bg-transparent transition-transform duration-300 ease-out
+          ${isMobileFiltersOpen ? "translate-y-0" : "translate-y-full lg:translate-y-0"}
           ${isDesktopFiltersCollapsed ? "lg:w-[84px]" : "lg:w-72"}
         `}
         >
           <Card
-            className={`h-full lg:h-[calc(100vh-6rem)] lg:sticky lg:top-24 rounded-none lg:rounded-2xl border-0 lg:border-0 shadow-none lg:shadow-none overflow-y-auto overscroll-contain scroll-smooth ${
-              isDesktopFiltersCollapsed ? "p-3" : "p-5 sm:p-6"
+            className={`flex h-full max-h-[88vh] flex-col lg:h-[calc(100vh-6rem)] lg:max-h-none lg:sticky lg:top-24 rounded-t-2xl lg:rounded-2xl border-0 shadow-none overflow-hidden ${
+              isDesktopFiltersCollapsed && isDesktopViewport ? "p-3" : "lg:p-5 xl:p-6"
             }`}
           >
-            <div className="flex items-center justify-between gap-3 mb-6 lg:hidden">
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold">Filters</h2>
-                {hasActiveFilters && (
-                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary/10 px-2 text-xs font-bold text-primary tabular-nums">
-                    {selectedBrands.length + (selectedCategory ? 1 : 0)}
-                  </span>
-                )}
+            <div className="lg:hidden shrink-0 border-b border-border/60 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
+              <div className="flex justify-center pt-2">
+                <span className="h-1 w-10 rounded-full bg-muted-foreground/25" aria-hidden />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-3 px-4 pb-3 pt-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold tracking-tight">Filters</h2>
+                    {hasActiveFilters && (
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-[10px] font-bold text-primary tabular-nums">
+                        {selectedBrands.length + (selectedCategory ? 1 : 0)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {isLoading ? "Loading..." : `${mobileFilterResultsCount} items`}
+                  </p>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
-                  size="icon"
-                  className="rounded-xl border-border/60 bg-background/60 hover:bg-muted/40"
-                  onClick={() => setIsDesktopFiltersCollapsed((v) => !v)}
-                  aria-label={isDesktopFiltersCollapsed ? "Expand filters content" : "Collapse filters content"}
+                  size="sm"
+                  onClick={handleCloseMobileFilters}
+                  className="h-8 shrink-0 rounded-lg border-border/60 px-2.5 text-xs font-semibold"
+                  aria-label="Close filters"
                 >
-                  {isDesktopFiltersCollapsed ? (
-                    <ChevronRight className="h-4 w-4" />
-                  ) : (
-                    <ChevronLeft className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button variant="ghost" size="icon" onClick={() => setIsMobileFiltersOpen(false)} aria-label="Close filters">
-                  <X className="h-6 w-6" />
+                  <X className="h-3.5 w-3.5 mr-1" />
+                  Close
                 </Button>
               </div>
             </div>
 
+            <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth px-4 py-3 lg:px-0 lg:py-0">
             <div className="hidden lg:flex items-center justify-end gap-3 mb-5">
               <span className="sr-only">Filters</span>
               <Button
@@ -749,44 +784,44 @@ export default function ProductsPage() {
 
             {/* Category Filter */}
             <AnimatePresence initial={false}>
-              {!isDesktopFiltersCollapsed && allCategories.length > 0 ? (
+              {showExpandedFilterContent && allCategories.length > 0 ? (
                 <motion.section
                   key="categories-expanded"
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="mb-6 overflow-hidden"
+                  className="mb-4 lg:mb-6 overflow-hidden"
                 >
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <h3 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                  <div className="flex items-center justify-between gap-3 mb-2 lg:mb-3">
+                    <h3 className="text-[10px] lg:text-[11px] font-black uppercase tracking-widest text-muted-foreground">
                       Categories
                     </h3>
                     {selectedCategory && (
                       <button
                         type="button"
                         onClick={() => updateUrlParams({ category: null })}
-                        className="text-[11px] font-bold text-primary hover:underline underline-offset-4"
+                        className="text-[10px] lg:text-[11px] font-bold text-primary hover:underline underline-offset-4"
                         aria-label="Clear category filter"
                       >
                         Clear
                       </button>
                     )}
                   </div>
-                  <div className="rounded-2xl border border-border/60 bg-background/60 p-2.5 max-h-[320px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
+                  <div className="rounded-xl lg:rounded-2xl border border-border/60 bg-muted/20 lg:bg-background/60 p-1.5 lg:p-2.5 max-h-[180px] lg:max-h-[320px] overflow-y-auto pr-1 lg:pr-2 scrollbar-thin scrollbar-thumb-primary/10">
                     {allCategories.map((category) => (
                       <label
                         key={category}
-                        className="flex items-start gap-3 rounded-xl px-2.5 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
+                        className="flex items-center gap-2.5 rounded-lg lg:rounded-xl px-2 py-1.5 lg:px-2.5 lg:py-2 hover:bg-muted/40 transition-colors cursor-pointer"
                       >
                         <Checkbox
                           id={`category-${category}`}
                           checked={selectedCategory === category}
                           onCheckedChange={() => handleCategoryChange(category)}
-                          className="mt-0.5 h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
+                          className="h-4 w-4 lg:h-5 lg:w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
                         />
                         <span
-                          className={`text-sm font-bold transition-colors ${
+                          className={`text-xs lg:text-sm font-semibold lg:font-bold transition-colors line-clamp-2 ${
                             selectedCategory === category
                               ? "text-primary"
                               : "text-muted-foreground hover:text-foreground"
@@ -803,45 +838,45 @@ export default function ProductsPage() {
 
             {/* Brand Filter */}
             <AnimatePresence initial={false}>
-              {!isDesktopFiltersCollapsed && brands.length > 0 ? (
+              {showExpandedFilterContent && brands.length > 0 ? (
                 <motion.section
                   key="brands-expanded"
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="mb-6 overflow-hidden"
+                  className="mb-4 lg:mb-6 overflow-hidden"
                 >
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <h3 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                  <div className="flex items-center justify-between gap-3 mb-2 lg:mb-3">
+                    <h3 className="text-[10px] lg:text-[11px] font-black uppercase tracking-widest text-muted-foreground">
                       Brands
                     </h3>
                     {selectedBrands.length > 0 && (
                       <button
                         type="button"
                         onClick={() => updateUrlParams({ brands: [] })}
-                        className="text-[11px] font-bold text-primary hover:underline underline-offset-4"
+                        className="text-[10px] lg:text-[11px] font-bold text-primary hover:underline underline-offset-4"
                         aria-label="Clear brand filters"
                       >
                         Clear
                       </button>
                     )}
                   </div>
-                  <div className="rounded-2xl border border-border/60 bg-background/60 p-2.5 max-h-[240px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/10">
+                  <div className="rounded-xl lg:rounded-2xl border border-border/60 bg-muted/20 lg:bg-background/60 p-1.5 lg:p-2.5 max-h-[160px] lg:max-h-[240px] overflow-y-auto pr-1 lg:pr-2 scrollbar-thin scrollbar-thumb-primary/10">
                     {brands.map((brand) => (
                       <label
                         key={brand.name}
-                        className="flex items-start justify-between gap-3 rounded-xl px-2.5 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
+                        className="flex items-center justify-between gap-2 rounded-lg lg:rounded-xl px-2 py-1.5 lg:px-2.5 lg:py-2 hover:bg-muted/40 transition-colors cursor-pointer"
                       >
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
                           <Checkbox
                             id={`brand-${brand.name}`}
                             checked={selectedBrands.includes(brand.name)}
                             onCheckedChange={() => handleBrandToggle(brand.name)}
-                            className="mt-0.5 h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
+                            className="h-4 w-4 lg:h-5 lg:w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
                           />
                           <span
-                            className={`text-sm font-bold transition-colors truncate ${
+                            className={`text-xs lg:text-sm font-semibold lg:font-bold transition-colors truncate ${
                               selectedBrands.includes(brand.name)
                                 ? "text-primary"
                                 : "text-muted-foreground hover:text-foreground"
@@ -850,7 +885,7 @@ export default function ProductsPage() {
                             {brand.name}
                           </span>
                         </div>
-                        <span className="text-xs text-muted-foreground font-semibold tabular-nums">
+                        <span className="text-[10px] lg:text-xs text-muted-foreground font-semibold tabular-nums shrink-0">
                           {brand.count}
                         </span>
                       </label>
@@ -861,7 +896,7 @@ export default function ProductsPage() {
             </AnimatePresence>
 
             {hasActiveFilters ? (
-              isDesktopFiltersCollapsed ? (
+              isDesktopFiltersCollapsed && isDesktopViewport ? (
                 <div className="hidden lg:flex flex-col gap-2">
                   <Button
                     type="button"
@@ -885,15 +920,39 @@ export default function ProductsPage() {
               ) : (
                 <Button
                   variant="outline"
-                  className="w-full rounded-xl border-primary/20 text-primary font-bold hover:bg-primary/5 h-11 transition-all bg-transparent"
+                  className="hidden lg:flex w-full rounded-xl border-primary/20 text-primary font-bold hover:bg-primary/5 h-11 transition-all bg-transparent"
                   onClick={handleClearFilters}
                 >
                   Reset All Filters
                 </Button>
               )
             ) : null}
+            </div>
+
+            <div className="lg:hidden shrink-0 border-t border-border/60 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <div className="flex items-center gap-2">
+                {hasActiveFilters && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleClearFilters}
+                    className="h-10 shrink-0 rounded-xl border-primary/20 px-4 text-xs font-bold text-primary"
+                  >
+                    Clear all
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  onClick={handleCloseMobileFilters}
+                  className="h-10 flex-1 rounded-xl font-bold text-sm shadow-md shadow-primary/15"
+                >
+                  Show {mobileFilterResultsCount} results
+                </Button>
+              </div>
+            </div>
           </Card>
         </motion.aside>
+        </>
         )}
 
         {/* Products Grid */}

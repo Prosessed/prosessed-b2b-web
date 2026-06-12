@@ -315,6 +315,17 @@ export function Navigation() {
           </AnimatePresence>
         </div>
 
+        <Button
+          asChild
+          size="sm"
+          className="md:hidden shrink-0 rounded-full font-bold text-xs shadow-md shadow-primary/15 hover:shadow-lg hover:shadow-primary/20 transition-shadow"
+        >
+          <Link href="/products" className="gap-1.5" aria-label="Shop Now">
+            <LayoutGrid className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Shop Now
+          </Link>
+        </Button>
+
         {/* Navigation links */}
         <nav className="hidden items-center gap-4 md:flex" aria-label="Main navigation">
           <Button
