@@ -188,14 +188,18 @@ export function Navigation() {
                               const priceDisplay = getPriceDisplay({
                                 basePrice: Number(item.price_list_rate ?? item.rate ?? 0),
                                 currency: user?.defaultCurrency,
-                                marginInfo: item.customer_price_margin,
+                                // Temporarily disabled: Price on Request / custom margin from search API
+                                // marginInfo: item.customer_price_margin,
                               })
                               const priceLabel =
-                                priceDisplay.kind === "hidden"
-                                  ? "Price on Request"
-                                  : priceDisplay.kind === "range"
-                                    ? `${priceDisplay.minLabel} - ${priceDisplay.maxLabel}`
-                                    : priceDisplay.label
+                                // priceDisplay.kind === "hidden"
+                                //   ? "Price on Request"
+                                //   :
+                                priceDisplay.kind === "range"
+                                  ? `${priceDisplay.minLabel} - ${priceDisplay.maxLabel}`
+                                  : priceDisplay.kind === "single"
+                                    ? priceDisplay.label
+                                    : ""
 
                               return (
                             <Link
