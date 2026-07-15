@@ -759,7 +759,10 @@ export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptio
         page_size: String(pageSize),
       })
       if (options?.tag) {
+        // Backend variants differ across OrderIT builds
         params.set("tag", options.tag)
+        params.set("tags", options.tag)
+        params.set("filterByTag", options.tag)
       }
       appendOrderitToSearchParams(params, settings, {
         sortByQty:

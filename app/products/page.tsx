@@ -132,6 +132,8 @@ export default function ProductsPage() {
   const [allProducts, setAllProducts] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  /** How many tagged/filtered items we want loaded (fills 20/50/100 per “page”). */
+  const [loadTargetCount, setLoadTargetCount] = useState(pageSize)
   const loadMoreStartedAtRef = useRef<number | null>(null)
   const pendingLoadMoreRef = useRef(false)
   const [canLoadMoreFallback, setCanLoadMoreFallback] = useState(true)
@@ -324,6 +326,7 @@ export default function ProductsPage() {
     prevFiltersRef.current = currentFiltersKey
     isResettingRef.current = true
     setCurrentPage(1)
+    setLoadTargetCount(pageSize)
     setCanLoadMoreFallback(true)
     // Only clear products if we're actually changing filters (not on initial mount with same filters)
     if (allProducts.length > 0) {
@@ -335,7 +338,7 @@ export default function ProductsPage() {
       isResettingRef.current = false
     }, 100)
     return () => clearTimeout(timer)
-  }, [currentFiltersKey])
+  }, [currentFiltersKey, pageSize])
 
   // Update products list when data changes
   const prevProductsLengthRef = useRef(0)
@@ -427,29 +430,39 @@ export default function ProductsPage() {
     if (isValidating) return
     if (isCategoryChanging) return
     pendingLoadMoreRef.current = false
+    if (useTaggedView) {
+      setLoadTargetCount((prev) => Math.max(prev, allProducts.length) + pageSize)
+      return
+    }
     setIsLoadingMore(true)
     setCurrentPage((prev) => prev + 1)
-  }, [hasNextPage, isLoadingMore, isValidating, isCategoryChanging])
+  }, [
+    hasNextPage,
+    isLoadingMore,
+    isValidating,
+    isCategoryChanging,
+    useTaggedView,
+    allProducts.length,
+    pageSize,
+  ])
 
-  // Tagged + specific tag: API may return mixed tags; skip empty filtered pages automatically
+  // Tagged view: API pages can mix tags; keep fetching until we hit selected page size (20/50/100)
   useEffect(() => {
-    if (!useTaggedView || !tagFromUrl) return
+    if (!useTaggedView) return
     if (!hasNextPage) return
     if (isLoading || isValidating || isLoadingMore || isCategoryChanging) return
-    if (currentPage <= 1) return
-    if (products.length > 0) return
+    if (allProducts.length >= loadTargetCount) return
     setIsLoadingMore(true)
     setCurrentPage((prev) => prev + 1)
   }, [
     useTaggedView,
-    tagFromUrl,
     hasNextPage,
     isLoading,
     isValidating,
     isLoadingMore,
     isCategoryChanging,
-    currentPage,
-    products.length,
+    allProducts.length,
+    loadTargetCount,
   ])
 
   // Infinite scroll observer
@@ -468,6 +481,10 @@ export default function ProductsPage() {
             return
           }
           if (isCategoryChanging) return
+          if (useTaggedView) {
+            setLoadTargetCount((prev) => Math.max(prev, allProducts.length) + pageSize)
+            return
+          }
           setIsLoadingMore(true)
           setCurrentPage((prev) => prev + 1)
         }
@@ -485,7 +502,15 @@ export default function ProductsPage() {
         observer.unobserve(currentTarget)
       }
     }
-  }, [hasNextPage, isLoadingMore, isValidating, isCategoryChanging])
+  }, [
+    hasNextPage,
+    isLoadingMore,
+    isValidating,
+    isCategoryChanging,
+    useTaggedView,
+    allProducts.length,
+    pageSize,
+  ])
 
   // Helper to update URL with current filter state; when any filter is set, drop previously_bought so we use items vtwo API
   const updateUrlParams = useCallback((updates: {
