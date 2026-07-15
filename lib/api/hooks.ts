@@ -711,23 +711,36 @@ export function useCustomerName(customerId: string | null) {
 export interface UseTaggedItemsOptions {
   sortByQty?: "asc" | "desc"
   inStockOnly?: boolean | null
+  page?: number
+  page_size?: number
+  /** Filter to a specific tag when the backend supports it */
+  tag?: string
+  /** When false, skip the request (SWR key is null). Default true. */
+  enabled?: boolean
 }
 
 export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptions) {
   const { user } = useAuth()
   const { data: warehousesData } = useWarehousesByCustomerBranch()
   const resolvedWarehouse = warehousesData?.default_warehouse || user?.defaultWarehouse || ""
+  const page = options?.page || 1
+  const pageSize = options?.page_size || 20
+  const enabled = options?.enabled !== false
 
-  const key = user
-    ? [
-        "taggedItems",
-        user.customerId,
-        user.companyName,
-        warehouse ?? resolvedWarehouse,
-        options?.sortByQty,
-        options?.inStockOnly,
-      ]
-    : null
+  const key =
+    user && enabled
+      ? [
+          "taggedItems",
+          user.customerId,
+          user.companyName,
+          warehouse ?? resolvedWarehouse,
+          page,
+          pageSize,
+          options?.tag || "",
+          options?.sortByQty,
+          options?.inStockOnly,
+        ]
+      : null
 
   return useSWR(
     key,
@@ -742,7 +755,12 @@ export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptio
         company: user.companyName || "",
         sortQtyField: "actual",
         warehouse: warehouse || resolvedWarehouse,
+        page: String(page),
+        page_size: String(pageSize),
       })
+      if (options?.tag) {
+        params.set("tag", options.tag)
+      }
       appendOrderitToSearchParams(params, settings, {
         sortByQty:
           options?.sortByQty === "asc" || options?.sortByQty === "desc"
@@ -765,12 +783,47 @@ export function useTaggedItems(warehouse?: string, options?: UseTaggedItemsOptio
         }
       )
 
-      console.log(`[Tagged Items API] Response:`, response)
       const raw = response?.message
-      const data = Array.isArray(raw) ? raw : (raw?.items ?? [])
-      return Array.isArray(data) ? data : []
+      const items = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.items)
+          ? raw.items
+          : []
+      const apiPagination = raw && !Array.isArray(raw) ? raw.pagination : undefined
+      const totalRecords =
+        typeof apiPagination?.total_records === "number"
+          ? apiPagination.total_records
+          : typeof raw?.total_records === "number"
+            ? raw.total_records
+            : typeof raw?.total_items_with_tags === "number"
+              ? raw.total_items_with_tags
+              : undefined
+      const pagination =
+        apiPagination && typeof apiPagination === "object"
+          ? apiPagination
+          : typeof totalRecords === "number"
+            ? {
+                total_records: totalRecords,
+                current_page: page,
+                page_size: pageSize,
+                has_next_page: page * pageSize < totalRecords,
+              }
+            : {
+                total_records: items.length,
+                current_page: page,
+                page_size: pageSize,
+                has_next_page: items.length >= pageSize,
+              }
+
+      return {
+        items,
+        pagination,
+        brands: raw && !Array.isArray(raw) ? raw.brands : undefined,
+        total_items_with_tags:
+          raw && !Array.isArray(raw) ? raw.total_items_with_tags : undefined,
+      }
     },
-    { revalidateOnFocus: false }
+    { revalidateOnFocus: false, keepPreviousData: true }
   )
 }
 

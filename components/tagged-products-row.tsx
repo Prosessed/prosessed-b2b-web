@@ -25,9 +25,12 @@ export function TaggedProductsRow({
   pageSize = 10,
   showTagFilter = false
 }: TaggedProductsRowProps) {
-  const { data: itemsData, isLoading } = useTaggedItems(warehouse)
+  const { data: itemsData, isLoading } = useTaggedItems(warehouse, {
+    page: 1,
+    page_size: pageSize,
+  })
 
-  const products = Array.isArray(itemsData) ? itemsData : []
+  const products = Array.isArray(itemsData?.items) ? itemsData.items : []
 
   // Group products by tags for display
   const tagGroups = new Map<string, typeof products>()

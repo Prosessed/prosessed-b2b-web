@@ -169,6 +169,8 @@ export default function ProductsPage() {
    */
   const sortByQtyForApi: "asc" | "desc" | undefined = undefined
 
+  const useTaggedView = !!(tagFromUrl || taggedFromUrl)
+
   // Search results
   const { data: searchData, isLoading: searchLoading, isValidating: searchValidating, error: searchError } = useSearch(
     searchQuery || "",
@@ -178,7 +180,7 @@ export default function ProductsPage() {
   )
 
   // Fetch products: use items vtwo when any filter (category/brand) or search; use most-bought only when solely previously_bought
-  const shouldFetchItems = !effectivePreviouslyBought && !searchQuery
+  const shouldFetchItems = !effectivePreviouslyBought && !searchQuery && !useTaggedView
   const { data: itemsData, isLoading: itemsLoading, isValidating: itemsValidating, error: itemsError } = useItems({
     item_group: shouldFetchItems ? selectedCategory : undefined,
     page: shouldFetchItems ? currentPage : undefined,
@@ -195,14 +197,23 @@ export default function ProductsPage() {
     time_frame: effectivePreviouslyBought ? "6 months" : undefined,
   })
 
-  const useTaggedView = tagFromUrl || taggedFromUrl
-  const { data: taggedItemsData, isLoading: taggedLoading, error: taggedError } = useTaggedItems(undefined, {
+  const {
+    data: taggedItemsData,
+    isLoading: taggedLoading,
+    isValidating: taggedValidating,
+    error: taggedError,
+  } = useTaggedItems(undefined, {
+    enabled: useTaggedView,
+    page: useTaggedView ? currentPage : undefined,
+    page_size: useTaggedView ? pageSize : undefined,
+    tag: tagFromUrl,
     sortByQty: useTaggedView ? sortByQtyForApi : undefined,
   })
   const productsWhenTag = useMemo(() => {
-    if (!useTaggedView || !taggedItemsData || !Array.isArray(taggedItemsData)) return []
-    if (tagFromUrl) return taggedItemsData.filter((p: any) => parseTags(p.tags).includes(tagFromUrl))
-    return taggedItemsData
+    if (!useTaggedView || !taggedItemsData?.items || !Array.isArray(taggedItemsData.items)) return []
+    // Keep client-side filter as a safety net when API returns mixed tags
+    if (tagFromUrl) return taggedItemsData.items.filter((p: any) => parseTags(p.tags).includes(tagFromUrl))
+    return taggedItemsData.items
   }, [useTaggedView, tagFromUrl, taggedItemsData])
 
   const isLoading = useTaggedView
@@ -210,7 +221,9 @@ export default function ProductsPage() {
     : searchQuery
     ? searchLoading
     : (effectivePreviouslyBought ? mostBoughtLoading : itemsLoading)
-  const isValidating = useTaggedView ? false : (searchQuery ? searchValidating : (effectivePreviouslyBought ? mostBoughtValidating : itemsValidating))
+  const isValidating = useTaggedView
+    ? taggedValidating
+    : (searchQuery ? searchValidating : (effectivePreviouslyBought ? mostBoughtValidating : itemsValidating))
   const error = useTaggedView ? taggedError : (searchQuery ? searchError : (effectivePreviouslyBought ? mostBoughtError : itemsError))
   const products = useTaggedView
     ? productsWhenTag
@@ -220,17 +233,16 @@ export default function ProductsPage() {
       ? (mostBoughtData?.message?.items || mostBoughtData?.message?.data || mostBoughtData?.items || [])
       : (itemsData?.message?.items || itemsData?.message?.data || itemsData?.message?.item_list || itemsData?.items || []))
   const pagination = useTaggedView
-    ? { total_records: productsWhenTag.length, has_next_page: false }
+    ? taggedItemsData?.pagination
     : searchQuery
     ? searchData?.pagination
     : (effectivePreviouslyBought
       ? (mostBoughtData?.message?.pagination || mostBoughtData?.pagination)
       : itemsData?.message?.pagination)
   const hasNextPage = useMemo(() => {
-    if (useTaggedView) return false
     if (typeof pagination?.has_next_page === "boolean") return pagination.has_next_page
     return canLoadMoreFallback
-  }, [canLoadMoreFallback, pagination?.has_next_page, useTaggedView])
+  }, [canLoadMoreFallback, pagination?.has_next_page])
   
   // Debug: Log first product to check rate field
   if (products.length > 0 && process.env.NODE_ENV === "development") {
@@ -418,6 +430,27 @@ export default function ProductsPage() {
     setIsLoadingMore(true)
     setCurrentPage((prev) => prev + 1)
   }, [hasNextPage, isLoadingMore, isValidating, isCategoryChanging])
+
+  // Tagged + specific tag: API may return mixed tags; skip empty filtered pages automatically
+  useEffect(() => {
+    if (!useTaggedView || !tagFromUrl) return
+    if (!hasNextPage) return
+    if (isLoading || isValidating || isLoadingMore || isCategoryChanging) return
+    if (currentPage <= 1) return
+    if (products.length > 0) return
+    setIsLoadingMore(true)
+    setCurrentPage((prev) => prev + 1)
+  }, [
+    useTaggedView,
+    tagFromUrl,
+    hasNextPage,
+    isLoading,
+    isValidating,
+    isLoadingMore,
+    isCategoryChanging,
+    currentPage,
+    products.length,
+  ])
 
   // Infinite scroll observer
   useEffect(() => {
