@@ -1,10 +1,24 @@
 "use client"
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react"
-import { setApiBaseUrl } from "../api/client"
-import { setAuthCookie } from "./actions"
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react"
+import { setApiBaseUrl, setUnauthorizedHandler } from "../api/client"
+import { validateOrderitSession } from "../api/orderit-settings"
+import { clearAuthCookie, setAuthCookie } from "./actions"
 import { authStorage } from "./storage.client"
 import type { AuthUser } from "./types"
+
+const LOGIN_PATH = "/login"
+
+const PUBLIC_ROUTE_PREFIXES = [
+  "/login",
+  "/signup",
+  "/contact",
+  "/privacy",
+  "/terms",
+]
+
+const isPublicRoute = (pathname: string) =>
+  PUBLIC_ROUTE_PREFIXES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
 
 interface AuthContextType {
   user: AuthUser | null
@@ -21,24 +35,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const cookieSyncedRef = useRef(false)
 
+  const handleSessionExpired = useCallback(async () => {
+    setUser(null)
+    authStorage.removeUser()
+    cookieSyncedRef.current = false
+    await clearAuthCookie().catch(() => {})
+
+    if (typeof window !== "undefined" && !isPublicRoute(window.location.pathname)) {
+      window.location.href = LOGIN_PATH
+    }
+  }, [])
+
   useEffect(() => {
-    const storedUser = authStorage.getUser()
-    if (storedUser) {
-      if (authStorage.isSessionValid(storedUser.sid)) {
+    setUnauthorizedHandler(() => {
+      void handleSessionExpired()
+    })
+    return () => setUnauthorizedHandler(null)
+  }, [handleSessionExpired])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const initAuth = async () => {
+      const storedUser = authStorage.getUser()
+
+      if (storedUser && authStorage.isSessionValid(storedUser.sid)) {
         setApiBaseUrl(storedUser.companyUrl)
+
+        const sessionValid = await validateOrderitSession({
+          apiKey: storedUser.apiKey,
+          apiSecret: storedUser.apiSecret,
+          sid: storedUser.sid,
+        })
+
+        if (cancelled) return
+
+        if (!sessionValid) {
+          await handleSessionExpired()
+          setIsLoading(false)
+          return
+        }
+
         setUser(storedUser)
-        // Sync auth cookie so server-rendered pages (e.g. /quotes) have session
         if (!cookieSyncedRef.current) {
           cookieSyncedRef.current = true
           setAuthCookie(storedUser).catch(() => {})
         }
-      } else {
+      } else if (storedUser) {
         authStorage.removeUser()
         setUser(null)
       }
+
+      if (!cancelled) {
+        setIsLoading(false)
+      }
     }
-    setIsLoading(false)
-  }, [])
+
+    void initAuth()
+
+    return () => {
+      cancelled = true
+    }
+  }, [handleSessionExpired])
 
   const login = (userData: AuthUser) => {
     setApiBaseUrl(userData.companyUrl)

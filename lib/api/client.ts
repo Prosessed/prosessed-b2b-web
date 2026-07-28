@@ -113,6 +113,18 @@ export class ApiError extends Error {
   }
 }
 
+let unauthorizedHandler: (() => void) | null = null
+
+export const setUnauthorizedHandler = (handler: (() => void) | null) => {
+  unauthorizedHandler = handler
+}
+
+const notifyUnauthorized = (status: number, hadAuth: boolean) => {
+  if (status === 401 && hadAuth && unauthorizedHandler) {
+    unauthorizedHandler()
+  }
+}
+
 /* ============================================================
    LOGGER (DEV ONLY)
 ============================================================ */
@@ -409,6 +421,7 @@ export const apiClient = {
       apiLogger.response(url, response.status, data, timeMs)
 
       if (!response.ok) {
+        notifyUnauthorized(response.status, useBearerAuth || Boolean(useTokenAuth))
         throw new ApiError(
           response.status,
           data?.message || response.statusText

@@ -3,7 +3,7 @@
  * Fetched before product APIs and merged in one place to avoid duplication.
  */
 
-import { apiClient } from "./client"
+import { apiClient, ApiError } from "./client"
 
 const ORDERIT_SETTINGS_PATH =
   "/api/method/prosessed_orderit.orderit_app.apis.orderit_settings.get_orderit_settings"
@@ -19,28 +19,46 @@ const isTruthyOne = (v: unknown): boolean =>
 
 type Auth = { apiKey?: string | null; apiSecret?: string | null; sid?: string | null }
 
+const requestOrderitSettings = (auth: Auth) =>
+  apiClient.request<{ message?: OrderitSettings } | OrderitSettings>(ORDERIT_SETTINGS_PATH, {
+    method: "GET",
+    auth,
+  })
+
+const parseOrderitSettingsResponse = (
+  response: { message?: OrderitSettings } | OrderitSettings
+): OrderitSettings | null => {
+  const msg = (response as { message?: OrderitSettings })?.message
+  return msg && typeof msg === "object"
+    ? (msg as OrderitSettings)
+    : (response as OrderitSettings) && typeof response === "object" && !Array.isArray(response)
+      ? (response as OrderitSettings)
+      : null
+}
+
+/**
+ * Validate session on app load. Returns false when the API responds with 401.
+ */
+export const validateOrderitSession = async (auth: Auth): Promise<boolean> => {
+  try {
+    await requestOrderitSettings(auth)
+    return true
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) return false
+    return true
+  }
+}
+
 /**
  * Fetch OrderIT settings once (per auth) before product APIs.
  * Always fetches fresh (no cache) so flags stay up-to-date.
  */
 export const fetchOrderitSettings = async (auth: Auth): Promise<OrderitSettings | null> => {
   try {
-    const response = await apiClient.request<{ message?: OrderitSettings } | OrderitSettings>(
-      ORDERIT_SETTINGS_PATH,
-      {
-        method: "GET",
-        auth,
-      }
-    )
-    const msg = (response as { message?: OrderitSettings })?.message
-    const settings =
-      msg && typeof msg === "object"
-        ? (msg as OrderitSettings)
-        : (response as OrderitSettings) && typeof response === "object" && !Array.isArray(response)
-          ? (response as OrderitSettings)
-          : null
-    return settings
-  } catch {
+    const response = await requestOrderitSettings(auth)
+    return parseOrderitSettingsResponse(response)
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) throw err
     return null
   }
 }
