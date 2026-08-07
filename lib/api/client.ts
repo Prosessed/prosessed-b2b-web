@@ -250,6 +250,36 @@ export const apiClient = {
     }))
   },
 
+  /* ------------------ Fetch Companies (by Mobile) ------------------ */
+  async getCompaniesByMobile(mobileNumber: string): Promise<Company[]> {
+    const params = new URLSearchParams({
+      fields: '["*"]',
+      filters: `[["custom_mobile_number", "=", "${mobileNumber}"]]`,
+    })
+
+    const response = await fetch(
+      `${COMPANY_FETCH_BASE_URL}/api/resource/All User Master?${params}`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `token ${FRAPPE_API_TOKEN}`,
+        },
+        credentials: "omit", // 🔥 NEVER send cookies
+      }
+    )
+
+    if (!response.ok) {
+      throw new ApiError(response.status, response.statusText)
+    }
+
+    const result = await response.json()
+
+    return (result.data || []).map((item: any) => ({
+      company_name: item.company_name || "",
+      company_url: item.company_url || "",
+    }))
+  },
+
   /* ------------------ Login (Custom API) ------------------ */
   async login(
     email: string,
@@ -322,6 +352,43 @@ export const apiClient = {
       {
         method: "POST",
         body: JSON.stringify({ email, otp_code: otpCode }),
+        auth: {},
+      }
+    )
+    if (data.message.success_key !== 1) {
+      throw new ApiError(401, data.message.message || "Authentication failed")
+    }
+    return data
+  },
+
+  /* ------------------ Mobile OTP Login ------------------ */
+  async requestMobileOtp(mobileNumber: string, companyUrl: string): Promise<{ success: boolean; message: string }> {
+    setApiBaseUrl(companyUrl)
+    const data = await this.request<{ success?: boolean; message?: string }>(
+      "/api/method/prosessed_orderit.api.get_otp",
+      {
+        method: "POST",
+        body: JSON.stringify({ mobile_number: mobileNumber }),
+        auth: {},
+      }
+    )
+    const success = data?.success ?? true
+    const message =
+      typeof data?.message === "string" ? data.message : "OTP sent to your mobile number"
+    return { success: Boolean(success), message }
+  },
+
+  async loginWithMobileOtp(
+    mobileNumber: string,
+    otp: string,
+    companyUrl: string
+  ): Promise<LoginResponse> {
+    setApiBaseUrl(companyUrl)
+    const data = await this.request<LoginResponse>(
+      "/api/method/prosessed_orderit.api.login",
+      {
+        method: "POST",
+        body: JSON.stringify({ mobile_number: mobileNumber, otp, platform: "web" }),
         auth: {},
       }
     )

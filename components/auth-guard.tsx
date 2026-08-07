@@ -9,6 +9,7 @@ const PUBLIC_ROUTES = [
   "/login",
   "/login/password",
   "/login/otp",
+  "/login/mobile-otp",
   "/login/forgot-password",
   "/signup",
   "/contact",

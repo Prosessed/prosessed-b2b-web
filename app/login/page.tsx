@@ -6,21 +6,42 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CardContent } from "@/components/ui/card"
-import { Loader2, ArrowRight, Mail } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Loader2, ArrowRight, Mail, Smartphone } from "lucide-react"
 import { apiClient, ApiError } from "@/lib/api/client"
 import type { Company } from "@/lib/auth/types"
+import { COUNTRY_DIAL_CODES, DEFAULT_COUNTRY_ISO2 } from "@/lib/constants/countries"
+import { toE164, isValidMobileNumber } from "@/lib/utils/phone"
 import Link from "next/link"
 
 const LOGIN_EMAIL_KEY = "login_email"
+const LOGIN_MOBILE_KEY = "login_mobile"
 const LOGIN_COMPANY_KEY = "login_company"
+
+type LoginTab = "email" | "mobile"
 
 export default function LoginPage() {
   const router = useRouter()
-  const [step, setStep] = useState<"email" | "company">("email")
+  const [step, setStep] = useState<"entry" | "company">("entry")
+  const [activeTab, setActiveTab] = useState<LoginTab>("email")
+
+  // Email flow state (unchanged behavior)
   const [email, setEmail] = useState("")
+
+  // Mobile flow state
+  const [countryIso2, setCountryIso2] = useState(DEFAULT_COUNTRY_ISO2)
+  const [localNumber, setLocalNumber] = useState("")
+  const [mobileE164, setMobileE164] = useState("")
+
   const [companies, setCompanies] = useState<Company[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as LoginTab)
+    setError("")
+  }
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,7 +77,71 @@ export default function LoginPage() {
     }
   }
 
+  const proceedWithMobileCompany = async (mobileValue: string, company: Company) => {
+    setError("")
+    setIsLoading(true)
+    try {
+      await apiClient.requestMobileOtp(mobileValue, company.company_url)
+      sessionStorage.setItem(LOGIN_MOBILE_KEY, mobileValue)
+      sessionStorage.setItem(LOGIN_COMPANY_KEY, JSON.stringify(company))
+      router.push("/login/mobile-otp")
+    } catch (err) {
+      if (err instanceof ApiError && err.message) {
+        setError(err.message)
+      } else {
+        setError("Failed to send OTP. Please try again.")
+      }
+      setIsLoading(false)
+    }
+  }
+
+  const handleMobileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+
+    const country = COUNTRY_DIAL_CODES.find((c) => c.iso2 === countryIso2)
+    const e164 = toE164(country?.dialCode ?? "", localNumber)
+
+    if (!isValidMobileNumber(e164)) {
+      setError("Please enter a valid mobile number")
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const companiesData = await apiClient.getCompaniesByMobile(e164)
+
+      if (companiesData.length === 0) {
+        setError("No companies found for this mobile number")
+        setIsLoading(false)
+        return
+      }
+
+      if (companiesData.length === 1) {
+        await proceedWithMobileCompany(e164, companiesData[0])
+        return
+      }
+
+      setMobileE164(e164)
+      setCompanies(companiesData)
+      setStep("company")
+      setIsLoading(false)
+    } catch (err) {
+      if (err instanceof ApiError && err.message) {
+        setError(err.message)
+      } else {
+        setError("Failed to fetch companies. Please try again.")
+      }
+      setIsLoading(false)
+    }
+  }
+
   const handleCompanySelect = (company: Company) => {
+    if (activeTab === "mobile") {
+      void proceedWithMobileCompany(mobileE164, company)
+      return
+    }
     sessionStorage.setItem(LOGIN_EMAIL_KEY, email)
     sessionStorage.setItem(LOGIN_COMPANY_KEY, JSON.stringify(company))
     router.push("/login/password")
@@ -81,62 +166,143 @@ export default function LoginPage() {
           <div className="space-y-2 mb-8">
             <h2 className="text-2xl font-bold">Welcome Back</h2>
             <p className="text-muted-foreground">
-              {step === "email" ? "Enter your email to access your business portal" : "Select your business entity"}
+              {step === "company"
+                ? "Select your business entity"
+                : activeTab === "email"
+                  ? "Enter your email to access your business portal"
+                  : "Enter your mobile number to access your business portal"}
             </p>
           </div>
 
-          {step === "email" ? (
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#808080]" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10 h-14 rounded-2xl bg-muted/50 border-border/50 focus:border-primary transition-all"
-                      required
+          {step === "entry" ? (
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="email">Email</TabsTrigger>
+                <TabsTrigger value="mobile">Mobile</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="email">
+                <form onSubmit={handleEmailSubmit} className="space-y-4">
+                  <CardContent className="space-y-6 px-0">
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#808080]" />
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="Enter your email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="pl-10 h-14 rounded-2xl bg-muted/50 border-border/50 focus:border-primary transition-all"
+                          required
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+
+                    {error && (
+                      <div className="p-4 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-2xl">
+                        {error}
+                      </div>
+                    )}
+
+                    <Button
+                      type="submit"
+                      className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-semibold rounded-2xl transition-all shadow-lg shadow-primary/20"
                       disabled={isLoading}
-                    />
-                  </div>
-                </div>
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Checking...
+                        </>
+                      ) : (
+                        <>
+                          Continue
+                          <ArrowRight className="ml-2 h-5 w-5" />
+                        </>
+                      )}
+                    </Button>
 
-                {error && (
-                  <div className="p-4 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-2xl">
-                    {error}
-                  </div>
-                )}
+                    <p className="text-center text-sm text-muted-foreground pt-2">
+                      New to the portal?{" "}
+                      <Link href="/signup" className="font-semibold text-primary hover:underline underline-offset-4">
+                        Create an account
+                      </Link>
+                    </p>
+                  </CardContent>
+                </form>
+              </TabsContent>
 
-                <Button
-                  type="submit"
-                  className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-semibold rounded-2xl transition-all shadow-lg shadow-primary/20"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Checking...
-                    </>
-                  ) : (
-                    <>
-                      Continue
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </>
-                  )}
-                </Button>
+              <TabsContent value="mobile">
+                <form onSubmit={handleMobileSubmit} className="space-y-4">
+                  <CardContent className="space-y-6 px-0">
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Select value={countryIso2} onValueChange={setCountryIso2} disabled={isLoading}>
+                          <SelectTrigger className="h-14 w-[128px] shrink-0 rounded-2xl bg-muted/50 border-border/50 focus:border-primary transition-all">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COUNTRY_DIAL_CODES.map((c) => (
+                              <SelectItem key={c.iso2} value={c.iso2}>
+                                <span className="mr-1">{c.flag}</span>
+                                {c.dialCode}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="relative flex-1">
+                          <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#808080]" />
+                          <Input
+                            id="mobile"
+                            type="tel"
+                            inputMode="numeric"
+                            placeholder="Enter mobile number"
+                            value={localNumber}
+                            onChange={(e) => setLocalNumber(e.target.value.replace(/\D/g, ""))}
+                            className="pl-10 h-14 rounded-2xl bg-muted/50 border-border/50 focus:border-primary transition-all"
+                            required
+                            disabled={isLoading}
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-                <p className="text-center text-sm text-muted-foreground pt-2">
-                  New to the portal?{" "}
-                  <Link href="/signup" className="font-semibold text-primary hover:underline underline-offset-4">
-                    Create an account
-                  </Link>
-                </p>
+                    {error && (
+                      <div className="p-4 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-2xl">
+                        {error}
+                      </div>
+                    )}
 
-              </CardContent>
-            </form>
+                    <Button
+                      type="submit"
+                      className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-semibold rounded-2xl transition-all shadow-lg shadow-primary/20"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Checking...
+                        </>
+                      ) : (
+                        <>
+                          Continue
+                          <ArrowRight className="ml-2 h-5 w-5" />
+                        </>
+                      )}
+                    </Button>
+
+                    <p className="text-center text-sm text-muted-foreground pt-2">
+                      New to the portal?{" "}
+                      <Link href="/signup" className="font-semibold text-primary hover:underline underline-offset-4">
+                        Create an account
+                      </Link>
+                    </p>
+                  </CardContent>
+                </form>
+              </TabsContent>
+            </Tabs>
           ) : (
             <div className="space-y-3">
               <div className="max-h-[300px] overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-primary/10">
@@ -165,16 +331,23 @@ export default function LoginPage() {
                 ))}
               </div>
 
+              {error && (
+                <div className="p-4 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-2xl">
+                  {error}
+                </div>
+              )}
+
               <Button
                 variant="ghost"
                 className="w-full mt-4 text-muted-foreground hover:text-foreground"
                 onClick={() => {
-                  setStep("email")
+                  setStep("entry")
                   setCompanies([])
                   setError("")
                 }}
+                disabled={isLoading}
               >
-                Use a different email
+                {activeTab === "email" ? "Use a different email" : "Use a different mobile number"}
               </Button>
 
               <p className="text-center text-sm text-muted-foreground pt-2">
