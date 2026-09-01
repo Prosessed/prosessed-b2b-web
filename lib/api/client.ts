@@ -216,6 +216,43 @@ const isFrappeExceptionPayload = (data: unknown): boolean => {
 }
 
 /* ============================================================
+   DOMAIN-SCOPED COMPANY FILTERING
+============================================================ */
+
+/** First hostname label of a company_url, e.g. "https://oasis.prosessed.com/app" → "oasis". */
+const companySlug = (companyUrl: string): string => {
+  try {
+    return new URL(companyUrl).hostname.split(".")[0]?.toLowerCase() ?? ""
+  } catch {
+    return ""
+  }
+}
+
+/**
+ * The same email/mobile number can be linked to unrelated companies across
+ * tenants (e.g. an internal user with access to Joyco, Oasis, Desitouch...).
+ * A customer logging in from a company's own branded portal domain
+ * (store.oasisfoods.com.au) should only see that company, not the full list.
+ *
+ * There's no explicit "portal domain" field on the company record to match
+ * against, so we match by substring: does the company's slug (from its
+ * company_url) appear in the current browser hostname? If nothing matches —
+ * e.g. the generic un-branded portal domain, or local/dev testing — fall
+ * back to the unfiltered list rather than risk locking someone out.
+ */
+const filterCompaniesByCurrentDomain = (companies: Company[]): Company[] => {
+  if (typeof window === "undefined" || companies.length <= 1) return companies
+
+  const host = window.location.hostname.toLowerCase()
+  const matches = companies.filter((c) => {
+    const slug = companySlug(c.company_url)
+    return slug.length > 0 && host.includes(slug)
+  })
+
+  return matches.length > 0 ? matches : companies
+}
+
+/* ============================================================
    API CLIENT
 ============================================================ */
 
@@ -244,10 +281,12 @@ export const apiClient = {
 
     const result = await response.json()
 
-    return (result.data || []).map((item: any) => ({
+    const companies = (result.data || []).map((item: any) => ({
       company_name: item.company_name || "",
       company_url: item.company_url || "",
     }))
+
+    return filterCompaniesByCurrentDomain(companies)
   },
 
   /* ------------------ Fetch Companies (by Mobile) ------------------ */
@@ -274,10 +313,12 @@ export const apiClient = {
 
     const result = await response.json()
 
-    return (result.data || []).map((item: any) => ({
+    const companies = (result.data || []).map((item: any) => ({
       company_name: item.company_name || "",
       company_url: item.company_url || "",
     }))
+
+    return filterCompaniesByCurrentDomain(companies)
   },
 
   /* ------------------ Login (Custom API) ------------------ */
@@ -364,7 +405,11 @@ export const apiClient = {
   /* ------------------ Mobile OTP Login ------------------ */
   async requestMobileOtp(mobileNumber: string, companyUrl: string): Promise<{ success: boolean; message: string }> {
     setApiBaseUrl(companyUrl)
-    const data = await this.request<{ success?: boolean; message?: string }>(
+    // prosessed_orderit.api.get_otp returns a Frappe-wrapped payload:
+    // { message: { success: boolean, channel, status, message } }
+    const data = await this.request<{
+      message?: { success?: boolean; message?: string }
+    }>(
       "/api/method/prosessed_orderit.api.get_otp",
       {
         method: "POST",
@@ -372,10 +417,15 @@ export const apiClient = {
         auth: {},
       }
     )
-    const success = data?.success ?? true
+    const success = data?.message?.success ?? false
     const message =
-      typeof data?.message === "string" ? data.message : "OTP sent to your mobile number"
-    return { success: Boolean(success), message }
+      typeof data?.message?.message === "string"
+        ? data.message.message
+        : "OTP sent to your mobile number"
+    if (!success) {
+      throw new ApiError(400, message || "Failed to send OTP")
+    }
+    return { success: true, message }
   },
 
   async loginWithMobileOtp(

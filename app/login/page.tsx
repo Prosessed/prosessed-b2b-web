@@ -7,22 +7,40 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, ArrowRight, Mail, Smartphone, Clock } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Loader2, ArrowRight, Mail, Smartphone } from "lucide-react"
 import { apiClient, ApiError } from "@/lib/api/client"
 import type { Company } from "@/lib/auth/types"
+import { COUNTRY_DIAL_CODES, DEFAULT_COUNTRY_ISO2 } from "@/lib/constants/countries"
+import { toE164, isValidMobileNumber } from "@/lib/utils/phone"
 import Link from "next/link"
 
 const LOGIN_EMAIL_KEY = "login_email"
+const LOGIN_MOBILE_KEY = "login_mobile"
 const LOGIN_COMPANY_KEY = "login_company"
 
 type LoginTab = "email" | "mobile"
+type PendingFlow = "email" | "mobile"
+
+const DEFAULT_DIAL_CODE =
+  COUNTRY_DIAL_CODES.find((c) => c.iso2 === DEFAULT_COUNTRY_ISO2)?.dialCode ?? "+91"
 
 export default function LoginPage() {
   const router = useRouter()
   const [step, setStep] = useState<"entry" | "company">("entry")
   const [activeTab, setActiveTab] = useState<LoginTab>("email")
   const [email, setEmail] = useState("")
+  const [dialCode, setDialCode] = useState(DEFAULT_DIAL_CODE)
+  const [mobileLocal, setMobileLocal] = useState("")
   const [companies, setCompanies] = useState<Company[]>([])
+  const [pendingFlow, setPendingFlow] = useState<PendingFlow>("email")
+  const [pendingMobile, setPendingMobile] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -52,6 +70,7 @@ export default function LoginPage() {
         return
       }
 
+      setPendingFlow("email")
       setCompanies(companiesData)
       setStep("company")
     } catch (err) {
@@ -65,7 +84,71 @@ export default function LoginPage() {
     }
   }
 
-  const handleCompanySelect = (company: Company) => {
+  const sendMobileOtpAndNavigate = async (mobile: string, company: Company) => {
+    await apiClient.requestMobileOtp(mobile, company.company_url)
+    sessionStorage.setItem(LOGIN_MOBILE_KEY, mobile)
+    sessionStorage.setItem(LOGIN_COMPANY_KEY, JSON.stringify(company))
+    router.push("/login/mobile-otp")
+  }
+
+  const handleMobileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+
+    const digits = mobileLocal.replace(/\D/g, "")
+    const e164 = toE164(dialCode, digits)
+    if (!isValidMobileNumber(e164)) {
+      setError("Please enter a valid mobile number")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const companiesData = await apiClient.getCompaniesByMobile(e164)
+
+      if (companiesData.length === 0) {
+        setError("No account found for this mobile number")
+        return
+      }
+
+      if (companiesData.length === 1) {
+        await sendMobileOtpAndNavigate(e164, companiesData[0])
+        return
+      }
+
+      setPendingFlow("mobile")
+      setPendingMobile(e164)
+      setCompanies(companiesData)
+      setStep("company")
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message)
+      } else {
+        setError("Failed to send OTP. Please try again.")
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleCompanySelect = async (company: Company) => {
+    if (pendingFlow === "mobile") {
+      setError("")
+      setIsLoading(true)
+      try {
+        await sendMobileOtpAndNavigate(pendingMobile, company)
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setError(err.message)
+        } else {
+          setError("Failed to send OTP. Please try again.")
+        }
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
     sessionStorage.setItem(LOGIN_EMAIL_KEY, email)
     sessionStorage.setItem(LOGIN_COMPANY_KEY, JSON.stringify(company))
     router.push("/login/password")
@@ -94,7 +177,7 @@ export default function LoginPage() {
                 ? "Select your business entity"
                 : activeTab === "email"
                   ? "Enter your email to access your business portal"
-                  : "Mobile OTP sign-in is coming soon"}
+                  : "Enter your mobile number to receive a login OTP"}
             </p>
           </div>
 
@@ -102,12 +185,7 @@ export default function LoginPage() {
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="email">Email</TabsTrigger>
-                <TabsTrigger value="mobile" className="gap-2">
-                  Mobile
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                    Soon
-                  </span>
-                </TabsTrigger>
+                <TabsTrigger value="mobile">Mobile</TabsTrigger>
               </TabsList>
 
               <TabsContent value="email">
@@ -164,41 +242,77 @@ export default function LoginPage() {
               </TabsContent>
 
               <TabsContent value="mobile">
-                <CardContent className="space-y-6 px-0">
-                  <div className="flex items-start gap-3 rounded-2xl border border-dashed border-border/60 bg-muted/30 p-4 text-left">
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <Clock className="h-4 w-4 text-primary" />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Smartphone className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-semibold">Mobile OTP login</span>
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                          Coming soon
-                        </span>
+                <form onSubmit={handleMobileSubmit} className="space-y-4">
+                  <CardContent className="space-y-6 px-0">
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Select value={dialCode} onValueChange={setDialCode}>
+                          <SelectTrigger
+                            className="h-14 w-[108px] shrink-0 rounded-2xl bg-muted/50 border-border/50 focus:border-primary transition-all justify-center"
+                            disabled={isLoading}
+                            aria-label="Country code"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COUNTRY_DIAL_CODES.map((c) => (
+                              <SelectItem key={c.iso2} value={c.dialCode}>
+                                <span className="mr-1">{c.flag}</span>
+                                {c.dialCode}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="relative flex-1">
+                          <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#808080]" />
+                          <Input
+                            id="mobile"
+                            type="tel"
+                            inputMode="numeric"
+                            autoComplete="tel"
+                            placeholder="Enter your mobile number"
+                            value={mobileLocal}
+                            onChange={(e) => setMobileLocal(e.target.value.replace(/\D/g, "").slice(0, 15))}
+                            className="pl-10 h-14 rounded-2xl bg-muted/50 border-border/50 focus:border-primary transition-all"
+                            required
+                            disabled={isLoading}
+                          />
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Sign in with your mobile number and OTP will be available here soon. Please use email login for now.
-                      </p>
                     </div>
-                  </div>
 
-                  <Button
-                    type="button"
-                    className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-semibold rounded-2xl transition-all shadow-lg shadow-primary/20"
-                    onClick={() => handleTabChange("email")}
-                  >
-                    Use Email Login
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
+                    {error && (
+                      <div className="p-4 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-2xl">
+                        {error}
+                      </div>
+                    )}
 
-                  <p className="text-center text-sm text-muted-foreground pt-2">
-                    New to the portal?{" "}
-                    <Link href="/signup" className="font-semibold text-primary hover:underline underline-offset-4">
-                      Create an account
-                    </Link>
-                  </p>
-                </CardContent>
+                    <Button
+                      type="submit"
+                      className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-semibold rounded-2xl transition-all shadow-lg shadow-primary/20"
+                      disabled={isLoading || mobileLocal.replace(/\D/g, "").length < 6}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Sending OTP...
+                        </>
+                      ) : (
+                        <>
+                          Send OTP
+                          <ArrowRight className="ml-2 h-5 w-5" />
+                        </>
+                      )}
+                    </Button>
+
+                    <p className="text-center text-sm text-muted-foreground pt-2">
+                      New to the portal?{" "}
+                      <Link href="/signup" className="font-semibold text-primary hover:underline underline-offset-4">
+                        Create an account
+                      </Link>
+                    </p>
+                  </CardContent>
+                </form>
               </TabsContent>
             </Tabs>
           ) : (
@@ -241,11 +355,12 @@ export default function LoginPage() {
                 onClick={() => {
                   setStep("entry")
                   setCompanies([])
+                  setPendingMobile("")
                   setError("")
                 }}
                 disabled={isLoading}
               >
-                Use a different email
+                {pendingFlow === "mobile" ? "Use a different number" : "Use a different email"}
               </Button>
 
               <p className="text-center text-sm text-muted-foreground pt-2">

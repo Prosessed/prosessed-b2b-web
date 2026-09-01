@@ -15,6 +15,7 @@ import type { Company } from "@/lib/auth/types"
 
 const LOGIN_MOBILE_KEY = "login_mobile"
 const LOGIN_COMPANY_KEY = "login_company"
+const RESEND_COOLDOWN_SECONDS = 30
 
 export default function LoginMobileOtpPage() {
   const router = useRouter()
@@ -27,6 +28,7 @@ export default function LoginMobileOtpPage() {
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
   const [ready, setReady] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS)
 
   useEffect(() => {
     const storedMobile = sessionStorage.getItem(LOGIN_MOBILE_KEY)
@@ -44,6 +46,12 @@ export default function LoginMobileOtpPage() {
     }
     setReady(true)
   }, [router])
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setTimeout(() => setResendCooldown((s) => s - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendCooldown])
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -76,13 +84,14 @@ export default function LoginMobileOtpPage() {
   }
 
   const handleResendOtp = async () => {
-    if (!company) return
+    if (!company || resendCooldown > 0) return
     setError("")
     setSuccessMessage("")
     setIsResending(true)
     try {
       const res = await apiClient.requestMobileOtp(mobile, company.company_url)
       setSuccessMessage(res.message || "New OTP sent")
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
     } catch (err) {
       if (err instanceof ApiError && err.message) {
         setError(err.message)
@@ -193,13 +202,15 @@ export default function LoginMobileOtpPage() {
                 variant="ghost"
                 className="w-full text-muted-foreground"
                 onClick={handleResendOtp}
-                disabled={isLoading || isResending}
+                disabled={isLoading || isResending || resendCooldown > 0}
               >
                 {isResending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Resending...
                   </>
+                ) : resendCooldown > 0 ? (
+                  `Resend OTP in ${resendCooldown}s`
                 ) : (
                   "Resend OTP"
                 )}
