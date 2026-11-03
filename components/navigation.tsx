@@ -20,6 +20,7 @@ import { clearAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
+import { cn } from "@/lib/utils"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { getPriceDisplay } from "@/lib/utils/pricing"
 import { AnimatePresence, motion } from "framer-motion"
@@ -94,13 +95,19 @@ export function Navigation() {
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <div className="container mx-auto flex h-16 items-center gap-4 px-4">
-        {/* Company Logo */}
-        <Link href="/" className="flex items-center min-w-0 shrink-0">
+        <div className="container mx-auto flex h-16 items-center gap-2 sm:gap-4 px-3 sm:px-4">
+        {/* Company Logo — hide on mobile while typing so search can use the width */}
+        <Link
+          href="/"
+          className={cn(
+            "flex items-center min-w-0 shrink-0",
+            searchTerm.length > 0 && "max-sm:hidden"
+          )}
+        >
           {bannersLoading ? (
-            <Skeleton className="h-14 w-14 sm:h-16 sm:w-16 rounded-md" aria-hidden />
+            <Skeleton className="h-10 w-10 sm:h-14 sm:w-14 md:h-16 md:w-16 rounded-md" aria-hidden />
           ) : companyLogo ? (
-            <div className="relative h-14 w-14 sm:h-16 sm:w-16">
+            <div className="relative h-10 w-10 sm:h-14 sm:w-14 md:h-16 md:w-16">
               <Image
                 src={companyLogo}
                 alt={companyName}
@@ -117,11 +124,17 @@ export function Navigation() {
         </Link>
 
         {/* Search bar */}
-        <div className="relative flex-1 max-w-2xl mx-auto group">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+        <div className="relative flex-1 min-w-0 max-w-2xl sm:mx-auto group">
+          <Search className="pointer-events-none absolute left-2.5 sm:left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary z-10" />
           <Input
-            type="search"
-            placeholder="Search for product name or categories..."
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            aria-label="Search products"
+            placeholder="Search products..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={(e) => {
@@ -131,44 +144,55 @@ export function Navigation() {
                 handleSearchSubmit()
               }
             }}
-            className="w-full pl-10 pr-24 bg-muted/50 focus:bg-background transition-all border-transparent focus:border-primary/50 h-10 rounded-xl"
+            className={cn(
+              "w-full min-w-0 pl-9 sm:pl-10 bg-muted/50 focus:bg-background transition-all border-transparent focus:border-primary/50 h-10 rounded-xl text-sm sm:text-base",
+              searchTerm.trim().length >= 2
+                ? "pr-[4.25rem] sm:pr-24"
+                : searchTerm
+                  ? "pr-9 sm:pr-12"
+                  : "pr-3"
+            )}
           />
-          {searchTerm && (
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {searchTerm ? (
+            <div className="absolute inset-y-0 right-1.5 sm:right-2 flex items-center gap-0.5 sm:gap-1">
               <button
+                type="button"
                 onClick={() => setSearchTerm("")}
-                className="h-7 w-7 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors"
+                aria-label="Clear search"
+                className="h-7 w-7 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors shrink-0"
               >
                 <X className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
-              {searchTerm.trim().length >= 2 && (
+              {searchTerm.trim().length >= 2 ? (
                 <button
+                  type="button"
                   onClick={handleSearchSubmit}
-                  className="h-7 w-7 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center transition-colors shadow-lg shadow-primary/20"
+                  aria-label="Submit search"
+                  className="h-7 w-7 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center transition-colors shadow-lg shadow-primary/20 shrink-0"
                 >
                   <ArrowRight className="h-4 w-4 text-primary-foreground" />
                 </button>
-              )}
+              ) : null}
             </div>
-          )}
+          ) : null}
 
           <AnimatePresence>
             {searchTerm.length >= 2 && (
               <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-background border-2 border-primary/20 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden z-100"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="fixed left-3 right-3 top-[4.25rem] z-[100] bg-background border-2 border-primary/20 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden sm:absolute sm:left-0 sm:right-0 sm:top-full sm:mt-2 sm:w-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="max-h-[500px] overflow-y-auto">
+                <div className="max-h-[min(500px,70vh)] overflow-y-auto overflow-x-hidden">
                   {isSearching ? (
-                    <div className="p-4 space-y-3">
+                    <div className="p-3 sm:p-4 space-y-3">
                       {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <Skeleton className="h-14 w-14 rounded-xl shrink-0" />
-                          <div className="space-y-2 flex-1">
+                        <div key={i} className="flex items-center gap-3 min-w-0">
+                          <Skeleton className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl shrink-0" />
+                          <div className="space-y-2 flex-1 min-w-0">
                             <Skeleton className="h-4 w-3/4" />
                             <Skeleton className="h-3 w-1/3" />
                           </div>
@@ -206,30 +230,30 @@ export function Navigation() {
                               key={item.item_code}
                               href={`/products/${item.item_code}`}
                               onClick={() => setSearchTerm("")}
-                              className="flex items-center gap-3 p-3 hover:bg-primary/5 rounded-xl transition-all group border border-transparent hover:border-primary/20"
+                              className="flex items-start sm:items-center gap-3 p-2.5 sm:p-3 hover:bg-primary/5 rounded-xl transition-all group border border-transparent hover:border-primary/20 min-w-0 w-full"
                             >
-                              <div className="h-14 w-14 rounded-xl bg-muted/50 relative overflow-hidden shrink-0 border border-border/50">
+                              <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-muted/50 relative overflow-hidden shrink-0 border border-border/50">
                                 <Image
                                   src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
                                   alt={item.item_name || "Product"}
                                   fill
-                                  className="object-contain p-2 group-hover:scale-110 transition-transform"
+                                  className="object-contain p-1.5 sm:p-2 group-hover:scale-110 transition-transform"
                                 />
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold group-hover:text-primary transition-colors line-clamp-1">
+                              <div className="flex-1 min-w-0 overflow-hidden">
+                                <p className="text-sm font-bold group-hover:text-primary transition-colors line-clamp-2 break-words">
                                   {item.item_name}
                                 </p>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <p className="text-xs font-black text-primary">{priceLabel}</p>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                                  <p className="text-xs font-black text-primary shrink-0">{priceLabel}</p>
                                   {item.item_group && (
-                                    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">
+                                    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded truncate max-w-full">
                                       {item.item_group}
                                     </span>
                                   )}
                                 </div>
                               </div>
-                              <Package className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0 opacity-0 group-hover:opacity-100" />
+                              <Package className="hidden sm:block h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0 opacity-0 group-hover:opacity-100" aria-hidden />
                             </Link>
                               )
                             })()
@@ -322,7 +346,10 @@ export function Navigation() {
         <Button
           asChild
           size="sm"
-          className="md:hidden shrink-0 rounded-full font-bold text-xs shadow-md shadow-primary/15 hover:shadow-lg hover:shadow-primary/20 transition-shadow"
+          className={cn(
+            "md:hidden shrink-0 rounded-full font-bold text-xs shadow-md shadow-primary/15 hover:shadow-lg hover:shadow-primary/20 transition-shadow",
+            searchTerm.length > 0 && "hidden"
+          )}
         >
           <Link href="/products" className="gap-1.5" aria-label="Shop Now">
             <LayoutGrid className="h-3.5 w-3.5 shrink-0" aria-hidden />

@@ -102,6 +102,44 @@ export const getApiBaseUrl = () => {
   return currentBaseUrl || DEFAULT_BASE_URL
 }
 
+/** Browser origins that are not allowlisted by tenant CORS need a same-origin proxy. */
+const needsApiProxy = (): boolean => {
+  if (typeof window === "undefined") return false
+  const host = window.location.hostname
+  if (host === "localhost" || host === "127.0.0.1") return true
+  if (
+    host.endsWith(".ngrok-free.dev") ||
+    host.endsWith(".ngrok-free.app") ||
+    host.endsWith(".ngrok.io") ||
+    host.endsWith(".loca.lt")
+  ) {
+    return true
+  }
+  if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(host)) return true
+  return false
+}
+
+const proxyAwareFetch = (absoluteUrl: string, init?: RequestInit): Promise<Response> => {
+  if (!needsApiProxy()) {
+    return fetch(absoluteUrl, init)
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(absoluteUrl)
+  } catch {
+    return fetch(absoluteUrl, init)
+  }
+
+  const headers = new Headers(init?.headers)
+  headers.set("x-proxy-origin", parsed.origin)
+
+  return fetch(`/api/proxy${parsed.pathname}${parsed.search}`, {
+    ...init,
+    headers,
+  })
+}
+
 /* ============================================================
    ERROR CLASS
 ============================================================ */
@@ -264,7 +302,7 @@ export const apiClient = {
       filters: `[["email_id", "=", "${email}"]]`,
     })
 
-    const response = await fetch(
+    const response = await proxyAwareFetch(
       `${COMPANY_FETCH_BASE_URL}/api/resource/All User Master?${params}`,
       {
         headers: {
@@ -296,7 +334,7 @@ export const apiClient = {
       filters: `[["custom_mobile_number", "=", "${mobileNumber}"]]`,
     })
 
-    const response = await fetch(
+    const response = await proxyAwareFetch(
       `${COMPANY_FETCH_BASE_URL}/api/resource/All User Master?${params}`,
       {
         headers: {
@@ -518,7 +556,7 @@ export const apiClient = {
     const start = performance.now()
 
     try {
-      const response = await fetch(url, {
+      const response = await proxyAwareFetch(url, {
         method,
         headers,
         body: options.body,
@@ -539,10 +577,13 @@ export const apiClient = {
 
       if (!response.ok) {
         notifyUnauthorized(response.status, useBearerAuth || Boolean(useTokenAuth))
-        throw new ApiError(
-          response.status,
-          data?.message || response.statusText
-        )
+        const message =
+          typeof data?.message === "string"
+            ? data.message
+            : typeof data?.message?.message === "string"
+              ? data.message.message
+              : response.statusText
+        throw new ApiError(response.status, message)
       }
 
       return data as T
@@ -588,7 +629,7 @@ export const apiClient = {
     const start = performance.now()
 
     try {
-      const resp = await fetch(url, {
+      const resp = await proxyAwareFetch(url, {
         method,
         headers,
         body: options.body,
@@ -601,7 +642,10 @@ export const apiClient = {
         let errMsg = resp.statusText
         try {
           const errJson = await resp.clone().json()
-          errMsg = errJson?.message || JSON.stringify(errJson)
+          errMsg =
+            (typeof errJson?.message === "string" && errJson.message) ||
+            (typeof errJson?.message?.message === "string" && errJson.message.message) ||
+            JSON.stringify(errJson)
         } catch {}
         apiLogger.response(url, resp.status, errMsg, timeMs)
         throw new ApiError(resp.status, errMsg)
@@ -669,7 +713,7 @@ export const apiClient = {
     apiLogger.request("POST", endpoint, headers, { customer: c, start_date: start, end_date: end })
 
     const t0 = performance.now()
-    const resp = await fetch(endpoint, {
+    const resp = await proxyAwareFetch(endpoint, {
       method: "POST",
       headers,
       body,
@@ -776,7 +820,7 @@ export const apiClient = {
     const start = performance.now()
 
     try {
-      const response = await fetch(url, {
+      const response = await proxyAwareFetch(url, {
         method,
         headers,
         body: JSON.stringify(payload),
