@@ -9,9 +9,6 @@ import type { Company, LoginResponse } from "../auth/types"
 const DEFAULT_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "https://internal.prosessed.com"
 
-const COMPANY_FETCH_BASE_URL = "https://internal.prosessed.com"
-const FRAPPE_API_TOKEN = "f53b798f9a6d54f:f863ed6ae78da94"
-
 let currentBaseUrl = ""
 
 /* ============================================================
@@ -218,41 +215,6 @@ const apiLogger = {
   },
 }
 
-/** Frappe often returns JSON with `exc_type`, `exception`, `_server_messages` instead of HTTP error text. */
-const parseFrappeErrorMessage = (data: unknown): string | undefined => {
-  if (data == null || typeof data !== "object") return undefined
-  const o = data as Record<string, unknown>
-
-  if (typeof o._server_messages === "string") {
-    try {
-      const parsed = JSON.parse(o._server_messages) as unknown
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const first = parsed[0] as { message?: string }
-        if (typeof first?.message === "string") return first.message
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-
-  if (typeof o.exception === "string" && o.exception.trim()) {
-    const lines = o.exception.trim().split("\n")
-    const last = lines[lines.length - 1]?.trim()
-    if (last) return last
-  }
-
-  if (typeof o.message === "string" && o.message.trim()) return o.message
-
-  if (typeof o.exc_type === "string" && o.exc_type.trim()) return o.exc_type
-
-  return undefined
-}
-
-const isFrappeExceptionPayload = (data: unknown): boolean => {
-  if (data == null || typeof data !== "object") return false
-  return typeof (data as { exc_type?: unknown }).exc_type === "string"
-}
-
 /* ============================================================
    DOMAIN-SCOPED COMPANY FILTERING
 ============================================================ */
@@ -295,67 +257,57 @@ const filterCompaniesByCurrentDomain = (companies: Company[]): Company[] => {
 ============================================================ */
 
 export const apiClient = {
-  /* ------------------ Fetch Companies ------------------ */
+  /* ------------------ Fetch Companies (via Next.js server; token stays server-side) ------------------ */
   async getCompaniesByEmail(email: string): Promise<Company[]> {
-    const params = new URLSearchParams({
-      fields: '["*"]',
-      filters: `[["email_id", "=", "${email}"]]`,
+    const response = await fetch("/api/companies", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+      credentials: "same-origin",
     })
 
-    const response = await proxyAwareFetch(
-      `${COMPANY_FETCH_BASE_URL}/api/resource/All User Master?${params}`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `token ${FRAPPE_API_TOKEN}`,
-        },
-        credentials: "omit", // 🔥 NEVER send cookies
-      }
-    )
-
-    if (!response.ok) {
-      throw new ApiError(response.status, response.statusText)
+    let result: { companies?: Company[]; message?: string } = {}
+    try {
+      result = await response.json()
+    } catch {
+      /* ignore */
     }
 
-    const result = await response.json()
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        typeof result.message === "string" ? result.message : response.statusText
+      )
+    }
 
-    const companies = (result.data || []).map((item: any) => ({
-      company_name: item.company_name || "",
-      company_url: item.company_url || "",
-    }))
-
+    const companies = Array.isArray(result.companies) ? result.companies : []
     return filterCompaniesByCurrentDomain(companies)
   },
 
   /* ------------------ Fetch Companies (by Mobile) ------------------ */
   async getCompaniesByMobile(mobileNumber: string): Promise<Company[]> {
-    const params = new URLSearchParams({
-      fields: '["*"]',
-      filters: `[["custom_mobile_number", "=", "${mobileNumber}"]]`,
+    const response = await fetch("/api/companies", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mobile: mobileNumber }),
+      credentials: "same-origin",
     })
 
-    const response = await proxyAwareFetch(
-      `${COMPANY_FETCH_BASE_URL}/api/resource/All User Master?${params}`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `token ${FRAPPE_API_TOKEN}`,
-        },
-        credentials: "omit", // 🔥 NEVER send cookies
-      }
-    )
-
-    if (!response.ok) {
-      throw new ApiError(response.status, response.statusText)
+    let result: { companies?: Company[]; message?: string } = {}
+    try {
+      result = await response.json()
+    } catch {
+      /* ignore */
     }
 
-    const result = await response.json()
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        typeof result.message === "string" ? result.message : response.statusText
+      )
+    }
 
-    const companies = (result.data || []).map((item: any) => ({
-      company_name: item.company_name || "",
-      company_url: item.company_url || "",
-    }))
-
+    const companies = Array.isArray(result.companies) ? result.companies : []
     return filterCompaniesByCurrentDomain(companies)
   },
 
@@ -782,8 +734,7 @@ export const apiClient = {
   },
 
   /**
-   * B2B registration — uses Frappe whitelisted method (same host + token as company lookup).
-   * Plain `/api/b2b-registration` is not a Frappe route and can yield DoesNotExistError.
+   * B2B registration — posted to our Next.js route; Frappe service token stays server-side.
    */
   async createB2bRegistration(
     payload: B2bRegistrationPayload
@@ -804,27 +755,21 @@ export const apiClient = {
             : payload.phone,
       }
       console.groupCollapsed("[B2B] createB2bRegistration")
-      console.log("baseUrl:", COMPANY_FETCH_BASE_URL)
+      console.log("endpoint:", "/api/b2b-registration")
       console.log("payload:", safePayload)
       console.groupEnd()
     }
 
-    const url = `${COMPANY_FETCH_BASE_URL.replace(/\/$/, "")}/api/resource/B2B Registration Form`
-    const method = "POST"
-    const headers = new Headers({
-      "Content-Type": "application/json",
-      Authorization: `token ${FRAPPE_API_TOKEN}`,
-    })
-
-    apiLogger.request(method, url, headers, JSON.stringify(payload))
+    const url = "/api/b2b-registration"
+    apiLogger.request("POST", url, { "Content-Type": "application/json" }, JSON.stringify(payload))
     const start = performance.now()
 
     try {
-      const response = await proxyAwareFetch(url, {
-        method,
-        headers,
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-        credentials: "omit",
+        credentials: "same-origin",
       })
 
       const timeMs = Math.round(performance.now() - start)
@@ -838,29 +783,12 @@ export const apiClient = {
 
       apiLogger.response(url, response.status, data, timeMs)
 
-      if (typeof data === "object" && data !== null && isFrappeExceptionPayload(data)) {
-        const errMsg =
-          parseFrappeErrorMessage(data) ||
-          "Registration could not be completed. Please verify your details or try again."
-        const status = response.ok ? 400 : response.status
-        throw new ApiError(status, errMsg)
-      }
-
       if (!response.ok) {
+        const d = data as Record<string, unknown> | null
         const errMsg =
-          parseFrappeErrorMessage(data) ||
-          (() => {
-            const d = data as Record<string, unknown> | null
-            if (d && typeof d === "object") {
-              if (typeof d.message === "string") return d.message
-              if (typeof d.detail === "string") return d.detail
-              if (typeof d.error === "string") return d.error
-            }
-            const m = (data as { message?: unknown })?.message
-            if (typeof m === "string") return m
-            if (m != null) return JSON.stringify(m)
-            return response.statusText
-          })()
+          (d && typeof d.message === "string" && d.message) ||
+          response.statusText ||
+          "Registration failed"
         throw new ApiError(response.status, errMsg)
       }
 
