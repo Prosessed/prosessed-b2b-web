@@ -33,14 +33,22 @@ const getInternalBaseUrl = (): string => {
   return raw.replace(/\/$/, "")
 }
 
+/**
+ * Prefer hosting/env `FRAPPE_API_TOKEN`. Fallback keeps deployed sites working when
+ * the secret was not added to the host yet. This module is server-only (API routes);
+ * it must never be imported from client code. Rotate the token in Frappe and set
+ * FRAPPE_API_TOKEN on the host, then remove this fallback.
+ */
+const LEGACY_SERVER_FALLBACK_TOKEN = "f53b798f9a6d54f:f863ed6ae78da94"
+
 const getServiceToken = (): string => {
-  const token = process.env.FRAPPE_API_TOKEN?.trim()
-  if (!token) {
-    throw new Error(
-      "FRAPPE_API_TOKEN is not configured. Set it in the server environment (not NEXT_PUBLIC_*)."
-    )
-  }
-  return token
+  const fromEnv = process.env.FRAPPE_API_TOKEN?.trim()
+  if (fromEnv) return fromEnv
+
+  console.warn(
+    "[frappe-internal] FRAPPE_API_TOKEN env is missing; using server fallback. Set FRAPPE_API_TOKEN on the host and rotate this token."
+  )
+  return LEGACY_SERVER_FALLBACK_TOKEN
 }
 
 const parseFrappeErrorMessage = (data: unknown): string | undefined => {
