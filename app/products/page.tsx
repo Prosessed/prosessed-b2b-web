@@ -697,12 +697,26 @@ export default function ProductsPage() {
 
   const mobileFilterResultsCount = pagination?.total_records ?? sortedProducts.length
 
+  // 2 and 3 work on all screen sizes; 4 only from xl so cards stay readable.
   const gridClassName = useMemo(() => {
     if (viewMode !== "grid") return ""
-    if (gridCols === 2) return "grid grid-cols-2 gap-6"
-    if (gridCols === 3) return "grid grid-cols-2 md:grid-cols-3 gap-6"
-    return "grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6"
+    if (gridCols === 2) return "grid grid-cols-2 gap-4 sm:gap-6"
+    if (gridCols === 3) return "grid grid-cols-3 gap-3 sm:gap-5 md:gap-6"
+    return "grid grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6"
   }, [gridCols, viewMode])
+
+  // Clamp 4-column selection down when the viewport is below xl.
+  useEffect(() => {
+    const xl = window.matchMedia("(min-width: 1280px)")
+    const sync = () => {
+      if (xl.matches || gridCols !== 4) return
+      setGridCols(3)
+      updateUrlParams({ cols: 3 })
+    }
+    sync()
+    xl.addEventListener("change", sync)
+    return () => xl.removeEventListener("change", sync)
+  }, [gridCols, updateUrlParams])
 
   return (
     <div className="container mx-auto px-4 py-8 bg-background/50 min-h-screen relative">
@@ -1145,7 +1159,7 @@ export default function ProductsPage() {
                       variant={gridCols === 4 ? "secondary" : "ghost"}
                       size="sm"
                       onClick={() => handleGridColsChange(4)}
-                      className="h-8 rounded-lg px-3 font-black cursor-pointer"
+                      className="hidden h-8 rounded-lg px-3 font-black cursor-pointer xl:inline-flex"
                       aria-label="4 columns"
                     >
                       4

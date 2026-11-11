@@ -368,6 +368,63 @@ export function useItemDetails(itemCode: string | null, qty: number = 1) {
   )
 }
 
+/**
+ * Fetch catalog images for line items when order/quote APIs omit `image`.
+ * Display-only; failures leave placeholders and never block the parent page.
+ */
+export function useItemImageMap(itemCodes: string[]) {
+  const { user } = useAuth()
+  const uniqueCodes = Array.from(
+    new Set(itemCodes.map((code) => String(code || "").trim()).filter(Boolean))
+  ).sort()
+  const key =
+    user && uniqueCodes.length > 0
+      ? ["itemImageMap", uniqueCodes.join("|"), user.customerId, user.companyName]
+      : null
+
+  return useSWR(
+    key,
+    async () => {
+      if (!user) return {} as Record<string, string | string[] | null>
+
+      const entries = await Promise.all(
+        uniqueCodes.map(async (itemCode) => {
+          try {
+            const response = await apiClient.request<any>(
+              "/api/method/prosessed_orderit.orderit.get_item_details",
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  item_code: itemCode,
+                  customer: user.customerId,
+                  qty: 1,
+                  warehouse: user.defaultWarehouse || "",
+                  company: user.companyName,
+                }),
+                auth: {
+                  apiKey: user.apiKey,
+                  apiSecret: user.apiSecret,
+                  sid: user.sid,
+                },
+              }
+            )
+            const detail = response?.message || response
+            return [itemCode, detail?.image ?? null] as const
+          } catch {
+            return [itemCode, null] as const
+          }
+        })
+      )
+
+      return Object.fromEntries(entries) as Record<string, string | string[] | null>
+    },
+    {
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+    }
+  )
+}
+
 export function useMostBoughtItems(params?: UseMostBoughtItemsParams) {
   const { user } = useAuth()
   const { data: warehousesData } = useWarehousesByCustomerBranch()
@@ -459,19 +516,37 @@ export function useQuotations(params?: UseQuotationsParams) {
   const startDate = params?.startDate ?? ""
   const endDate = params?.endDate ?? ""
 
-  const key = user ? ["quotations", user.email, user.customerId, startDate, endDate] : null
+  // Do not filter by owner=email — that hid quotes created by other users for the same customer.
+  // get_all_quotations ignores customer_name server-side, so we resolve the display name and
+  // scope the list client-side to prevent cross-customer leakage.
+  const key =
+    user && user.customerId ? ["quotations", user.customerId, startDate, endDate] : null
 
   return useSWR(
     key,
     async () => {
-      if (!user) return null
+      if (!user?.customerId) return null
 
-      const search = new URLSearchParams({
-        owner: user.email,
-      })
-      if (user.customerId) {
-        search.set("customer_name", user.customerId)
+      const auth = {
+        apiKey: user.apiKey,
+        apiSecret: user.apiSecret,
+        sid: user.sid,
       }
+
+      const customerNameResponse = await apiClient.request<{ message?: unknown }>(
+        `/api/method/prosessed_orderit.orderit.get_customer_names?customer_id=${encodeURIComponent(
+          user.customerId
+        )}`,
+        { method: "GET", auth }
+      )
+      const customerDisplayName = resolveCustomerDisplayName(
+        customerNameResponse?.message,
+        user.customerId
+      )
+
+      const search = new URLSearchParams()
+      // Best-effort server hint (may be ignored); prefer display name when available.
+      search.set("customer_name", customerDisplayName || user.customerId)
       if (startDate) search.set("startDate", toApiDate(startDate))
       if (endDate) search.set("endDate", toApiDate(endDate))
 
@@ -479,18 +554,24 @@ export function useQuotations(params?: UseQuotationsParams) {
         `/api/method/prosessed_orderit.orderit.get_all_quotations?${search}`,
         {
           method: "GET",
-          auth: {
-            apiKey: user.apiKey,
-            apiSecret: user.apiSecret,
-            sid: user.sid,
-          },
+          auth,
         }
       )
 
       const msg = response?.message
-      if (Array.isArray(msg)) return msg
-      if (msg && typeof msg === "object" && Array.isArray((msg as any).quotations)) return (msg as any).quotations
-      return []
+      let list: any[] = []
+      if (Array.isArray(msg)) list = msg
+      else if (msg && typeof msg === "object" && Array.isArray((msg as any).quotations)) {
+        list = (msg as any).quotations
+      }
+
+      const scopeName = (customerDisplayName || user.fullName || "").trim()
+      // Fail closed: never show unscoped quotations if we cannot identify the customer.
+      if (!scopeName) return []
+      const needle = scopeName.toLowerCase()
+      return list.filter(
+        (q) => String(q?.customer_name || "").trim().toLowerCase() === needle
+      )
     },
     {
       revalidateOnFocus: false,
@@ -1091,17 +1172,19 @@ export function useAllInvoices(params?: UseAllInvoicesParams) {
         []
 
       const totalRecords =
-        typeof raw?.pagination?.total_records === "number"
-          ? raw.pagination.total_records
-          : typeof raw?.total_records === "number"
-            ? raw.total_records
-          : typeof raw?.totalRecords === "number"
-            ? raw.totalRecords
-            : typeof raw?.total === "number"
-              ? raw.total
-              : typeof response?.total_records === "number"
-                ? response.total_records
-                : undefined
+        typeof raw?.total_invoice_count === "number"
+          ? raw.total_invoice_count
+          : typeof raw?.pagination?.total_records === "number"
+            ? raw.pagination.total_records
+            : typeof raw?.total_records === "number"
+              ? raw.total_records
+              : typeof raw?.totalRecords === "number"
+                ? raw.totalRecords
+                : typeof raw?.total === "number"
+                  ? raw.total
+                  : typeof response?.total_records === "number"
+                    ? response.total_records
+                    : undefined
 
       const hasNextPage =
         typeof raw?.pagination?.has_next_page === "boolean"

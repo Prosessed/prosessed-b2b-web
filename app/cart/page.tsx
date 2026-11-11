@@ -10,6 +10,7 @@ import { useCartContext } from "@/lib/cart/context"
 import { useAuth } from "@/lib/auth/context"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
+import { decodeHtmlEntities } from "@/lib/utils/html"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { AnimatePresence, motion } from "framer-motion"
 import {
@@ -208,24 +209,21 @@ export default function CartPage() {
     return `${year}-${month}-${day}`
   }, [])
 
-  // TEMPORARY:
-  // For now we are NOT requesting geolocation permissions.
-  // Hard-coded sample coordinates:
-  const hardcodedLatitude = "23.0225"
-  const hardcodedLongitude = "72.5714"
-
   const handleSubmit = useCallback(
     async (action: "quote" | "order") => {
       if (!canCreateQuote && !canCreateOrder) return
+      if (!cartItems.length) {
+        setSubmitError("Your cart is empty. Add items before submitting.")
+        return
+      }
 
       setIsSubmitting(true)
       setSubmitError("")
       try {
         if (action === "order") {
           const delivery_date = getTomorrowDate()
+          // Do not send placeholder/fake geolocation (previously Ahmedabad coords).
           await placeOrder({
-            latitude: hardcodedLatitude,
-            longitude: hardcodedLongitude,
             delivery_date,
           })
           setSubmitSuccess("order")
@@ -248,7 +246,15 @@ export default function CartPage() {
         setIsSubmitting(false)
       }
     },
-    [submitQuotation, router, canCreateQuote, canCreateOrder, placeOrder, getTomorrowDate]
+    [
+      submitQuotation,
+      router,
+      canCreateQuote,
+      canCreateOrder,
+      placeOrder,
+      getTomorrowDate,
+      cartItems.length,
+    ]
   )
 
   const handleClearCart = useCallback(async () => {
@@ -274,7 +280,7 @@ export default function CartPage() {
     )
   }
 
-  if (!cart) {
+  if (!cart || cartItems.length === 0) {
     return (
       <div className="p-12 text-center">
         <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -387,7 +393,7 @@ export default function CartPage() {
                               getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) ||
                               "/placeholder.svg"
                             }
-                            alt={item.item_name}
+                            alt={decodeHtmlEntities(item.item_name)}
                             fill
                             className="object-contain p-2"
                           />
@@ -400,7 +406,7 @@ export default function CartPage() {
                                 href={`/products/${item.item_code}`}
                                 className="font-bold text-lg hover:text-primary"
                               >
-                                {item.item_name}
+                                {decodeHtmlEntities(item.item_name)}
                               </Link>
                               <p className="text-xs text-muted-foreground">
                                 {item.uom} • {formatPrice(item.rate ?? 0, currency)}
@@ -435,7 +441,7 @@ export default function CartPage() {
                                   event.currentTarget.blur()
                                 }}
                                 className="h-9 w-16 rounded-none border-0 border-x px-2 text-center font-bold tabular-nums focus-visible:ring-0"
-                                aria-label={`Quantity for ${item.item_name}`}
+                                aria-label={`Quantity for ${decodeHtmlEntities(item.item_name)}`}
                               />
                               <Button
                                 size="icon"
@@ -454,7 +460,7 @@ export default function CartPage() {
                               className="text-destructive cursor-pointer"
                               disabled={isUpdating === item.name}
                               onClick={() => handleRemoveItem(item.name)}
-                              aria-label={`Remove ${item.item_name} from cart`}
+                              aria-label={`Remove ${decodeHtmlEntities(item.item_name)} from cart`}
                             >
                               <Trash2 className="h-4 w-4 mr-1" />
                               Remove
@@ -576,7 +582,12 @@ export default function CartPage() {
                     <Button
                       size="lg"
                       className="w-full"
-                      disabled={isSubmitting || bannersLoading || !canCreateQuote}
+                      disabled={
+                        isSubmitting ||
+                        bannersLoading ||
+                        !canCreateQuote ||
+                        cartItems.length === 0
+                      }
                       onClick={() => handleSubmit("quote")}
                       variant={primaryAction === "quote" ? "default" : "outline"}
                       aria-label="Submit quotation"
@@ -596,7 +607,12 @@ export default function CartPage() {
                     <Button
                       size="lg"
                       className="w-full"
-                      disabled={isSubmitting || bannersLoading || !canCreateOrder}
+                      disabled={
+                        isSubmitting ||
+                        bannersLoading ||
+                        !canCreateOrder ||
+                        cartItems.length === 0
+                      }
                       onClick={() => handleSubmit("order")}
                       variant={primaryAction === "order" ? "default" : "outline"}
                       aria-label="Place order"

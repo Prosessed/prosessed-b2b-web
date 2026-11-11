@@ -1,5 +1,4 @@
 "use client"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -7,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useAllInvoices } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
 import { formatDate, formatPrice } from "@/lib/utils/currency"
+import { getInvoiceStatusBadge, resolveInvoiceStatus } from "@/lib/utils/invoice-status"
 import { FileText, Package } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useState } from "react"
@@ -15,19 +15,6 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 
 function getInvoiceNumber(invoice: any, fallback: string) {
   return invoice?.invoice_id ?? invoice?.name ?? invoice?.invoice ?? invoice?.docname ?? fallback
-}
-
-function getInvoiceStatusBadge(status: string | null | undefined) {
-  const s = String(status ?? "").trim()
-  const lower = s.toLowerCase()
-
-  if (!s) return <Badge className="bg-muted text-muted-foreground">—</Badge>
-  if (lower.includes("cancel")) return <Badge className="bg-red-500/10 text-red-700 dark:text-red-400">{s}</Badge>
-  if (lower.includes("draft") || lower.includes("review")) return <Badge className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400">{s}</Badge>
-  if (lower.includes("submit") || lower.includes("confirmed") || lower.includes("paid") || lower.includes("approved")) {
-    return <Badge className="bg-green-500/10 text-green-700 dark:text-green-400">{s}</Badge>
-  }
-  return <Badge className="bg-muted text-muted-foreground">{s}</Badge>
 }
 
 export default function MyInvoicesPage() {
@@ -130,7 +117,7 @@ export default function MyInvoicesPage() {
           <div className="grid gap-4">
             {invoices.map((inv: any, idx: number) => {
               const invoiceNumber = getInvoiceNumber(inv, String(idx))
-              const status = inv?.workflow_state ?? inv?.status ?? inv?.invoice_status ?? ""
+              const status = resolveInvoiceStatus(inv)
               const amount = inv?.grand_total ?? inv?.amount ?? inv?.total ?? inv?.net_total ?? 0
               const dateStr = inv?.transaction_date ?? inv?.posting_date ?? inv?.issue_date ?? inv?.date ?? null
 

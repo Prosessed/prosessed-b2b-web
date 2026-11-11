@@ -60,7 +60,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedUser = authStorage.getUser()
 
       if (storedUser && authStorage.isSessionValid(storedUser.sid)) {
-        setApiBaseUrl(storedUser.companyUrl)
+        try {
+          setApiBaseUrl(storedUser.companyUrl)
+        } catch {
+          // Stored company URL is outside the Prosessed allowlist — clear session.
+          authStorage.removeUser()
+          setUser(null)
+          if (!cancelled) setIsLoading(false)
+          return
+        }
 
         const sessionValid = await validateOrderitSession({
           apiKey: storedUser.apiKey,
@@ -99,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [handleSessionExpired])
 
   const login = (userData: AuthUser) => {
+    // Reject sessions whose API host is outside the Prosessed allowlist.
     setApiBaseUrl(userData.companyUrl)
     setUser(userData)
     authStorage.setUser(userData)

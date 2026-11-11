@@ -12,6 +12,7 @@ import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { useAuth } from "@/lib/auth/context"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
+import { decodeHtmlEntities } from "@/lib/utils/html"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { motion, AnimatePresence } from "framer-motion"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./ui/sheet"
@@ -295,7 +296,7 @@ export function CartDrawer() {
                           <div className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-muted/40">
                             <Image
                               src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
-                              alt={item.item_name || "Product"}
+                              alt={decodeHtmlEntities(item.item_name) || "Product"}
                               fill
                               className="object-contain p-2"
                             />
@@ -309,7 +310,7 @@ export function CartDrawer() {
                           <div className="flex-1 min-w-0 space-y-2">
                             <div>
                               <h3 className="font-bold text-sm leading-tight line-clamp-2">
-                                {item.item_name}
+                                {decodeHtmlEntities(item.item_name)}
                               </h3>
                               <p className="text-xs text-muted-foreground mt-1">
                                 {item.uom} • {formatPrice(item.rate ?? 0, currency)} each
@@ -340,7 +341,7 @@ export function CartDrawer() {
                                     event.currentTarget.blur()
                                   }}
                                   className="h-7 w-14 rounded-md border border-primary/20 bg-background/70 px-2 text-center font-bold text-xs tabular-nums focus-visible:ring-2 focus-visible:ring-primary"
-                                  aria-label={`Quantity for ${item.item_name}`}
+                                  aria-label={`Quantity for ${decodeHtmlEntities(item.item_name)}`}
                                 />
                                 <Button
                                   onClick={() => updateQuantity(item.name, item.qty + 1)}
@@ -367,7 +368,7 @@ export function CartDrawer() {
                               onClick={() => handleRemoveItem(item.name)}
                               disabled={isUpdating === item.name}
                               className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-0 cursor-pointer"
-                              aria-label={`Remove ${item.item_name} from cart`}
+                              aria-label={`Remove ${decodeHtmlEntities(item.item_name)} from cart`}
                             >
                               <Trash2 className="h-3 w-3 mr-1" />
                               Remove

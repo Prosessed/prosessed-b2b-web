@@ -1,20 +1,21 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getApiBaseUrl } from "@/lib/api/client"
-import { useOrderDetails } from "@/lib/api/hooks"
+import { useItemImageMap, useOrderDetails } from "@/lib/api/hooks"
 import { fetchSalesOrderPdfBlob, useDefaultSalesOrderPrintFormat } from "@/lib/api/print"
 import { useAuth } from "@/lib/auth/context"
 import { formatDate, formatPrice } from "@/lib/utils/currency"
-import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
+import { decodeHtmlEntities } from "@/lib/utils/html"
+import { getDisplayImageUrl, resolveLineItemImage } from "@/lib/utils/image-url"
+import { getOrderStatusBadge } from "@/lib/utils/order-status"
 import { ArrowLeft, FileText, Loader2, Mail, MapPin, Package, Phone, User } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -25,6 +26,18 @@ export default function OrderDetailPage() {
   const [pdfError, setPdfError] = useState<string>("")
   const { data: order, isLoading, error } = useOrderDetails(id)
   const currency = user?.defaultCurrency ?? "AUD"
+
+  const orderItems = useMemo(() => {
+    const m = order as any
+    if (!m) return [] as any[]
+    return Array.isArray(m.order_items) ? m.order_items : (m.items ?? [])
+  }, [order])
+
+  const itemCodes = useMemo(
+    () => orderItems.map((item: any) => item?.item_code).filter(Boolean) as string[],
+    [orderItems]
+  )
+  const { data: itemImageMap = {} } = useItemImageMap(itemCodes)
 
   const handleViewPdf = useCallback(async () => {
     if (!user || !id) return
@@ -110,7 +123,7 @@ export default function OrderDetailPage() {
   const m = order as any
   const orderId = m.order_id ?? m.name ?? id
   const orderDate = m.order_date ?? m.transaction_date
-  const items = Array.isArray(m.order_items) ? m.order_items : (m.items ?? [])
+  const items = orderItems
   const invoices = Array.isArray(m.invoices) ? m.invoices : []
   const grandTotal = m.order_grand_total ?? m.grand_total ?? 0
   const netTotal = m.order_net_total ?? m.order_total ?? m.net_total ?? 0
@@ -174,9 +187,7 @@ export default function OrderDetailPage() {
                       )}
                     </Button>
                   </div>
-                  {workflowStatus && (
-                    <Badge className="bg-primary/10 text-primary">{workflowStatus}</Badge>
-                  )}
+                  {workflowStatus ? getOrderStatusBadge(workflowStatus) : null}
 
                 </div>
               </div>
@@ -247,14 +258,21 @@ export default function OrderDetailPage() {
                     <div key={item.item_code || idx} className="flex items-center gap-4 p-3 border rounded-lg">
                       <div className="relative h-16 w-16 rounded overflow-hidden bg-muted shrink-0">
                         <Image
-                          src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
-                          alt={item.item_name || "Item"}
+                          src={
+                            getDisplayImageUrl(
+                              resolveLineItemImage(item, itemImageMap),
+                              getApiBaseUrl()
+                            ) || "/placeholder.svg"
+                          }
+                          alt={decodeHtmlEntities(item.item_name) || "Item"}
                           fill
                           className="object-contain p-1"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{item.item_name || item.item_code}</p>
+                        <p className="font-medium truncate">
+                          {decodeHtmlEntities(item.item_name) || item.item_code}
+                        </p>
                         <p className="text-sm text-muted-foreground">
                           Qty: {item.item_quantity ?? item.qty ?? item.quantity ?? 0} · {item.uom || item.stock_uom || ""}
                         </p>

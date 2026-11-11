@@ -201,8 +201,9 @@ export interface SubmitCartResponse {
 ========================= */
 export interface CreateSalesOrderFromCartParams {
   quotation_id: string
-  latitude: string
-  longitude: string
+  /** Optional — omit rather than sending placeholder/fake coordinates. */
+  latitude?: string
+  longitude?: string
   /** Expected format: YYYY-MM-DD */
   delivery_date: string
   custom_order_source?: "App" | string
@@ -354,11 +355,27 @@ export async function createSalesOrderFromCart(
 ): Promise<CreateSalesOrderFromCartResponse> {
   if (!user) throw new Error("User not authenticated")
 
+  const latitude = typeof params.latitude === "string" ? params.latitude.trim() : ""
+  const longitude = typeof params.longitude === "string" ? params.longitude.trim() : ""
+
+  const body: Record<string, string> = {
+    quotation_id: params.quotation_id,
+    delivery_date: params.delivery_date,
+  }
+  if (params.custom_order_source) {
+    body.custom_order_source = params.custom_order_source
+  }
+  // Only send real coordinates — never invent placeholder locations.
+  if (latitude && longitude) {
+    body.latitude = latitude
+    body.longitude = longitude
+  }
+
   return apiClient.request<CreateSalesOrderFromCartResponse>(
     "/api/method/prosessed_orderit.orderit.create_sales_order_from_cart",
     {
       method: "POST",
-      body: JSON.stringify(params),
+      body: JSON.stringify(body),
       auth: {
         apiKey: user.apiKey,
         apiSecret: user.apiSecret,

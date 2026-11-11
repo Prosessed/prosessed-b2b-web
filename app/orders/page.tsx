@@ -1,18 +1,22 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { DateInput } from "@/components/ui/date-input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useSalesPersonOrders } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
 import { fetchSalesOrderPdfBlob, useDefaultSalesOrderPrintFormat } from "@/lib/api/print"
 import { formatPrice, formatDate } from "@/lib/utils/currency"
+import { toLocalISODate, toLocalISODateDaysAgo } from "@/lib/utils/date"
+import { getOrderStatusBadge } from "@/lib/utils/order-status"
 import { motion } from "framer-motion"
-import { ArrowRight, Calendar, Download, Eye, Loader2, Package, User } from "lucide-react"
+import { ArrowRight, Calendar, Download, Eye, Loader2, Package } from "lucide-react"
 import Link from "next/link"
 import { useCallback, useMemo, useState } from "react"
+
+const PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 
 const PRESETS = [
   { label: "Last 7 days", days: 7 },
@@ -25,18 +29,8 @@ const PRESETS = [
   { label: "Last 3 months", days: 90 },
 ] as const
 
-function getTodayISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function getDaysAgoISO(days: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return d.toISOString().slice(0, 10)
-}
-
-const defaultEnd = getTodayISO()
-const defaultStart = getDaysAgoISO(30)
+const defaultEnd = toLocalISODate()
+const defaultStart = toLocalISODateDaysAgo(30)
 
 export default function OrdersPage() {
   const { user, isAuthenticated } = useAuth()
@@ -44,16 +38,42 @@ export default function OrdersPage() {
   const [startDate, setStartDate] = useState(defaultStart)
   const [endDate, setEndDate] = useState(defaultEnd)
   const [activePresetIndex, setActivePresetIndex] = useState<number>(1) // default: Last 30 days
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(20)
   const [pdfLoadingState, setPdfLoadingState] = useState<{ orderId: string; action: "view" | "download" } | null>(null)
   const [pdfError, setPdfError] = useState<string>("")
 
   const { data, isLoading, error } = useSalesPersonOrders({
-    page: 1,
-    pageSize: 50,
+    page,
+    pageSize,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
   })
   const orders = data?.sales_orders ?? []
+  const totalRecords = data?.total_sales_order_count
+
+  const totalPages = useMemo(() => {
+    if (typeof totalRecords !== "number" || totalRecords < 0) return null
+    return Math.max(1, Math.ceil(totalRecords / pageSize))
+  }, [totalRecords, pageSize])
+
+  const hasPrevPage = page > 1
+  const hasNextPage = useMemo(() => {
+    if (typeof totalPages === "number") return page < totalPages
+    return orders.length >= pageSize
+  }, [page, totalPages, orders.length, pageSize])
+
+  const handleStartDateChange = useCallback((value: string) => {
+    setStartDate(value)
+    setActivePresetIndex(-1)
+    setPage(1)
+  }, [])
+
+  const handleEndDateChange = useCallback((value: string) => {
+    setEndDate(value)
+    setActivePresetIndex(-1)
+    setPage(1)
+  }, [])
 
   const handleViewPdf = useCallback(async (orderId: string) => {
     if (!user) return
@@ -102,25 +122,25 @@ export default function OrdersPage() {
 
   const applyPreset = useCallback((presetIndex: number, preset: (typeof PRESETS)[number]) => {
     if ("days" in preset && preset.days) {
-      const nextEnd = getTodayISO()
-      const nextStart = getDaysAgoISO(preset.days)
-      setEndDate(nextEnd)
-      setStartDate(nextStart)
+      setEndDate(toLocalISODate())
+      setStartDate(toLocalISODateDaysAgo(preset.days))
     } else if ("getRange" in preset && preset.getRange) {
       const { start, end } = preset.getRange()
-      setStartDate(start.toISOString().slice(0, 10))
-      setEndDate(end.toISOString().slice(0, 10))
+      setStartDate(toLocalISODate(start))
+      setEndDate(toLocalISODate(end))
     }
     setActivePresetIndex(presetIndex)
+    setPage(1)
   }, [])
 
-  const getStatusBadge = (workflowState: string) => {
-    const s = (workflowState || "").toLowerCase()
-    if (s.includes("review") || s.includes("draft")) return <Badge className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400">{workflowState || "Pending"}</Badge>
-    if (s.includes("submit") || s.includes("confirm")) return <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-400">{workflowState}</Badge>
-    if (s.includes("cancel")) return <Badge className="bg-red-500/10 text-red-700 dark:text-red-400">{workflowState}</Badge>
-    return <Badge className="bg-muted text-muted-foreground">{workflowState || "—"}</Badge>
-  }
+  const handleResetDateRange = useCallback(() => {
+    setStartDate(defaultStart)
+    setEndDate(defaultEnd)
+    setActivePresetIndex(1)
+    setPage(1)
+  }, [])
+
+  const getStatusBadge = (workflowState: string) => getOrderStatusBadge(workflowState)
 
   if (!isAuthenticated || !user) {
     return (
@@ -138,12 +158,38 @@ export default function OrdersPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">My Orders</h1>
-          <p className="text-muted-foreground">View your sales orders</p>
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">My Orders</h1>
+            <p className="text-muted-foreground">View your sales orders</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-muted-foreground">Items per page</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => {
+                const next = Number(value)
+                if (!PAGE_SIZE_OPTIONS.includes(next as (typeof PAGE_SIZE_OPTIONS)[number])) return
+                setPageSize(next as (typeof PAGE_SIZE_OPTIONS)[number])
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="w-[110px] rounded-xl" aria-label="Orders per page">
+                <SelectValue placeholder="20" />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {/* Date range & sales person filter */}
+        {/* Date range filter */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -165,10 +211,7 @@ export default function OrdersPage() {
                   <DateInput
                     id="orders-start"
                     value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value)
-                      setActivePresetIndex(-1)
-                    }}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
                     className="w-full rounded-xl border-2 border-border/60 bg-background focus:border-primary transition-colors cursor-pointer"
                     aria-label="Start date"
                   />
@@ -180,10 +223,7 @@ export default function OrdersPage() {
                   <DateInput
                     id="orders-end"
                     value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value)
-                      setActivePresetIndex(-1)
-                    }}
+                    onChange={(e) => handleEndDateChange(e.target.value)}
                     className="w-full rounded-xl border-2 border-border/60 bg-background focus:border-primary transition-colors cursor-pointer"
                     aria-label="End date"
                   />
@@ -236,11 +276,16 @@ export default function OrdersPage() {
             <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-50" />
             <h3 className="text-lg font-semibold mb-2">No orders in this range</h3>
             <p className="text-muted-foreground mb-6">Try a different date range</p>
-            <Button variant="outline" onClick={() => { setStartDate(defaultStart); setEndDate(defaultEnd) }} className="cursor-pointer">
+            <Button
+              variant="outline"
+              onClick={handleResetDateRange}
+              className="cursor-pointer"
+              aria-label="Reset date range to last 30 days"
+            >
               Reset to last 30 days
             </Button>
           </Card>
-        ) : orders.length > 0 ? (
+        ) : (
           <div className="grid gap-4">
             {orders.map((order: any) => {
               const isLoadingThisOrder = pdfLoadingState?.orderId === order.name
@@ -384,9 +429,40 @@ export default function OrdersPage() {
               )
             })}
           </div>
-        ) : null}
+        )}
 
-        
+        {!isLoading && orders.length > 0 && (
+          <div className="mt-8 flex items-center justify-between gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={!hasPrevPage}
+              aria-label="Previous page"
+            >
+              Previous
+            </Button>
+
+            <div className="text-sm text-muted-foreground">
+              Page {page}
+              {typeof totalPages === "number" ? ` of ${totalPages}` : ""}
+              {typeof totalRecords === "number" ? ` · ${totalRecords} total` : ""}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (!hasNextPage) return
+                setPage((p) => p + 1)
+              }}
+              disabled={!hasNextPage}
+              aria-label="Next page"
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

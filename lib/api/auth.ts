@@ -1,4 +1,5 @@
 import type { AuthCredentials, AuthResponse, Company } from "../auth/types"
+import { isAllowedProsessedOrigin } from "../utils/tenant-url"
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://internal.prosessed.com"
 
@@ -72,33 +73,73 @@ function toBaseUrlOnly(url: string | null | undefined): string | undefined {
   }
 }
 
+const readFrappeMessage = (data: { message?: unknown }, fallback: string): string => {
+  if (typeof data?.message === "string" && data.message.trim()) return data.message
+  if (
+    data?.message &&
+    typeof data.message === "object" &&
+    "message" in data.message &&
+    typeof data.message.message === "string" &&
+    data.message.message.trim()
+  ) {
+    return data.message.message
+  }
+  return fallback
+}
+
+/**
+ * Call the tenant through the same-origin proxy.
+ * The browser cannot call tenant hosts directly: they do not send CORS headers,
+ * which surfaces as "Failed to fetch". The proxy only allows Prosessed hosts.
+ */
+const fetchTenant = async (absoluteUrl: string, init?: RequestInit): Promise<Response> => {
+  const parsed = new URL(absoluteUrl)
+  if (!isAllowedProsessedOrigin(parsed.origin)) {
+    throw new Error("Company URL is not an allowed Prosessed host")
+  }
+  const headers = new Headers(init?.headers)
+  headers.set("x-proxy-origin", parsed.origin)
+
+  return fetch(`/api/proxy${parsed.pathname}${parsed.search}`, {
+    ...init,
+    headers,
+  })
+}
+
 export async function requestOTP(
   email: string,
   companyUrl?: string | null
 ): Promise<{ success: boolean; message: string }> {
   const baseUrl = toBaseUrlOnly(companyUrl)
+  if (!baseUrl || !isAllowedProsessedOrigin(baseUrl)) {
+    throw new Error("Company URL is missing or not an allowed Prosessed host")
+  }
 
   const url =
     `${baseUrl}/api/method/prosessed_orderit.api.request_password_reset_otp` +
     `?email=${encodeURIComponent(email)}`
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain",
-    },
-    credentials: "include", // important for Frappe Guest session
-  })
+  let response: Response
+  try {
+    response = await fetchTenant(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain",
+      },
+    })
+  } catch {
+    throw new Error("Could not reach the company server. Please try again.")
+  }
 
   const data = await response.json().catch(() => ({}))
 
-  if (!response.ok) {
-    throw new Error(data?.message || "Failed to send OTP")
+  if (!response.ok || data?.message?.success === false) {
+    throw new Error(readFrappeMessage(data, "Failed to send OTP"))
   }
 
   return {
     success: true,
-    message: data?.message?.message || "OTP sent successfully",
+    message: readFrappeMessage(data, "OTP sent successfully"),
   }
 }
 export async function verifyOtpAndResetPassword(
@@ -108,6 +149,9 @@ export async function verifyOtpAndResetPassword(
   companyUrl?: string | null
 ): Promise<{ success: boolean; message: string }> {
   const baseUrl = toBaseUrlOnly(companyUrl)
+  if (!baseUrl || !isAllowedProsessedOrigin(baseUrl)) {
+    throw new Error("Company URL is missing or not an allowed Prosessed host")
+  }
 
   const url =
     `${baseUrl}/api/method/prosessed_orderit.api.verify_otp_and_reset_password` +
@@ -115,20 +159,21 @@ export async function verifyOtpAndResetPassword(
     `&otp=${encodeURIComponent(otp)}` +
     `&new_password=${encodeURIComponent(newPassword)}`
 
-  const response = await fetch(url, {
-    method: "POST",
-    credentials: "include",
-  })
+  let response: Response
+  try {
+    response = await fetchTenant(url, { method: "POST" })
+  } catch {
+    throw new Error("Could not reach the company server. Please try again.")
+  }
 
   const data = await response.json().catch(() => ({}))
 
-  if (!response.ok) {
-    throw new Error(data?.message || "Failed to reset password")
+  if (!response.ok || data?.message?.success === false) {
+    throw new Error(readFrappeMessage(data, "Failed to reset password"))
   }
 
   return {
     success: true,
-    message:
-      data?.message?.message || "Password has been reset successfully",
+    message: readFrappeMessage(data, "Password has been reset successfully"),
   }
 }

@@ -20,6 +20,8 @@ import {
 } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
 import { formatDate } from "@/lib/utils/currency"
+import { toLocalISODate } from "@/lib/utils/date"
+import { decodeHtmlEntities } from "@/lib/utils/html"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { getPriceDisplay } from "@/lib/utils/pricing"
 import {
@@ -52,9 +54,7 @@ type SelectedProduct = {
   availableUoms: ProductUomOption[]
 }
 
-function getTodayIsoDate() {
-  return new Date().toISOString().slice(0, 10)
-}
+const getTodayIsoDate = (): string => toLocalISODate()
 
 function getInvoiceNumber(invoice: any) {
   return String(invoice?.invoice_id ?? invoice?.name ?? invoice?.invoice ?? invoice?.docname ?? "").trim()
@@ -577,7 +577,7 @@ export default function ReturnRequestsPage() {
                             <div className="relative aspect-square bg-gradient-to-br from-muted/30 to-muted/10">
                               <Image
                                 src={imageUrl}
-                                alt={item.item_name || item.item_code || "Product"}
+                                alt={decodeHtmlEntities(item.item_name) || item.item_code || "Product"}
                                 fill
                                 className="object-contain p-6"
                                 sizes="(max-width: 1280px) 50vw, 25vw"
@@ -591,7 +591,9 @@ export default function ReturnRequestsPage() {
                             </div>
                             <CardContent className="px-5 pt-5 pb-5">
                               <div className="min-h-12">
-                                <p className="font-semibold leading-snug line-clamp-2">{item.item_name || item.item_code}</p>
+                                <p className="font-semibold leading-snug line-clamp-2">
+                                  {decodeHtmlEntities(item.item_name) || item.item_code}
+                                </p>
                                 <p className="text-xs text-muted-foreground mt-1">
                                   {item.item_code || "—"}
                                   {item.item_group ? ` · ${item.item_group}` : ""}
@@ -722,7 +724,7 @@ export default function ReturnRequestsPage() {
                           <div key={product.item_code} className="rounded-xl border border-border/60 bg-background p-3">
                             <div className="flex items-start justify-between gap-3 mb-3">
                               <div className="min-w-0">
-                                <p className="font-medium">{product.item_name}</p>
+                                <p className="font-medium">{decodeHtmlEntities(product.item_name)}</p>
                                 <p className="text-sm text-muted-foreground">{product.item_code}</p>
                               </div>
                               <Button type="button" variant="ghost" size="icon" onClick={() => removeProduct(product.item_code)}>
@@ -739,7 +741,7 @@ export default function ReturnRequestsPage() {
                                   type="text"
                                   inputMode="numeric"
                                   autoComplete="off"
-                                  aria-label={`Quantity for ${product.item_name || product.item_code}`}
+                                  aria-label={`Quantity for ${decodeHtmlEntities(product.item_name) || product.item_code}`}
                                   value={
                                     quantityDraftByCode[product.item_code] !== undefined
                                       ? quantityDraftByCode[product.item_code]
@@ -879,7 +881,9 @@ export default function ReturnRequestsPage() {
                         <div key={`${item.item_code ?? item.item_name ?? "item"}-${index}`} className="rounded-xl border border-border/60 p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-medium">{item.item_name || item.item_code || "Item"}</p>
+                              <p className="font-medium">
+                                {decodeHtmlEntities(item.item_name) || item.item_code || "Item"}
+                              </p>
                               <p className="text-sm text-muted-foreground">
                                 {item.item_code || "—"}
                                 {item.item_group ? ` · ${item.item_group}` : ""}

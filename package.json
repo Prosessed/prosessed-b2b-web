@@ -6,7 +6,9 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "build:lint": "npm run lint && npm run build",
+    "deploy": "firebase deploy --only apphosting:dev-ecom --project b2b-commerce-4d195"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",

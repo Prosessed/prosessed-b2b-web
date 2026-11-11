@@ -3,6 +3,7 @@ import {
   fetchCompaniesByEmail,
   fetchCompaniesByMobile,
 } from "@/lib/server/frappe-internal"
+import { isAllowedProsessedOrigin } from "@/lib/utils/tenant-url"
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +33,10 @@ export async function POST(request: NextRequest) {
       ? await fetchCompaniesByEmail(email)
       : await fetchCompaniesByMobile(mobile)
 
-    return NextResponse.json({ companies })
+    // Never hand the client a company_url outside the Prosessed allowlist.
+    const allowed = companies.filter((c) => isAllowedProsessedOrigin(c.company_url))
+
+    return NextResponse.json({ companies: allowed })
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to fetch companies"
