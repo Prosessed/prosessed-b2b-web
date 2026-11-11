@@ -7,6 +7,7 @@ import { DateInput } from "@/components/ui/date-input"
 import { useQuotations } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
 import { formatPrice, formatDate } from "@/lib/utils/currency"
+import { toLocalISODate, toLocalISODateDaysAgo } from "@/lib/utils/date"
 import { motion } from "framer-motion"
 import { Calendar, CheckCircle, Clock, FileText, XCircle } from "lucide-react"
 import Link from "next/link"
@@ -26,18 +27,8 @@ const PRESETS = [
   { label: "Last 3 months", days: 90 },
 ] as const
 
-function getTodayISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function getDaysAgoISO(days: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return d.toISOString().slice(0, 10)
-}
-
-const defaultEnd = getTodayISO()
-const defaultStart = getDaysAgoISO(30)
+const defaultEnd = toLocalISODate()
+const defaultStart = toLocalISODateDaysAgo(30)
 
 export default function QuotesPage() {
   const { user, isAuthenticated } = useAuth()
@@ -53,14 +44,12 @@ export default function QuotesPage() {
 
   const applyPreset = useCallback((presetIndex: number, preset: (typeof PRESETS)[number]) => {
     if ("days" in preset && preset.days) {
-      const nextEnd = getTodayISO()
-      const nextStart = getDaysAgoISO(preset.days)
-      setEndDate(nextEnd)
-      setStartDate(nextStart)
+      setEndDate(toLocalISODate())
+      setStartDate(toLocalISODateDaysAgo(preset.days))
     } else if ("getRange" in preset && preset.getRange) {
       const { start, end } = preset.getRange()
-      setStartDate(start.toISOString().slice(0, 10))
-      setEndDate(end.toISOString().slice(0, 10))
+      setStartDate(toLocalISODate(start))
+      setEndDate(toLocalISODate(end))
     }
     setActivePresetIndex(presetIndex)
   }, [])

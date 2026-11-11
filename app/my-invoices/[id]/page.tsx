@@ -1,5 +1,4 @@
 "use client"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -12,6 +11,8 @@ import {
 } from "@/lib/api/print"
 import { useAuth } from "@/lib/auth/context"
 import { formatDate, formatPrice } from "@/lib/utils/currency"
+import { decodeHtmlEntities } from "@/lib/utils/html"
+import { getInvoiceStatusBadge, resolveInvoiceStatus } from "@/lib/utils/invoice-status"
 import { ArrowLeft, Eye, FileText, Loader2, Package, Download, MapPin, Mail, Phone, User } from "lucide-react"
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -44,6 +45,40 @@ function getItems(details: any) {
   if (Array.isArray(details?.item_list)) return details.item_list
   return []
 }
+
+/** First finite numeric amount from candidate API fields. Skips null/undefined/NaN/objects. */
+const pickAmount = (...values: unknown[]): number | null => {
+  for (const value of values) {
+    if (value == null || value === "") continue
+    if (typeof value === "object") continue
+    const amount = Number(value)
+    if (Number.isFinite(amount)) return amount
+  }
+  return null
+}
+
+/**
+ * Prefer a non-zero amount when APIs send `net_total: 0` but still provide `total`.
+ * Falls back to the first finite value (including 0) when every candidate is zero/missing.
+ */
+const pickNetAmount = (...values: unknown[]): number | null => {
+  let firstFinite: number | null = null
+  for (const value of values) {
+    if (value == null || value === "") continue
+    if (typeof value === "object") continue
+    const amount = Number(value)
+    if (!Number.isFinite(amount)) continue
+    if (firstFinite == null) firstFinite = amount
+    if (amount !== 0) return amount
+  }
+  return firstFinite
+}
+
+const sumItemAmounts = (items: any[]): number =>
+  items.reduce((sum, item) => {
+    const amount = pickAmount(item?.amount, item?.net_amount, item?.item_amount)
+    return sum + (amount ?? 0)
+  }, 0)
 
 export default function MyInvoiceDetailPage() {
   const params = useParams()
@@ -128,23 +163,9 @@ export default function MyInvoiceDetailPage() {
     }
   }, [user, id, invoiceNumber, resolvedPrintFormat])
 
-  const statusText = useMemo(() => {
-    if (!invoice) return ""
-    return invoice?.workflow_state ?? invoice?.status ?? invoice?.docstatus ?? ""
-  }, [invoice])
+  const statusText = useMemo(() => resolveInvoiceStatus(invoice), [invoice])
 
-  const statusBadge = useMemo(() => {
-    const s = String(statusText ?? "").trim()
-    const lower = s.toLowerCase()
-
-    if (!s) return <Badge className="bg-muted text-muted-foreground">—</Badge>
-    if (lower.includes("cancel")) return <Badge className="bg-red-500/10 text-red-700 dark:text-red-400">{s}</Badge>
-    if (lower.includes("draft") || lower.includes("review")) return <Badge className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400">{s}</Badge>
-    if (lower.includes("submit") || lower.includes("paid") || lower.includes("approved") || lower.includes("confirmed")) {
-      return <Badge className="bg-green-500/10 text-green-700 dark:text-green-400">{s}</Badge>
-    }
-    return <Badge className="bg-muted text-muted-foreground">{s}</Badge>
-  }, [statusText])
+  const statusBadge = useMemo(() => getInvoiceStatusBadge(statusText), [statusText])
 
   if (!isAuthenticated || !user) {
     return (
@@ -209,9 +230,30 @@ export default function MyInvoiceDetailPage() {
 
   const address = renderInvoiceAddress(inv)
 
-  const grandTotal = inv?.grand_total ?? inv?.amount ?? inv?.total ?? 0
-  const netTotal = inv?.net_total ?? inv?.sub_total ?? inv?.subtotal ?? 0
-  const taxes = inv?.total_taxes_and_charges ?? inv?.tax_amount ?? inv?.taxes ?? 0
+  // Frappe: `total` / `net_total` are pre-tax; `grand_total` is after tax.
+  // Display-only: do not change API calls, PDF, list page, or order flows.
+  const grandTotal =
+    pickAmount(inv?.grand_total, inv?.rounded_total, inv?.amount, inv?.invoice_grand_total) ?? 0
+  const taxes =
+    pickAmount(
+      inv?.total_taxes_and_charges,
+      inv?.tax_amount,
+      inv?.invoice_total_taxes_and_charges,
+      typeof inv?.taxes === "number" || typeof inv?.taxes === "string" ? inv.taxes : null
+    ) ?? 0
+  const itemsNet = sumItemAmounts(items)
+  const netTotal =
+    pickNetAmount(
+      inv?.net_total,
+      inv?.total,
+      inv?.base_net_total,
+      inv?.invoice_net_total,
+      inv?.invoice_total,
+      inv?.sub_total,
+      inv?.subtotal,
+      itemsNet || null,
+      grandTotal !== 0 && taxes !== 0 ? grandTotal - taxes : null
+    ) ?? 0
 
   return (
     <div className="min-h-screen bg-background">
@@ -366,7 +408,9 @@ export default function MyInvoiceDetailPage() {
               ) : (
                 <div className="space-y-3">
                   {items.map((item: any, idx: number) => {
-                    const name = item?.item_name ?? item?.name ?? item?.item_code ?? `Item ${idx + 1}`
+                    const name = decodeHtmlEntities(
+                      item?.item_name ?? item?.name ?? item?.item_code ?? `Item ${idx + 1}`
+                    )
                     const qty = item?.qty ?? item?.quantity ?? item?.item_quantity ?? 0
                     const uom = item?.uom ?? item?.stock_uom ?? item?.uom_name ?? ""
                     const amount = item?.amount ?? item?.net_amount ?? item?.item_amount ?? 0

@@ -367,6 +367,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const currentQuotationId = quotationIdRef.current || cartRef.current?.name
         if (!currentQuotationId) throw new Error("Cart not found")
 
+        const itemCount = cartRef.current?.items?.length ?? 0
+        if (itemCount === 0) {
+          throw new Error("Your cart is empty. Add items before submitting.")
+        }
+
         try {
           await submitCart(
             {
@@ -398,6 +403,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const currentQuotationId = quotationIdRef.current || cartRef.current?.name
         if (!currentQuotationId) throw new Error("Cart not found")
 
+        const itemCount = cartRef.current?.items?.length ?? 0
+        if (itemCount === 0) {
+          throw new Error("Your cart is empty. Add items before placing an order.")
+        }
+
         try {
           await createSalesOrderFromCart(
             {
@@ -405,6 +415,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
               latitude: params.latitude,
               longitude: params.longitude,
               delivery_date: params.delivery_date,
+              custom_order_source: params.custom_order_source,
             },
             user
           )

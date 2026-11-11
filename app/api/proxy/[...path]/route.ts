@@ -1,18 +1,5 @@
+import { isAllowedProsessedOrigin } from "@/lib/utils/tenant-url"
 import { NextRequest, NextResponse } from "next/server"
-
-const isAllowedOrigin = (origin: string | null): origin is string => {
-  if (!origin) return false
-  try {
-    const { protocol, hostname } = new URL(origin)
-    if (protocol !== "https:" && protocol !== "http:") return false
-    return (
-      hostname === "internal.prosessed.com" ||
-      hostname.endsWith(".prosessed.com")
-    )
-  } catch {
-    return false
-  }
-}
 
 const buildTargetUrl = (req: NextRequest, pathParts: string[], origin: string): string => {
   const rawPath = `/${pathParts.join("/")}`
@@ -22,7 +9,7 @@ const buildTargetUrl = (req: NextRequest, pathParts: string[], origin: string): 
 
 const forward = async (req: NextRequest, pathParts: string[]) => {
   const origin = req.headers.get("x-proxy-origin")
-  if (!isAllowedOrigin(origin)) {
+  if (!isAllowedProsessedOrigin(origin)) {
     return NextResponse.json({ message: "Proxy origin not allowed" }, { status: 403 })
   }
 

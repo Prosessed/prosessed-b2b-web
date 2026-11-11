@@ -1,6 +1,7 @@
 
 
 import type { Company, LoginResponse } from "../auth/types"
+import { assertAllowedProsessedOrigin, isAllowedProsessedOrigin } from "../utils/tenant-url"
 
 /* ============================================================
    CONFIG
@@ -87,12 +88,8 @@ const getAuthFromStorage = (): AuthCredentials => {
 ============================================================ */
 
 export const setApiBaseUrl = (url: string) => {
-  try {
-    const parsed = new URL(url)
-    currentBaseUrl = `${parsed.protocol}//${parsed.host}`
-  } catch {
-    currentBaseUrl = url.replace(/\/$/, "")
-  }
+  // Fail closed: never point the API client at a non-Prosessed host.
+  currentBaseUrl = assertAllowedProsessedOrigin(url)
 }
 
 export const getApiBaseUrl = () => {
@@ -117,14 +114,18 @@ const needsApiProxy = (): boolean => {
 }
 
 const proxyAwareFetch = (absoluteUrl: string, init?: RequestInit): Promise<Response> => {
-  if (!needsApiProxy()) {
-    return fetch(absoluteUrl, init)
-  }
-
   let parsed: URL
   try {
     parsed = new URL(absoluteUrl)
   } catch {
+    return Promise.reject(new Error("Invalid API URL"))
+  }
+
+  if (!isAllowedProsessedOrigin(parsed.origin)) {
+    return Promise.reject(new Error("Company URL is not an allowed Prosessed host"))
+  }
+
+  if (!needsApiProxy()) {
     return fetch(absoluteUrl, init)
   }
 
@@ -281,7 +282,9 @@ export const apiClient = {
     }
 
     const companies = Array.isArray(result.companies) ? result.companies : []
-    return filterCompaniesByCurrentDomain(companies)
+    return filterCompaniesByCurrentDomain(
+      companies.filter((c) => isAllowedProsessedOrigin(c.company_url))
+    )
   },
 
   /* ------------------ Fetch Companies (by Mobile) ------------------ */
@@ -308,7 +311,9 @@ export const apiClient = {
     }
 
     const companies = Array.isArray(result.companies) ? result.companies : []
-    return filterCompaniesByCurrentDomain(companies)
+    return filterCompaniesByCurrentDomain(
+      companies.filter((c) => isAllowedProsessedOrigin(c.company_url))
+    )
   },
 
   /* ------------------ Login (Custom API) ------------------ */

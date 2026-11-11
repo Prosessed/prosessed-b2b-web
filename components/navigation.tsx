@@ -21,6 +21,7 @@ import { useAuth } from "@/lib/auth/context"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { cn } from "@/lib/utils"
+import { decodeHtmlEntities } from "@/lib/utils/html"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { getPriceDisplay } from "@/lib/utils/pricing"
 import { AnimatePresence, motion } from "framer-motion"
@@ -235,14 +236,14 @@ export function Navigation() {
                               <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-muted/50 relative overflow-hidden shrink-0 border border-border/50">
                                 <Image
                                   src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
-                                  alt={item.item_name || "Product"}
+                                  alt={decodeHtmlEntities(item.item_name) || "Product"}
                                   fill
                                   className="object-contain p-1.5 sm:p-2 group-hover:scale-110 transition-transform"
                                 />
                               </div>
                               <div className="flex-1 min-w-0 overflow-hidden">
                                 <p className="text-sm font-bold group-hover:text-primary transition-colors line-clamp-2 break-words">
-                                  {item.item_name}
+                                  {decodeHtmlEntities(item.item_name)}
                                 </p>
                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
                                   <p className="text-xs font-black text-primary shrink-0">{priceLabel}</p>

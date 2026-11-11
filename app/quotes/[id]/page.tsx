@@ -4,15 +4,17 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useQuotationDetails } from "@/lib/api/hooks"
+import { useItemImageMap, useQuotationDetails } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice, formatDate } from "@/lib/utils/currency"
-import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
+import { decodeHtmlEntities } from "@/lib/utils/html"
+import { getDisplayImageUrl, resolveLineItemImage } from "@/lib/utils/image-url"
 import { ArrowLeft, FileText, MapPin, Package } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { useMemo } from "react"
 
 export default function QuoteDetailPage() {
   const params = useParams()
@@ -20,6 +22,20 @@ export default function QuoteDetailPage() {
   const { user } = useAuth()
   const { data: quote, isLoading, error } = useQuotationDetails(id)
   const currency = user?.defaultCurrency ?? "AUD"
+
+  const quoteItems = useMemo(() => {
+    const q = quote as any
+    if (!q) return [] as any[]
+    if (Array.isArray(q.quotation_items)) return q.quotation_items
+    if (Array.isArray(q.items)) return q.items
+    return q.order_items ?? []
+  }, [quote])
+
+  const itemCodes = useMemo(
+    () => quoteItems.map((item: any) => item?.item_code).filter(Boolean) as string[],
+    [quoteItems]
+  )
+  const { data: itemImageMap = {} } = useItemImageMap(itemCodes)
 
   if (!id) {
     return (
@@ -67,7 +83,7 @@ export default function QuoteDetailPage() {
   const addressHtml = q.address_display ?? ""
   const addressText = q.customer_address ?? ""
   const address = addressText || addressHtml.replace(/<br\s*\/?>/gi, "\n").trim() || "—"
-  const items = Array.isArray(q.quotation_items) ? q.quotation_items : (Array.isArray(q.items) ? q.items : (q.order_items ?? []))
+  const items = quoteItems
   const totalTaxesAndCharges =
     q.total_taxes_and_charges ??
     q.total_taxes ??
@@ -125,14 +141,21 @@ export default function QuoteDetailPage() {
                     <div key={item.name ?? item.item_code ?? idx} className="flex items-center gap-4 p-3 border rounded-lg">
                       <div className="relative h-14 w-14 rounded overflow-hidden bg-muted shrink-0">
                         <Image
-                          src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
-                          alt={item.item_name || "Item"}
+                          src={
+                            getDisplayImageUrl(
+                              resolveLineItemImage(item, itemImageMap),
+                              getApiBaseUrl()
+                            ) || "/placeholder.svg"
+                          }
+                          alt={decodeHtmlEntities(item.item_name) || "Item"}
                           fill
                           className="object-contain p-1"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{item.item_name ?? item.item_code}</p>
+                        <p className="font-medium truncate">
+                          {decodeHtmlEntities(item.item_name) || item.item_code}
+                        </p>
                         <p className="text-sm text-muted-foreground">
                           Qty: {item.qty ?? item.quantity ?? item.item_quantity ?? 0} {item.uom ?? item.stock_uom ?? ""}
                         </p>

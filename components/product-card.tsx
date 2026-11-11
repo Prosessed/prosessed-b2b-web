@@ -10,6 +10,7 @@ import { useCartContext } from "@/lib/cart/context"
 import { findCartLineByItemCode } from "@/lib/cart/utils"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { formatPrice } from "@/lib/utils/currency"
+import { decodeHtmlEntities } from "@/lib/utils/html"
 import { getDisplayImageUrl } from "@/lib/utils/image-url"
 import { parseTags } from "@/lib/utils/tags"
 import { TagBadge } from "@/components/tag-badge"
@@ -53,6 +54,7 @@ export function ProductCard({
   tags,
   discount,
 }: ProductCardProps) {
+  const displayName = decodeHtmlEntities(name)
   const displayUnit = unit || "unit"
   const tagList = parseTags(tags)
   const { cart, addItem, updateItem, removeItem, isLoading: cartLoading } = useCartContext()
@@ -223,7 +225,7 @@ export function ProductCard({
           >
             <Image
               src={getDisplayImageUrl(image, getApiBaseUrl()) || "/placeholder.svg"}
-              alt={name}
+              alt={displayName}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
               quality={90}
@@ -245,7 +247,7 @@ export function ProductCard({
               ? "font-semibold text-sm leading-tight line-clamp-2 min-h-10 text-foreground group-hover/name:text-primary transition-colors"
               : "font-semibold text-sm leading-tight line-clamp-2 text-foreground group-hover/name:text-primary transition-colors"}
             >
-              {name}
+              {displayName}
             </h3>
           </Link>
 
