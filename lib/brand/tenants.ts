@@ -99,6 +99,7 @@ export const tenants: TenantConfig[] = [
     name: "devb2b",
     domains: [
       "devb2b.prosessed.com",
+      "devb2b.localhost",
     ],
     status: "active",
     features: {
