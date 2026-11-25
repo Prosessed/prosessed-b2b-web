@@ -3,10 +3,10 @@ const nextConfig = {
   turbopack: {
     root: '.',
   },
-  // Allow phone/LAN + ngrok access during local development
+  // Allow phone/LAN + custom host access during local development
   allowedDevOrigins: [
     '192.168.0.4',
-    'oblivion-luxurious-countless.ngrok-free.dev',
+    'devb2b.prosessed.com',
     '*.ngrok-free.dev',
     '*.ngrok-free.app',
   ],

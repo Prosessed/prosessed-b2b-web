@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CardContent } from "@/components/ui/card"
-import { Loader2, ArrowRight, Mail, Lock, ArrowLeft, Building2 } from "lucide-react"
+import { Loader2, ArrowRight, Mail, Lock, ArrowLeft, Building2, Eye, EyeOff } from "lucide-react"
 import { requestOTP, verifyOtpAndResetPassword } from "@/lib/api/auth"
 import Link from "next/link"
 
@@ -27,6 +27,8 @@ export default function ForgotPasswordPage() {
   const [otp, setOtp] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [isNewPasswordVisible, setIsNewPasswordVisible] = useState(false)
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
@@ -208,14 +210,30 @@ export default function ForgotPasswordPage() {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#808080]" />
                     <Input
-                      type="password"
+                      type={isNewPasswordVisible ? "text" : "password"}
                       placeholder="Enter new password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="pl-10 h-12 rounded-2xl bg-muted/50 border-border/50 focus:border-primary transition-all"
+                      className="pl-10 pr-12 h-12 rounded-2xl bg-muted/50 border-border/50 focus:border-primary transition-all"
                       required
                       disabled={isLoading}
                     />
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                      aria-label={isNewPasswordVisible ? "Hide new password" : "Show new password"}
+                      aria-pressed={isNewPasswordVisible}
+                      tabIndex={0}
+                      onClick={() => setIsNewPasswordVisible((prev) => !prev)}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" && e.key !== " ") return
+                        e.preventDefault()
+                        setIsNewPasswordVisible((prev) => !prev)
+                      }}
+                      disabled={isLoading}
+                    >
+                      {isNewPasswordVisible ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -223,14 +241,30 @@ export default function ForgotPasswordPage() {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#808080]" />
                     <Input
-                      type="password"
+                      type={isConfirmPasswordVisible ? "text" : "password"}
                       placeholder="Confirm new password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10 h-12 rounded-2xl bg-muted/50 border-border/50 focus:border-primary transition-all"
+                      className="pl-10 pr-12 h-12 rounded-2xl bg-muted/50 border-border/50 focus:border-primary transition-all"
                       required
                       disabled={isLoading}
                     />
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                      aria-label={isConfirmPasswordVisible ? "Hide confirm password" : "Show confirm password"}
+                      aria-pressed={isConfirmPasswordVisible}
+                      tabIndex={0}
+                      onClick={() => setIsConfirmPasswordVisible((prev) => !prev)}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" && e.key !== " ") return
+                        e.preventDefault()
+                        setIsConfirmPasswordVisible((prev) => !prev)
+                      }}
+                      disabled={isLoading}
+                    >
+                      {isConfirmPasswordVisible ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
                   </div>
                 </div>
 

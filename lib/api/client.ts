@@ -45,38 +45,24 @@ const getAuthFromStorage = (): AuthCredentials => {
   if (typeof window === "undefined") return {}
 
   try {
-    // AuthProvider (current implementation)
     const rawUser = localStorage.getItem("prosessed_auth")
-    if (rawUser) {
-      const parsedUser = JSON.parse(rawUser)
+    if (!rawUser) return {}
 
-      // Only use sid when the client-side session is still valid.
-      const rawSession = localStorage.getItem("prosessed_session")
-      if (rawSession) {
-        const session = JSON.parse(rawSession)
-        if (typeof session?.sid === "string" && typeof parsedUser?.sid === "string") {
-          if (session.sid !== parsedUser.sid) return {}
-        }
-      }
+    const parsedUser = JSON.parse(rawUser)
 
-      return {
-        apiKey: parsedUser?.apiKey ?? null,
-        apiSecret: parsedUser?.apiSecret ?? null,
-        sid: parsedUser?.sid ?? null,
+    // Only use sid when the client-side session is still valid.
+    const rawSession = localStorage.getItem("prosessed_session")
+    if (rawSession) {
+      const session = JSON.parse(rawSession)
+      if (typeof session?.sid === "string" && typeof parsedUser?.sid === "string") {
+        if (session.sid !== parsedUser.sid) return {}
       }
     }
 
-    // Legacy Zustand store (if still present)
-    const rawLegacy = localStorage.getItem("auth-storage")
-    if (!rawLegacy) return {}
-
-    const parsed = JSON.parse(rawLegacy)
-    const state = parsed?.state
-
     return {
-      apiKey: state?.apiKey || null,
-      apiSecret: state?.apiSecret || null,
-      sid: state?.sid || null,
+      apiKey: parsedUser?.apiKey ?? null,
+      apiSecret: parsedUser?.apiSecret ?? null,
+      sid: parsedUser?.sid ?? null,
     }
   } catch {
     return {}

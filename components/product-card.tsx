@@ -10,7 +10,7 @@ import { useCartContext } from "@/lib/cart/context"
 import { findCartLineByItemCode } from "@/lib/cart/utils"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { formatPrice } from "@/lib/utils/currency"
-import { decodeHtmlEntities } from "@/lib/utils/html"
+import { toPlainText } from "@/lib/utils/html"
 import { getDisplayImageUrl } from "@/lib/utils/image-url"
 import { parseTags } from "@/lib/utils/tags"
 import { TagBadge } from "@/components/tag-badge"
@@ -54,7 +54,7 @@ export function ProductCard({
   tags,
   discount,
 }: ProductCardProps) {
-  const displayName = decodeHtmlEntities(name)
+  const displayName = toPlainText(name)
   const displayUnit = unit || "unit"
   const tagList = parseTags(tags)
   const { cart, addItem, updateItem, removeItem, isLoading: cartLoading } = useCartContext()

@@ -18,7 +18,7 @@ import { useAuth } from "@/lib/auth/context"
 import { useWarehousesByCustomerBranch } from "@/lib/api/hooks"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
-import { decodeHtmlEntities } from "@/lib/utils/html"
+import { toPlainText } from "@/lib/utils/html"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { parseTags } from "@/lib/utils/tags"
 import { TagBadge } from "@/components/tag-badge"
@@ -271,7 +271,7 @@ export default function ProductDetailPage() {
             <div className="relative aspect-square bg-muted/30">
               <Image
                 src={getDisplayImageUrl(getFirstImageUrl(product.image), getApiBaseUrl()) || "/placeholder.svg"}
-                alt={decodeHtmlEntities(product.item_name) || "Product image"}
+                alt={toPlainText(product.item_name) || "Product image"}
                 fill
                 className="object-contain p-8"
                 priority
@@ -309,7 +309,7 @@ export default function ProductDetailPage() {
               )}
             </div>
             <h1 className="text-4xl font-black mb-3 tracking-tight">
-              {decodeHtmlEntities(product.item_name)}
+              {toPlainText(product.item_name)}
             </h1>
             {parseTags(product.tags).length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3" aria-label="Product tags">
@@ -320,7 +320,7 @@ export default function ProductDetailPage() {
             )}
             {product.description && (
               <p className="text-muted-foreground leading-relaxed">
-                {decodeHtmlEntities(product.description)}
+                {toPlainText(product.description)}
               </p>
             )}
           </div>

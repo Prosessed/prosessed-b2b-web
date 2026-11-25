@@ -10,7 +10,7 @@ import { useCartContext } from "@/lib/cart/context"
 import { useAuth } from "@/lib/auth/context"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice } from "@/lib/utils/currency"
-import { decodeHtmlEntities } from "@/lib/utils/html"
+import { toPlainText } from "@/lib/utils/html"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { AnimatePresence, motion } from "framer-motion"
 import {
@@ -393,7 +393,7 @@ export default function CartPage() {
                               getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) ||
                               "/placeholder.svg"
                             }
-                            alt={decodeHtmlEntities(item.item_name)}
+                            alt={toPlainText(item.item_name)}
                             fill
                             className="object-contain p-2"
                           />
@@ -406,7 +406,7 @@ export default function CartPage() {
                                 href={`/products/${item.item_code}`}
                                 className="font-bold text-lg hover:text-primary"
                               >
-                                {decodeHtmlEntities(item.item_name)}
+                                {toPlainText(item.item_name)}
                               </Link>
                               <p className="text-xs text-muted-foreground">
                                 {item.uom} • {formatPrice(item.rate ?? 0, currency)}
@@ -441,7 +441,7 @@ export default function CartPage() {
                                   event.currentTarget.blur()
                                 }}
                                 className="h-9 w-16 rounded-none border-0 border-x px-2 text-center font-bold tabular-nums focus-visible:ring-0"
-                                aria-label={`Quantity for ${decodeHtmlEntities(item.item_name)}`}
+                                aria-label={`Quantity for ${toPlainText(item.item_name)}`}
                               />
                               <Button
                                 size="icon"
@@ -460,7 +460,7 @@ export default function CartPage() {
                               className="text-destructive cursor-pointer"
                               disabled={isUpdating === item.name}
                               onClick={() => handleRemoveItem(item.name)}
-                              aria-label={`Remove ${decodeHtmlEntities(item.item_name)} from cart`}
+                              aria-label={`Remove ${toPlainText(item.item_name)} from cart`}
                             >
                               <Trash2 className="h-4 w-4 mr-1" />
                               Remove

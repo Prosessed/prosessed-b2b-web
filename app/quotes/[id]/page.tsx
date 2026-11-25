@@ -8,7 +8,7 @@ import { useItemImageMap, useQuotationDetails } from "@/lib/api/hooks"
 import { useAuth } from "@/lib/auth/context"
 import { getApiBaseUrl } from "@/lib/api/client"
 import { formatPrice, formatDate } from "@/lib/utils/currency"
-import { decodeHtmlEntities } from "@/lib/utils/html"
+import { toPlainText } from "@/lib/utils/html"
 import { getDisplayImageUrl, resolveLineItemImage } from "@/lib/utils/image-url"
 import { ArrowLeft, FileText, MapPin, Package } from "lucide-react"
 import Image from "next/image"
@@ -147,14 +147,14 @@ export default function QuoteDetailPage() {
                               getApiBaseUrl()
                             ) || "/placeholder.svg"
                           }
-                          alt={decodeHtmlEntities(item.item_name) || "Item"}
+                          alt={toPlainText(item.item_name) || "Item"}
                           fill
                           className="object-contain p-1"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">
-                          {decodeHtmlEntities(item.item_name) || item.item_code}
+                          {toPlainText(item.item_name) || item.item_code}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           Qty: {item.qty ?? item.quantity ?? item.item_quantity ?? 0} {item.uom ?? item.stock_uom ?? ""}

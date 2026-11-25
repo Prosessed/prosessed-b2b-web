@@ -8,7 +8,7 @@ import { useItemImageMap, useOrderDetails } from "@/lib/api/hooks"
 import { fetchSalesOrderPdfBlob, useDefaultSalesOrderPrintFormat } from "@/lib/api/print"
 import { useAuth } from "@/lib/auth/context"
 import { formatDate, formatPrice } from "@/lib/utils/currency"
-import { decodeHtmlEntities } from "@/lib/utils/html"
+import { toPlainText } from "@/lib/utils/html"
 import { getDisplayImageUrl, resolveLineItemImage } from "@/lib/utils/image-url"
 import { getOrderStatusBadge } from "@/lib/utils/order-status"
 import { ArrowLeft, FileText, Loader2, Mail, MapPin, Package, Phone, User } from "lucide-react"
@@ -264,14 +264,14 @@ export default function OrderDetailPage() {
                               getApiBaseUrl()
                             ) || "/placeholder.svg"
                           }
-                          alt={decodeHtmlEntities(item.item_name) || "Item"}
+                          alt={toPlainText(item.item_name) || "Item"}
                           fill
                           className="object-contain p-1"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">
-                          {decodeHtmlEntities(item.item_name) || item.item_code}
+                          {toPlainText(item.item_name) || item.item_code}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           Qty: {item.item_quantity ?? item.qty ?? item.quantity ?? 0} · {item.uom || item.stock_uom || ""}

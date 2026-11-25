@@ -8,6 +8,7 @@ import { Mail, Phone, Globe, MapPin, Instagram, Facebook, Twitter, Linkedin, You
 import { apiClient } from "@/lib/api/client"
 import { useAuth } from "@/lib/auth/context"
 import { useBannersAndDeals } from "@/lib/api/hooks"
+import { useBrandOptional } from "@/components/brand-provider"
 
 interface CompanyDetails {
   company_name: string
@@ -41,6 +42,13 @@ export function Footer() {
   const { isAuthenticated } = useAuth()
   const pathname = usePathname()
   const { data: bannersData } = useBannersAndDeals()
+  const brand = useBrandOptional()
+  const isBrandedTenant =
+    Boolean(brand) &&
+    !brand?.isDefault &&
+    (Boolean(brand?.branding.logoUrl) || Boolean(brand?.features.distinctShell))
+  const productName = isBrandedTenant ? brand!.branding.productName : "B2B Ordering Portal"
+  const isDistinctShell = Boolean(brand?.features.distinctShell)
 
   const isLoginRoute = pathname.startsWith("/login")
 
@@ -90,7 +98,13 @@ export function Footer() {
   }>
 
   return (
-    <footer className="bg-muted/30 border-t mt-16">
+    <footer
+      className={
+        isDistinctShell
+          ? "mt-16 border-t border-primary/15 bg-primary/[0.04]"
+          : "bg-muted/30 border-t mt-16"
+      }
+    >
       <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-10">
         {/* Column grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 lg:gap-12 max-w-6xl mx-auto">
@@ -108,7 +122,7 @@ export function Footer() {
                 )}
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">B2B Ordering Portal</p>
+              <p className="text-sm text-muted-foreground">{productName}</p>
             )}
           </FooterColumn>
 
@@ -172,8 +186,9 @@ export function Footer() {
           {/* Portal features */}
           <FooterColumn title="Portal" className="text-center sm:text-left">
             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Place Order · Get Quote · View Orders · Track Dispatch · Download Invoice · Ledger
-              Statement
+              {isDistinctShell
+                ? "Order · Quote · Invoice · Pay — built for Oblivion partners"
+                : "Place Order · Get Quote · View Orders · Track Dispatch · Download Invoice · Ledger Statement"}
             </p>
           </FooterColumn>
 
