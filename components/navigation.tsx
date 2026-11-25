@@ -21,7 +21,7 @@ import { useAuth } from "@/lib/auth/context"
 import { useCartContext } from "@/lib/cart/context"
 import { useCartDrawer } from "@/lib/cart/drawer-context"
 import { cn } from "@/lib/utils"
-import { decodeHtmlEntities } from "@/lib/utils/html"
+import { toPlainText } from "@/lib/utils/html"
 import { getDisplayImageUrl, getFirstImageUrl } from "@/lib/utils/image-url"
 import { getPriceDisplay } from "@/lib/utils/pricing"
 import { AnimatePresence, motion } from "framer-motion"
@@ -31,6 +31,8 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { AnnouncementPopup } from "@/components/announcement-popup"
+import { TenantLogo } from "@/components/tenant-logo"
+import { useBrandOptional } from "@/components/brand-provider"
 import {
   applyThemeToDocument,
   persistTheme,
@@ -50,6 +52,7 @@ export function Navigation() {
   const debouncedSearch = useDebounce(searchTerm, 400)
   const { data: searchResults, isValidating: isSearching } = useSearch(debouncedSearch)
   const { data: bannersData, isLoading: bannersLoading } = useBannersAndDeals()
+  const brand = useBrandOptional()
 
   const handleCategoriesNavClick = (e: React.MouseEvent) => {
     if (pathname !== "/") return
@@ -88,24 +91,52 @@ export function Navigation() {
 
   // Get company logo from banners data or fallback to company name
   const companyLogo = bannersData?.company_logo
-  const companyName = isAuthenticated && user
+  const originalCompanyName = isAuthenticated && user
     ? (user.companyName || user.companyUrl.replace(/https?:\/\//, "").split(".")[0] || "B2B Portal")
     : "B2B Portal"
+  // Only white-label tenants (logo / distinct shell) replace the name and logo.
+  const isBrandedTenant =
+    Boolean(brand) &&
+    !brand?.isDefault &&
+    (Boolean(brand?.branding.logoUrl) || Boolean(brand?.features.distinctShell))
+  const companyName = isBrandedTenant ? brand!.branding.productName : originalCompanyName
+  const hasTenantLogo = isBrandedTenant && Boolean(brand?.branding.logoUrl)
+  const isDistinctShell = Boolean(brand?.features.distinctShell)
+  const isWideLogo = Boolean(brand?.branding.logoAspectRatio)
   const isLoginRoute = pathname.startsWith("/login")
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+      <header
+        className={cn(
+          "sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60",
+          isDistinctShell && "border-primary/20 shadow-sm shadow-primary/5"
+        )}
+      >
+        {isDistinctShell && (
+          <div className="h-1 w-full bg-gradient-to-r from-primary via-primary/70 to-primary/20" aria-hidden />
+        )}
         <div className="container mx-auto flex h-16 items-center gap-2 sm:gap-4 px-3 sm:px-4">
         {/* Company Logo — hide on mobile while typing so search can use the width */}
         <Link
           href="/"
           className={cn(
             "flex items-center min-w-0 shrink-0",
+            isDistinctShell && "gap-2 sm:gap-3",
             searchTerm.length > 0 && "max-sm:hidden"
           )}
         >
-          {bannersLoading ? (
+          {hasTenantLogo ? (
+            <TenantLogo
+              className={cn(
+                "h-10 w-10 sm:h-14 sm:w-14 md:h-16 md:w-16",
+                isDistinctShell && "h-9 w-9 sm:h-11 sm:w-11 md:h-12 md:w-12",
+                isWideLogo && "w-auto h-9 sm:h-11 md:h-12 sm:w-auto md:w-auto"
+              )}
+              size={isDistinctShell ? 48 : 64}
+              priority
+            />
+          ) : bannersLoading ? (
             <Skeleton className="h-10 w-10 sm:h-14 sm:w-14 md:h-16 md:w-16 rounded-md" aria-hidden />
           ) : companyLogo ? (
             <div className="relative h-10 w-10 sm:h-14 sm:w-14 md:h-16 md:w-16">
@@ -119,6 +150,11 @@ export function Navigation() {
             </div>
           ) : (
             <span className="text-lg font-bold truncate">
+              {companyName}
+            </span>
+          )}
+          {isDistinctShell && !isWideLogo && (
+            <span className="hidden sm:block text-sm font-semibold tracking-tight text-foreground truncate max-w-[10rem] md:max-w-[14rem]">
               {companyName}
             </span>
           )}
@@ -236,14 +272,14 @@ export function Navigation() {
                               <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-muted/50 relative overflow-hidden shrink-0 border border-border/50">
                                 <Image
                                   src={getDisplayImageUrl(getFirstImageUrl(item.image), getApiBaseUrl()) || "/placeholder.svg"}
-                                  alt={decodeHtmlEntities(item.item_name) || "Product"}
+                                  alt={toPlainText(item.item_name) || "Product"}
                                   fill
                                   className="object-contain p-1.5 sm:p-2 group-hover:scale-110 transition-transform"
                                 />
                               </div>
                               <div className="flex-1 min-w-0 overflow-hidden">
                                 <p className="text-sm font-bold group-hover:text-primary transition-colors line-clamp-2 break-words">
-                                  {decodeHtmlEntities(item.item_name)}
+                                  {toPlainText(item.item_name)}
                                 </p>
                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
                                   <p className="text-xs font-black text-primary shrink-0">{priceLabel}</p>

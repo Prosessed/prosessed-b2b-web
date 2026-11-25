@@ -11,7 +11,7 @@ import {
 } from "@/lib/api/print"
 import { useAuth } from "@/lib/auth/context"
 import { formatDate, formatPrice } from "@/lib/utils/currency"
-import { decodeHtmlEntities } from "@/lib/utils/html"
+import { toPlainText } from "@/lib/utils/html"
 import { getInvoiceStatusBadge, resolveInvoiceStatus } from "@/lib/utils/invoice-status"
 import { ArrowLeft, Eye, FileText, Loader2, Package, Download, MapPin, Mail, Phone, User } from "lucide-react"
 import Link from "next/link"
@@ -408,7 +408,7 @@ export default function MyInvoiceDetailPage() {
               ) : (
                 <div className="space-y-3">
                   {items.map((item: any, idx: number) => {
-                    const name = decodeHtmlEntities(
+                    const name = toPlainText(
                       item?.item_name ?? item?.name ?? item?.item_code ?? `Item ${idx + 1}`
                     )
                     const qty = item?.qty ?? item?.quantity ?? item?.item_quantity ?? 0

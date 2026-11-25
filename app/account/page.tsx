@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useAllInvoices, useCustomerDetails } from "@/lib/api/hooks"
 import { clearAuthCookie } from "@/lib/auth/actions"
 import { useAuth } from "@/lib/auth/context"
+import { toPlainText } from "@/lib/utils/html"
 import { Building, CreditCard, Edit, LogOut, Mail, MapPin, Package, RotateCcw, User, Phone, Users } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -268,7 +269,7 @@ export default function AccountPage() {
                 <ul className="space-y-2">
                   {topSelling.slice(0, 10).map((item: any) => (
                     <li key={item.item_code} className="flex justify-between text-sm">
-                      <span>{item.item_name}</span>
+                      <span>{toPlainText(item.item_name)}</span>
                       <span className="text-muted-foreground">Qty: {item.total_qty} · {(item.total_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </li>
                   ))}

@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { parseTags } from "@/lib/utils/tags"
+import { toPlainText } from "@/lib/utils/html"
 import { useItems, useMostBoughtItems, useSearch, useTaggedItems } from "@/lib/api/hooks"
 import { getFirstImageUrl } from "@/lib/utils/image-url"
 import { useItemGroupTree } from "@/hooks/useItemGroupTree"
@@ -46,6 +47,31 @@ const getAllCategories = (tree: any[]): string[] => {
   
   return categories
 }
+/** The selected group plus all its descendants (so a parent category still matches its children's items). */
+const getCategoryGroupNames = (tree: any[], target: string): Set<string> | null => {
+  const collectNames = (node: any, names: Set<string>) => {
+    if (node.value) names.add(node.value)
+    for (const child of node.children ?? []) collectNames(child, names)
+  }
+
+  const findNode = (nodes: any[]): Set<string> | null => {
+    for (const node of nodes) {
+      if (node.value === target) {
+        const names = new Set<string>()
+        collectNames(node, names)
+        return names
+      }
+      if (node.children?.length) {
+        const found = findNode(node.children)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  return findNode(tree)
+}
+
 // Helper to flatten all categories from tree
 // const getAllCategories = (tree: any[]): string[] => {
 //   const categories: string[] = []
@@ -346,6 +372,10 @@ export default function ProductsPage() {
   const prevFiltersKeyRef = useRef("")
   
   useEffect(() => {
+    // While the new filter/page is loading, `products` is still the previous result
+    // (keepPreviousData). Applying it would show the old category's items under the new one.
+    if (isLoading) return
+
     const productsChanged = products.length !== prevProductsLengthRef.current
     const pageChanged = currentPage !== prevPageRef.current
     const filtersChanged = prevFiltersKeyRef.current !== currentFiltersKey
@@ -402,7 +432,7 @@ export default function ProductsPage() {
         }
       }
     }
-  }, [products, currentPage, currentFiltersKey, pageSize, pagination?.has_next_page])
+  }, [products, currentPage, currentFiltersKey, pageSize, pagination?.has_next_page, isLoading])
 
   // Always stop the "load more" spinner when the request finishes (even if API returns 0 items or errors)
   useEffect(() => {
@@ -531,6 +561,10 @@ export default function ProductsPage() {
         params.delete("previously_bought")
         params.delete("tagged")
         params.delete("tag")
+        // A search would override the category, and brands from the previous category
+        // are not listed for the new one (hidden filter) — clear both.
+        params.delete("search")
+        params.delete("brands")
       } else {
         params.delete("category")
       }
@@ -669,9 +703,21 @@ export default function ProductsPage() {
   const hasActiveFilters = selectedBrands.length > 0 || !!selectedCategory || !!tagFromUrl || taggedFromUrl
   const showExpandedFilterContent = !isDesktopViewport || !isDesktopFiltersCollapsed
 
+  const selectedCategoryGroups = useMemo(
+    () => (selectedCategory ? getCategoryGroupNames(categoryTree || [], selectedCategory) : null),
+    [categoryTree, selectedCategory]
+  )
+
   // Filter by tag (client-side); name sort client-side
   const sortedProducts = useMemo(() => {
     let list = allProducts
+    // Safety net: when browsing a category, never show items that belong to another group.
+    // Items without an `item_group` value are kept (nothing to compare).
+    if (shouldFetchItems && selectedCategoryGroups) {
+      list = list.filter(
+        (p: any) => typeof p?.item_group !== "string" || !p.item_group || selectedCategoryGroups.has(p.item_group)
+      )
+    }
     if (tagFromUrl) {
       list = list.filter((p: any) => {
         const tags = parseTags(p.tags)
@@ -680,20 +726,20 @@ export default function ProductsPage() {
     }
     if (sortBy === "name-asc") {
       return [...list].sort((a: any, b: any) => {
-        const nameA = (a.item_name ?? a.name ?? "").toString()
-        const nameB = (b.item_name ?? b.name ?? "").toString()
+        const nameA = toPlainText((a.item_name ?? a.name ?? "").toString())
+        const nameB = toPlainText((b.item_name ?? b.name ?? "").toString())
         return nameA.localeCompare(nameB, undefined, { sensitivity: "base" })
       })
     }
     if (sortBy === "name-desc") {
       return [...list].sort((a: any, b: any) => {
-        const nameA = (a.item_name ?? a.name ?? "").toString()
-        const nameB = (b.item_name ?? b.name ?? "").toString()
+        const nameA = toPlainText((a.item_name ?? a.name ?? "").toString())
+        const nameB = toPlainText((b.item_name ?? b.name ?? "").toString())
         return nameB.localeCompare(nameA, undefined, { sensitivity: "base" })
       })
     }
     return list
-  }, [allProducts, sortBy, tagFromUrl])
+  }, [allProducts, sortBy, tagFromUrl, shouldFetchItems, selectedCategoryGroups])
 
   const mobileFilterResultsCount = pagination?.total_records ?? sortedProducts.length
 
