@@ -8,7 +8,9 @@ export { tenants } from "./tenants"
 export {
   normalizeHost,
   getHostFromHeaders,
+  getHostCandidatesFromHeaders,
   getTenantByHost,
+  getTenantFromHeaders,
   getTenantById,
   getDefaultTenant,
 } from "./lookup"

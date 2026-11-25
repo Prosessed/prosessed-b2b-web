@@ -1,8 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import {
   getDefaultTenant,
-  getHostFromHeaders,
-  getTenantByHost,
+  getTenantFromHeaders,
 } from "@/lib/brand/lookup"
 import { TENANT_ID_HEADER } from "@/lib/brand/types"
 
@@ -25,8 +24,8 @@ export const middleware = (request: NextRequest) => {
   }
 
   // Unlisted domains fall back to the default tenant so they behave exactly as before.
-  const host = getHostFromHeaders(request.headers)
-  const tenant = getTenantByHost(host) ?? getDefaultTenant()
+  // Try both x-forwarded-host and host so custom domains still match on App Hosting.
+  const tenant = getTenantFromHeaders(request.headers) ?? getDefaultTenant()
 
   if (!tenant) return NextResponse.next()
 
