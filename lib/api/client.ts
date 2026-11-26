@@ -85,8 +85,11 @@ export const getApiBaseUrl = () => {
 /** Browser origins that are not allowlisted by tenant CORS need a same-origin proxy. */
 const needsApiProxy = (): boolean => {
   if (typeof window === "undefined") return false
-  const host = window.location.hostname
-  if (host === "localhost" || host === "127.0.0.1") return true
+  const host = window.location.hostname.toLowerCase()
+  // plain localhost and tenant previews like devb2b.localhost / store.localhost
+  if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost")) {
+    return true
+  }
   if (
     host.endsWith(".ngrok-free.dev") ||
     host.endsWith(".ngrok-free.app") ||

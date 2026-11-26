@@ -142,6 +142,20 @@ export async function requestOTP(
     message: readFrappeMessage(data, "OTP sent successfully"),
   }
 }
+const isResetSuccess = (data: { message?: unknown }): boolean => {
+  const message = data?.message
+  if (message && typeof message === "object") {
+    const payload = message as { success?: boolean; success_key?: number }
+    if (payload.success === false) return false
+    if (payload.success === true) return true
+    if (payload.success_key === 1) return true
+    if (payload.success_key === 0) return false
+  }
+  // String-only Frappe payloads still mean the method returned without raising
+  if (typeof message === "string" && message.trim().length > 0) return true
+  return false
+}
+
 export async function verifyOtpAndResetPassword(
   email: string,
   otp: string,
@@ -153,6 +167,8 @@ export async function verifyOtpAndResetPassword(
     throw new Error("Company URL is missing or not an allowed Prosessed host")
   }
 
+  // Prefer JSON body so passwords with special characters are not mangled in the query string.
+  // Keep query params as a fallback for older method signatures that only read form_dict from the URL.
   const url =
     `${baseUrl}/api/method/prosessed_orderit.api.verify_otp_and_reset_password` +
     `?email=${encodeURIComponent(email)}` +
@@ -161,14 +177,25 @@ export async function verifyOtpAndResetPassword(
 
   let response: Response
   try {
-    response = await fetchTenant(url, { method: "POST" })
+    response = await fetchTenant(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        otp,
+        new_password: newPassword,
+      }),
+    })
   } catch {
     throw new Error("Could not reach the company server. Please try again.")
   }
 
   const data = await response.json().catch(() => ({}))
 
-  if (!response.ok || data?.message?.success === false) {
+  if (!response.ok || !isResetSuccess(data)) {
     throw new Error(readFrappeMessage(data, "Failed to reset password"))
   }
 
