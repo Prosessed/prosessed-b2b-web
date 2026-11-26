@@ -87,9 +87,10 @@ export default function ForgotPasswordPage() {
     setIsLoading(true)
     try {
       await verifyOtpAndResetPassword(email, otp, newPassword, companyUrl)
-      setSuccessMessage("Password has been reset successfully. Redirecting to login...")
-      clearLoginSession()
-      setTimeout(() => router.push("/login"), 1500)
+      // Keep email + company so the next login hits the same tenant where the password was updated.
+      sessionStorage.setItem("password_reset_success", "1")
+      setSuccessMessage("Password has been reset successfully. Redirecting to sign in...")
+      setTimeout(() => router.push("/login/password"), 1200)
     } catch (err: any) {
       setError(err.message || "Invalid or expired OTP, or failed to reset. Please try again.")
     } finally {

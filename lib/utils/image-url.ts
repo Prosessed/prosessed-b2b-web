@@ -36,19 +36,60 @@ export function resolveLineItemImage(
   return getFirstImageUrl(imageByItemCode[code])
 }
 
+const isLocalDevHost = (): boolean => {
+  if (typeof window === "undefined") return false
+  const host = window.location.hostname.toLowerCase()
+  return host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost")
+}
+
+const toAbsoluteTenantUrl = (
+  imageUrl: string,
+  companyBaseUrl: string | null | undefined
+): string => {
+  const trimmed = imageUrl.trim()
+  if (trimmed.startsWith("/files") || trimmed.startsWith("/private/files")) {
+    if (!companyBaseUrl) return trimmed
+    const base = companyBaseUrl.replace(/\/$/, "")
+    return `${base}${trimmed.startsWith("/") ? trimmed : `/${trimmed}`}`
+  }
+  return trimmed
+}
+
+const toProxiedMediaUrl = (absoluteUrl: string): string => {
+  try {
+    const parsed = new URL(absoluteUrl)
+    if (
+      !parsed.pathname.startsWith("/files") &&
+      !parsed.pathname.startsWith("/private/files")
+    ) {
+      return absoluteUrl
+    }
+    if (
+      parsed.hostname !== "internal.prosessed.com" &&
+      !parsed.hostname.endsWith(".prosessed.com")
+    ) {
+      return absoluteUrl
+    }
+    return `/api/media?src=${encodeURIComponent(parsed.toString())}`
+  } catch {
+    return absoluteUrl
+  }
+}
+
 /**
  * If the image URL from the API starts with "/files", prepend the logged-in
  * company base URL so the image loads from the correct tenant.
+ * On local *.localhost previews, rewrite Prosessed file URLs through /api/media
+ * so the browser does not load them cross-origin (which shows alt text).
  */
 export function getDisplayImageUrl(
   imageUrl: string | null | undefined,
   companyBaseUrl: string | null | undefined
 ): string {
   if (!imageUrl || typeof imageUrl !== "string") return imageUrl ?? ""
-  const trimmed = imageUrl.trim()
-  if (trimmed.startsWith("/files") && companyBaseUrl) {
-    const base = companyBaseUrl.replace(/\/$/, "")
-    return base + (trimmed.startsWith("/") ? trimmed : "/" + trimmed)
+  const absolute = toAbsoluteTenantUrl(imageUrl, companyBaseUrl)
+  if (typeof window !== "undefined" && isLocalDevHost()) {
+    return toProxiedMediaUrl(absolute)
   }
-  return imageUrl
+  return absolute
 }

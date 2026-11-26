@@ -26,6 +26,7 @@ export default function PasswordPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isOtpLoading, setIsOtpLoading] = useState(false)
   const [error, setError] = useState("")
+  const [infoMessage, setInfoMessage] = useState("")
 
   useEffect(() => {
     const storedEmail = sessionStorage.getItem("login_email")
@@ -38,6 +39,11 @@ export default function PasswordPage() {
 
     setEmail(storedEmail)
     setCompany(JSON.parse(storedCompany))
+
+    if (sessionStorage.getItem("password_reset_success") === "1") {
+      sessionStorage.removeItem("password_reset_success")
+      setInfoMessage("Password updated. Sign in with your new password.")
+    }
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,6 +51,7 @@ export default function PasswordPage() {
     if (!company) return
 
     setError("")
+    setInfoMessage("")
     setIsLoading(true)
 
     try {
@@ -57,6 +64,8 @@ export default function PasswordPage() {
       router.push("/")
     } catch (err) {
       if (err instanceof ApiError) {
+        setError(err.message || "Login failed. Please check your password and try again.")
+      } else if (err instanceof Error && err.message) {
         setError(err.message)
       } else {
         setError("Login failed. Please check your password and try again.")
@@ -136,6 +145,12 @@ export default function PasswordPage() {
                 </button>
               </div>
             </div>
+
+            {infoMessage && (
+              <div className="p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg dark:text-green-400 dark:bg-green-950/30 dark:border-green-800">
+                {infoMessage}
+              </div>
+            )}
 
             {error && (
               <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg">
