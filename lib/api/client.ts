@@ -82,8 +82,12 @@ export const getApiBaseUrl = () => {
   return currentBaseUrl || DEFAULT_BASE_URL
 }
 
-/** Browser origins that are not allowlisted by tenant CORS need a same-origin proxy. */
-const needsApiProxy = (): boolean => {
+/**
+ * Use same-origin /api/proxy when the browser cannot call the tenant directly.
+ * Most ERP hosts do not send CORS for portal origins (e.g. devb2b.prosessed.com
+ * → stage.prosessed.com), which surfaces as "Failed to fetch".
+ */
+const needsApiProxy = (targetOrigin: string): boolean => {
   if (typeof window === "undefined") return false
   const host = window.location.hostname.toLowerCase()
   // plain localhost and tenant previews like devb2b.localhost / store.localhost
@@ -99,7 +103,13 @@ const needsApiProxy = (): boolean => {
     return true
   }
   if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(host)) return true
-  return false
+
+  // Cross-origin Prosessed tenant (portal host ≠ company API host)
+  try {
+    return new URL(targetOrigin).origin !== window.location.origin
+  } catch {
+    return true
+  }
 }
 
 const proxyAwareFetch = (absoluteUrl: string, init?: RequestInit): Promise<Response> => {
@@ -114,7 +124,7 @@ const proxyAwareFetch = (absoluteUrl: string, init?: RequestInit): Promise<Respo
     return Promise.reject(new Error("Company URL is not an allowed Prosessed host"))
   }
 
-  if (!needsApiProxy()) {
+  if (!needsApiProxy(parsed.origin)) {
     return fetch(absoluteUrl, init)
   }
 
@@ -124,6 +134,14 @@ const proxyAwareFetch = (absoluteUrl: string, init?: RequestInit): Promise<Respo
   return fetch(`/api/proxy${parsed.pathname}${parsed.search}`, {
     ...init,
     headers,
+  }).catch((err: unknown) => {
+    const detail = err instanceof Error ? err.message : "network error"
+    if (detail === "Failed to fetch" || /fetch/i.test(detail)) {
+      throw new Error(
+        "Could not reach the company server. Check the company URL or try again."
+      )
+    }
+    throw err
   })
 }
 
